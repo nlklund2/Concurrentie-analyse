@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Concurrentiemonitor terStal</title>
+<style>
+  /* Rollen uit het gevalideerde referentiepalet (dataviz); licht + donker. */
+  :root {
+    color-scheme: light;
+    --page:      #f9f9f7;  --surface: #fcfcfb;
+    --ink:       #0b0b0b;  --ink-2:   #52514e;  --muted: #898781;
+    --grid:      #e1e0d9;  --axis:    #c3c2b7;
+    --border:    rgba(11,11,11,.10);
+    --good-text: #006300;  --bad-text: #d03b3b;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+    --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page:      #0d0d0d;  --surface: #1a1a19;
+      --ink:       #ffffff;  --ink-2:   #c3c2b7;  --muted: #898781;
+      --grid:      #2c2c2a;  --axis:    #383835;
+      --border:    rgba(255,255,255,.10);
+      --good-text: #0ca30c;  --bad-text: #e66767;
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+      --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--page); color:var(--ink);
+         font:14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+           padding:14px 20px; border-bottom:1px solid var(--border); }
+  header h1 { font-size:16px; margin:0 auto 0 0; font-weight:650; }
+  main { max-width:1180px; margin:0 auto; padding:20px; display:grid; gap:20px; }
+  .card { background:var(--surface); border:1px solid var(--border);
+          border-radius:10px; padding:16px 18px; }
+  .card h2 { margin:0 0 4px; font-size:14px; font-weight:650; }
+  .sub { color:var(--ink-2); font-size:12.5px; margin:0 0 12px; }
+  .filters { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  .filters label { font-size:12.5px; color:var(--ink-2); display:flex; gap:6px; align-items:center; }
+  select, input[type=email], button {
+    font:inherit; color:var(--ink); background:var(--surface);
+    border:1px solid var(--axis); border-radius:7px; padding:6px 10px; }
+  button { cursor:pointer; } button:hover { border-color:var(--muted); }
+  button.primary { background:var(--s1); border-color:var(--s1); color:#fff; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { display:flex; gap:7px; align-items:center; padding:5px 11px;
+          border:1px solid var(--axis); border-radius:999px; cursor:pointer;
+          font-size:12.5px; color:var(--ink-2); user-select:none; }
+  .chip.on { color:var(--ink); border-color:var(--muted); background:color-mix(in srgb, var(--surface) 88%, var(--ink) 12%); }
+  .chip .dot { width:9px; height:9px; border-radius:50%; background:var(--muted); }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .tile { border:1px solid var(--border); border-radius:9px; padding:10px 12px; }
+  .tile .naam { font-size:12px; color:var(--ink-2); display:flex; gap:6px; align-items:center;}
+  .tile .val { font-size:22px; font-weight:650; margin:2px 0; }
+  .tile .d { font-size:12px; color:var(--ink-2); }
+  .plot { position:relative; height:320px; }
+  .plot-wrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--grid); }
+  th { color:var(--ink-2); font-weight:600; font-size:12px; }
+  td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .hint { color:var(--muted); font-size:13px; padding:26px 0; text-align:center; }
+  .hidden { display:none !important; }
+  .tools { float:right; display:flex; gap:6px; }
+  .tools button { font-size:12px; padding:3px 9px; }
+  #login { max-width:380px; margin:12vh auto; }
+  #login input { width:100%; margin:8px 0; }
+  #melding { font-size:13px; color:var(--ink-2); margin-top:8px; min-height:18px; }
+  .status-ok::before { content:"● "; color:var(--good-text); }
+  .status-fout::before { content:"● "; color:var(--bad-text); }
+  .status-afwijkend::before { content:"● "; color:#c98500; }
+  .pos { color:var(--ink-2); } .neg { color:var(--ink-2); }
+  code { background:color-mix(in srgb, var(--surface) 90%, var(--ink) 10%); padding:1px 5px; border-radius:4px; }
+</style>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div id="login" class="card hidden">
+  <h2>Concurrentiemonitor terStal</h2>
+  <p class="sub">Log in met je werk-e-mailadres; je ontvangt een eenmalige inloglink.
+     Toegang wordt beheerd in Supabase (uitnodigingen).</p>
+  <input type="email" id="email" placeholder="naam@bedrijf.nl" autocomplete="email">
+  <button class="primary" id="loginBtn">Stuur inloglink</button>
+  <div id="melding"></div>
+</div>
+
+<div id="setup" class="card hidden" style="max-width:520px;margin:12vh auto">
+  <h2>Configuratie ontbreekt</h2>
+  <p class="sub">Er is geen <code>config.js</code> gevonden. Op Netlify wordt dit bestand
+  automatisch aangemaakt uit de omgevingsvariabelen <code>SUPABASE_URL</code> en
+  <code>SUPABASE_ANON_KEY</code> (zie README). Voor lokaal gebruik: kopieer
+  <code>config.example.js</code> naar <code>config.js</code> en vul de waarden in.</p>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <h1>Concurrentiemonitor terStal</h1>
+  <label>Week <select id="weekSel"></select></label>
+  <label>Historie <select id="rangeSel">
+    <option value="12">12 weken</option>
+    <option value="26" selected>26 weken</option>
+    <option value="52">52 weken</option>
+  </select></label>
+  <button id="logout">Uitloggen</button>
+</header>
+<main>
+  <div class="card">
+    <div class="filters">
+      <label>Doelgroep <select id="audSel"><option value="">alle</option></select></label>
+      <label>Producttype <select id="typeSel"><option value="">alle</option></select></label>
+      <div class="chips" id="retailerChips"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Actueel assortiment</h2>
+    <p class="sub">Actieve artikelen online in de gekozen week, met verschil t.o.v. de week ervoor en het aandeel afgeprijsd.</p>
+    <div class="tiles" id="tiles"></div>
+  </div>
+
+  <div class="card">
+    <div class="tools"><button data-tbl="omvang">Tabel</button></div>
+    <h2>Assortimentsomvang per week</h2>
+    <p class="sub" id="omvangSub"></p>
+    <div class="plot"><canvas id="omvangChart"></canvas></div>
+    <div id="omvangTbl" class="plot-wrap hidden"></div>
+  </div>
+
+  <div class="card">
+    <div class="tools"><button data-tbl="mediaan">Tabel</button></div>
+    <h2>Mediaanprijs per week</h2>
+    <p class="sub">Mediaan van de gekozen productgroep — kies een doelgroep én producttype; prijzen over gemengde groepen middelen is misleidend.</p>
+    <div class="plot" id="mediaanPlot"><canvas id="mediaanChart"></canvas></div>
+    <div class="hint hidden" id="mediaanHint">Kies eerst een doelgroep én een producttype in de filterbalk.</div>
+    <div id="mediaanTbl" class="plot-wrap hidden"></div>
+  </div>
+
+  <div class="card">
+    <div class="tools"><button data-tbl="punten">Tabel</button></div>
+    <h2>Prijspuntenverdeling</h2>
+    <p class="sub">Aantal artikelen per prijsband in de actuele stand — het prijspuntenspel van het waardesegment. Kies een producttype.</p>
+    <div class="plot" id="puntenPlot"><canvas id="puntenChart"></canvas></div>
+    <div class="hint hidden" id="puntenHint">Kies eerst een producttype in de filterbalk.</div>
+    <div id="puntenTbl" class="plot-wrap hidden"></div>
+  </div>
+
+  <div class="card">
+    <h2>Grootste prijsverlagingen in deze week</h2>
+    <p class="sub">Uit de mutatieregistratie (top 20 op procentuele verlaging, binnen de gekozen bronnen).</p>
+    <div class="plot-wrap" id="movers"></div>
+  </div>
+
+  <div class="card">
+    <h2>Gezondheid van de bronnen</h2>
+    <p class="sub">Bij status 🟠 afwijkend of 🔴 fout is de week voor die bron niet verwerkt — cijfers dan niet gebruiken voor besluiten.</p>
+    <div class="plot-wrap" id="health"></div>
+  </div>
+</main>
+</div>
+
+<script>
+"use strict";
+/* Vaste kleur per bron (slot in het gevalideerde palet). Kleur volgt de bron,
+   nooit de selectie. Max 8 bronnen tegelijk in de grafieken. Houd dit in lijn
+   met color_slot in scraper/retailers.yml. */
+const SLOTS = { terstal:1, zeeman:2, wibra:3, primark:4, action:5, hema:6, "c-and-a":7 };
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const slotColor = rid => SLOTS[rid] ? cssVar(`--s${SLOTS[rid]}`) : cssVar("--muted");
+
+const eur = v => v == null ? "–" : new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).format(v);
+const pctf = v => v == null ? "–" : `${Math.round(v*100)}%`;
+function isoWeekLabel(d) {
+  const dt = new Date(d + "T00:00:00Z");
+  const day = (dt.getUTCDay() + 6) % 7;
+  dt.setUTCDate(dt.getUTCDate() - day + 3);
+  const jan4 = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
+  const wk = 1 + Math.round(((dt - jan4) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+  return `W${String(wk).padStart(2,"0")}`;
+}
+
+let sb = null, charts = {};
+const state = { weeks:[], week:null, range:26, retailers:{}, selected:[],
+                stats:[], totals:[], aud:"", type:"" };
+
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!window.MONITOR_CONFIG || !window.MONITOR_CONFIG.url) {
+    document.getElementById("setup").classList.remove("hidden"); return;
+  }
+  sb = window.supabase.createClient(MONITOR_CONFIG.url, MONITOR_CONFIG.anonKey);
+  document.getElementById("loginBtn").onclick = login;
+  document.getElementById("logout").onclick = () => sb.auth.signOut().then(() => location.reload());
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { showApp(); } else {
+    sb.auth.onAuthStateChange((_e, s) => { if (s) showApp(); });
+    document.getElementById("login").classList.remove("hidden");
+  }
+});
+
+async function login() {
+  const email = document.getElementById("email").value.trim();
+  const msg = document.getElementById("melding");
+  if (!email) { msg.textContent = "Vul een e-mailadres in."; return; }
+  msg.textContent = "Versturen…";
+  const { error } = await sb.auth.signInWithOtp({ email,
+    options: { emailRedirectTo: location.origin + location.pathname } });
+  msg.textContent = error ? `Mislukt: ${error.message}` :
+    "Verstuurd — check je inbox (alleen uitgenodigde accounts kunnen inloggen).";
+}
+
+async function fetchAll(build) {
+  const out = []; const PAGE = 1000;
+  for (let from = 0;; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    out.push(...data);
+    if (data.length < PAGE) return out;
+  }
+}
+
+async function showApp() {
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  try { await loadData(); } catch (e) {
+    document.getElementById("tiles").innerHTML =
+      `<div class="hint">Laden mislukt: ${e.message}</div>`;
+    return;
+  }
+  buildFilters(); render();
+}
+
+async function loadData() {
+  const [{ data: rws }, { data: wks }] = await Promise.all([
+    sb.from("retailers").select("*"),
+    sb.from("v_weeks").select("week").order("week", { ascending:false }).limit(60),
+  ]);
+  (rws || []).forEach(r => state.retailers[r.id] = r);
+  state.weeks = (wks || []).map(w => w.week);
+  if (!state.weeks.length) {
+    document.querySelector("main").innerHTML =
+      `<div class="card"><div class="hint">Nog geen data. Draai eerst de workflow
+       “Wekelijkse scrape” op GitHub; kom daarna hier terug.</div></div>`;
+    return;
+  }
+  state.week = state.weeks[0];
+  const start = state.weeks[Math.min(state.weeks.length, 52) - 1];
+  [state.stats, state.totals] = await Promise.all([
+    fetchAll(() => sb.from("weekly_stats").select("*").gte("week", start)),
+    fetchAll(() => sb.from("v_retailer_week_totals").select("*").gte("week", start)),
+  ]);
+}
+
+function buildFilters() {
+  const weekSel = document.getElementById("weekSel");
+  weekSel.innerHTML = state.weeks.map(w =>
+    `<option value="${w}">${isoWeekLabel(w)} · ${w}</option>`).join("");
+  weekSel.onchange = () => { state.week = weekSel.value; render(); };
+  document.getElementById("rangeSel").onchange = e => { state.range = +e.target.value; render(); };
+
+  const auds = [...new Set(state.stats.map(s => s.audience))].sort();
+  const types = [...new Set(state.stats.map(s => s.product_type))].sort();
+  const audSel = document.getElementById("audSel"), typeSel = document.getElementById("typeSel");
+  audSel.innerHTML += auds.map(a => `<option>${a}</option>`).join("");
+  typeSel.innerHTML += types.map(t => `<option>${t}</option>`).join("");
+  audSel.onchange = () => { state.aud = audSel.value; render(); };
+  typeSel.onchange = () => { state.type = typeSel.value; render(); };
+
+  const withData = new Set(state.totals.map(t => t.retailer_id));
+  const ids = Object.keys(state.retailers).filter(r => withData.has(r))
+    .sort((a, b) => (SLOTS[a] || 99) - (SLOTS[b] || 99));
+  state.selected = ids.filter(r => SLOTS[r]).slice(0, 8);
+  const box = document.getElementById("retailerChips");
+  box.innerHTML = ids.map(rid => `
+    <span class="chip ${state.selected.includes(rid) ? "on" : ""}" data-rid="${rid}">
+      <span class="dot" style="background:${slotColor(rid)}"></span>
+      ${state.retailers[rid]?.name || rid}</span>`).join("");
+  box.querySelectorAll(".chip").forEach(chip => chip.onclick = () => {
+    const rid = chip.dataset.rid;
+    const i = state.selected.indexOf(rid);
+    if (i >= 0) state.selected.splice(i, 1);
+    else if (!SLOTS[rid]) { alert("Deze bron heeft nog geen vaste grafiekkleur (slot 1-8) — wijs er één toe in het dashboard/retailers.yml voordat hij in grafieken kan."); return; }
+    else if (state.selected.length >= 8) { alert("Maximaal 8 bronnen tegelijk in de grafieken."); return; }
+    else state.selected.push(rid);
+    chip.classList.toggle("on");
+    render();
+  });
+
+  document.querySelectorAll("[data-tbl]").forEach(btn => btn.onclick = () => {
+    document.getElementById(btn.dataset.tbl + "Tbl").classList.toggle("hidden");
+  });
+}
+
+const naam = rid => state.retailers[rid]?.name || rid;
+const weeksInRange = () => state.weeks.slice(0, state.range).reverse();
+
+function seriesFromStats(field) {
+  const weeks = weeksInRange();
+  return state.selected.map(rid => ({
+    label: naam(rid), borderColor: slotColor(rid), backgroundColor: slotColor(rid),
+    borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 14,
+    tension: 0.2, spanGaps: true,
+    data: weeks.map(w => {
+      const rows = state.stats.filter(s => s.retailer_id === rid && s.week === w
+        && (!state.aud || s.audience === state.aud)
+        && (!state.type || s.product_type === state.type));
+      if (!rows.length) return null;
+      if (field === "active_count") return rows.reduce((a, r) => a + r.active_count, 0);
+      const vals = rows.map(r => r[field]).filter(v => v != null).map(Number);
+      return vals.length === 1 ? vals[0] : null; // mediaan alleen bij één specifieke groep
+    }),
+  }));
+}
+
+function baseOptions(yFmt) {
+  const ink2 = cssVar("--ink-2"), grid = cssVar("--grid"), muted = cssVar("--muted");
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { position: "bottom", labels: { color: ink2, boxWidth: 10, boxHeight: 10, usePointStyle: true } },
+      tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${yFmt(c.parsed.y)}` } },
+    },
+    scales: {
+      x: { ticks: { color: muted }, grid: { display: false }, border: { color: cssVar("--axis") } },
+      y: { ticks: { color: muted, callback: v => yFmt(v) }, grid: { color: grid }, border: { display: false } },
+    },
+  };
+}
+
+function drawChart(id, type, labels, datasets, yFmt) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id),
+    { type, data: { labels, datasets }, options: baseOptions(yFmt) });
+}
+
+function tableFrom(labels, datasets, fmt) {
+  const head = `<tr><th>Bron</th>${labels.map(l => `<th class="num">${l}</th>`).join("")}</tr>`;
+  const rows = datasets.map(d =>
+    `<tr><td>${d.label}</td>${d.data.map(v =>
+      `<td class="num">${v == null ? "–" : fmt(v)}</td>`).join("")}</tr>`).join("");
+  return `<table>${head}${rows}</table>`;
+}
+
+function render() {
+  renderTiles(); renderOmvang(); renderMediaan(); renderPunten();
+  renderMovers(); renderHealth();
+}
+
+function renderTiles() {
+  const cur = Object.fromEntries(state.totals.filter(t => t.week === state.week)
+    .map(t => [t.retailer_id, t]));
+  const prevWeek = state.weeks[state.weeks.indexOf(state.week) + 1];
+  const prev = Object.fromEntries(state.totals.filter(t => t.week === prevWeek)
+    .map(t => [t.retailer_id, t]));
+  document.getElementById("tiles").innerHTML = state.selected.map(rid => {
+    const c = cur[rid], p = prev[rid];
+    let d = "–";
+    if (c && p && p.active_count) {
+      const dd = (c.active_count - p.active_count) / p.active_count;
+      d = `${dd >= 0 ? "+" : ""}${(dd * 100).toFixed(1)}% t.o.v. vorige week`;
+    }
+    return `<div class="tile">
+      <div class="naam"><span class="dot" style="width:9px;height:9px;border-radius:50%;background:${slotColor(rid)}"></span>${naam(rid)}</div>
+      <div class="val">${c ? c.active_count.toLocaleString("nl-NL") : "–"}</div>
+      <div class="d">${d}</div>
+      <div class="d">sale-druk ${c ? pctf(c.sale_share) : "–"}</div></div>`;
+  }).join("") || `<div class="hint">Selecteer bronnen in de filterbalk.</div>`;
+}
+
+function renderOmvang() {
+  const labels = weeksInRange().map(isoWeekLabel);
+  const ds = seriesFromStats("active_count");
+  const scope = [state.aud || "alle doelgroepen", state.type || "alle producttypen"].join(" · ");
+  document.getElementById("omvangSub").textContent =
+    `Actieve artikelen per week — ${scope}.`;
+  drawChart("omvangChart", "line", labels, ds, v => (+v).toLocaleString("nl-NL"));
+  document.getElementById("omvangTbl").innerHTML =
+    tableFrom(labels, ds, v => (+v).toLocaleString("nl-NL"));
+}
+
+function renderMediaan() {
+  const ok = !!state.type && !!state.aud;
+  document.getElementById("mediaanPlot").classList.toggle("hidden", !ok);
+  document.getElementById("mediaanHint").classList.toggle("hidden", ok);
+  if (!ok) { document.getElementById("mediaanTbl").innerHTML = ""; return; }
+  const labels = weeksInRange().map(isoWeekLabel);
+  const ds = seriesFromStats("price_median");
+  drawChart("mediaanChart", "line", labels, ds, eur);
+  document.getElementById("mediaanTbl").innerHTML = tableFrom(labels, ds, eur);
+}
+
+const BUCKETS = [0, 2, 3, 4, 5, 6, 8, 10, 12.5, 15, 20, 25, 30, 40, 50, 75, 100, Infinity];
+const bucketLabel = i => BUCKETS[i + 1] === Infinity ? `€${BUCKETS[i]}+`
+  : `€${BUCKETS[i]}–${BUCKETS[i + 1]}`;
+
+async function renderPunten() {
+  const ok = !!state.type;
+  document.getElementById("puntenPlot").classList.toggle("hidden", !ok);
+  document.getElementById("puntenHint").classList.toggle("hidden", ok);
+  if (!ok) { document.getElementById("puntenTbl").innerHTML = ""; return; }
+  const counts = {};
+  await Promise.all(state.selected.map(async rid => {
+    let q = () => {
+      let b = sb.from("products").select("current_price")
+        .eq("retailer_id", rid).eq("status", "active").eq("product_type", state.type)
+        .not("current_price", "is", null);
+      if (state.aud) b = b.eq("audience", state.aud);
+      return b;
+    };
+    const rows = await fetchAll(q);
+    const c = new Array(BUCKETS.length - 1).fill(0);
+    rows.forEach(r => {
+      const p = Number(r.current_price);
+      const i = BUCKETS.findIndex((b, j) => p >= b && p < BUCKETS[j + 1]);
+      if (i >= 0) c[i]++;
+    });
+    counts[rid] = c;
+  }));
+  const labels = BUCKETS.slice(0, -1).map((_, i) => bucketLabel(i));
+  const ds = state.selected.map(rid => ({
+    label: naam(rid), backgroundColor: slotColor(rid), borderWidth: 0,
+    borderRadius: 4, borderSkipped: "start", maxBarThickness: 26,
+    data: counts[rid] || [],
+  }));
+  drawChart("puntenChart", "bar", labels, ds, v => (+v).toLocaleString("nl-NL"));
+  document.getElementById("puntenTbl").innerHTML =
+    tableFrom(labels, ds, v => (+v).toLocaleString("nl-NL"));
+}
+
+async function renderMovers() {
+  const box = document.getElementById("movers");
+  box.innerHTML = `<div class="hint">Laden…</div>`;
+  const { data, error } = await sb.from("price_events")
+    .select("retailer_id,product_key,price,prev_price")
+    .eq("week", state.week).eq("event", "price_down").limit(1000);
+  if (error) { box.innerHTML = `<div class="hint">${error.message}</div>`; return; }
+  let evs = (data || []).filter(e => e.prev_price && e.price &&
+    state.selected.includes(e.retailer_id));
+  evs.forEach(e => e.d = (Number(e.price) - Number(e.prev_price)) / Number(e.prev_price));
+  evs.sort((a, b) => a.d - b.d);
+  evs = evs.slice(0, 20);
+  if (!evs.length) { box.innerHTML = `<div class="hint">Geen prijsverlagingen in deze week.</div>`; return; }
+  const titles = {};
+  await Promise.all([...new Set(evs.map(e => e.retailer_id))].map(async rid => {
+    const keys = evs.filter(e => e.retailer_id === rid).map(e => e.product_key);
+    const { data: prods } = await sb.from("products")
+      .select("product_key,title,url,audience,product_type")
+      .eq("retailer_id", rid).in("product_key", keys);
+    (prods || []).forEach(p => titles[rid + "|" + p.product_key] = p);
+  }));
+  box.innerHTML = `<table><tr><th>Bron</th><th>Artikel</th><th>Groep</th>
+    <th class="num">Van</th><th class="num">Naar</th><th class="num">Verschil</th></tr>` +
+    evs.map(e => {
+      const p = titles[e.retailer_id + "|" + e.product_key] || {};
+      const titel = p.url ? `<a href="${p.url}" target="_blank" rel="noreferrer">${p.title || e.product_key}</a>`
+                          : (p.title || e.product_key);
+      return `<tr><td>${naam(e.retailer_id)}</td><td>${titel}</td>
+        <td>${p.audience || ""} / ${p.product_type || ""}</td>
+        <td class="num">${eur(e.prev_price)}</td><td class="num">${eur(e.price)}</td>
+        <td class="num">${(e.d * 100).toFixed(0)}%</td></tr>`;
+    }).join("") + `</table>`;
+}
+
+async function renderHealth() {
+  const box = document.getElementById("health");
+  const { data, error } = await sb.from("scrape_runs").select("*")
+    .eq("week", state.week).order("run_at", { ascending: false }).limit(100);
+  if (error) { box.innerHTML = `<div class="hint">${error.message}</div>`; return; }
+  const seen = new Set(); const rows = [];
+  (data || []).forEach(r => { if (!seen.has(r.retailer_id)) { seen.add(r.retailer_id); rows.push(r); } });
+  if (!rows.length) { box.innerHTML = `<div class="hint">Geen runs voor deze week.</div>`; return; }
+  box.innerHTML = `<table><tr><th>Bron</th><th>Strategie</th>
+    <th class="num">Artikelen</th><th>Status</th><th>Notitie</th></tr>` +
+    rows.map(r => `<tr><td>${naam(r.retailer_id)}</td><td>${r.strategy || "–"}</td>
+      <td class="num">${r.products_found ?? "–"}</td>
+      <td class="status-${r.status}">${r.status}</td>
+      <td>${(r.note || "").slice(0, 140)}</td></tr>`).join("") + `</table>`;
+}
+
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (state.weeks.length) render();
+});
+</script>
+</body>
+</html>

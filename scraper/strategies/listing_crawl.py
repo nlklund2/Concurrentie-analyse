@@ -1,0 +1,107 @@
+"""Categorielijstpagina's crawlen: het werkpaard voor niet-Shopify-shops.
+
+Per categorie worden pagina's 1..n opgehaald; producten komen uit de in de
+pagina ingebedde JSON (JSON-LD / __NEXT_DATA__ / application/json). Dat kost
+1 request per ±24-48 artikelen in plaats van 1 per artikel.
+"""
+from __future__ import annotations
+
+import re
+from urllib.parse import urlsplit
+
+from .. import discover
+from ..config import RetailerCfg
+from ..http import Http
+from ..jsonscan import products_from_html
+from ..models import Product, ScrapeResult
+
+PAGINATION_PATTERNS = ("?page={n}", "?p={n}", "?pagina={n}")
+
+
+def category_urls(cfg: RetailerCfg, http: Http, res: ScrapeResult) -> list[str]:
+    if cfg.seeds:
+        return cfg.seeds[: cfg.max_categories]
+    urls: list[str] = []
+    for sm in discover.find_sitemaps(http, cfg.base):
+        all_urls = discover.sitemap_urls(http, sm, cfg.url_filter)
+        _, cats = discover.split_product_category_urls(all_urls)
+        urls.extend(cats)
+        if len(urls) >= cfg.max_categories:
+            break
+    if not urls:
+        urls = discover.nav_categories(http, cfg.base, cfg.url_filter, cfg.max_categories)
+        if urls:
+            res.notes.append("categorieën uit navigatie (geen categorie-sitemap gevonden)")
+    if cfg.focus_categories and urls:
+        rx = re.compile(cfg.focus_categories, re.I)
+        focused = [u for u in urls if rx.search(u)]
+        if focused:
+            res.notes.append(f"focus: {len(focused)} van {len(urls)} categorieën gecrawld")
+            urls = focused
+        else:
+            res.notes.append("focusfilter matchte geen categorie — alle categorieën "
+                             "gecrawld; producten worden na de mapping gefilterd")
+    return urls[: cfg.max_categories]
+
+
+def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
+    res = ScrapeResult(retailer_id=cfg.id, strategy="listing")
+    cats = category_urls(cfg, http, res)
+    res.categories_found = len(cats)
+    if not cats:
+        res.error = "geen categorie-URLs gevonden (sitemap noch navigatie)"
+        return res
+
+    seen: dict[str, Product] = {}
+    for cat_url in cats:
+        cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
+        first = http.get(cat_url)
+        if first is None:
+            continue
+        page_products = products_from_html(first.text, cat_url)
+        _absorb(seen, page_products, cat_path)
+        if not page_products:
+            continue
+
+        # paginering: probeer patronen tot er één nieuwe producten oplevert
+        pattern = None
+        for pat in PAGINATION_PATTERNS:
+            candidate = cat_url + pat.format(n=2)
+            resp = http.get(candidate)
+            if resp is None:
+                continue
+            prods2 = products_from_html(resp.text, candidate)
+            if prods2 and {p.key for p in prods2} - set(seen):
+                pattern = pat
+                _absorb(seen, prods2, cat_path)
+                break
+        if pattern:
+            for n in range(3, cfg.max_pages_per_category + 1):
+                resp = http.get(cat_url + pattern.format(n=n))
+                if resp is None:
+                    break
+                prods_n = products_from_html(resp.text, cat_url)
+                new_keys = {p.key for p in prods_n} - set(seen)
+                _absorb(seen, prods_n, cat_path)
+                if not new_keys:
+                    break
+                if limit and len(seen) >= limit:
+                    break
+        if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
+            break
+
+    res.products = list(seen.values())[: limit or cfg.max_products]
+    return res
+
+
+def _absorb(seen: dict[str, Product], products: list[Product], cat_path: str) -> None:
+    for p in products:
+        if not p.category_raw:
+            p.category_raw = cat_path
+        cur = seen.get(p.key)
+        if cur is None:
+            seen[p.key] = p
+        elif cur.price is None and p.price is not None:
+            seen[p.key] = p
+        elif p.category_raw and not cur.category_raw:
+            cur.category_raw = p.category_raw

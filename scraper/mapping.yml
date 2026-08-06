@@ -1,0 +1,30 @@
+# =====================================================================
+# Uniforme taxonomie: regexregels van bron-categorie naar onze indeling.
+# Volgorde is betekenisvol — de eerste match wint. Onderhoud: maandelijks
+# 15 min de "onbekend/overig"-bak in het dashboard nalopen (PLAN.md §6.7).
+# =====================================================================
+
+audience:
+  - {label: baby,     match: "\\bbaby|newborn|romper"}
+  - {label: meisjes,  match: "meisje|meiden|\\bgirls?\\b"}
+  - {label: jongens,  match: "jongen|\\bboys?\\b"}
+  - {label: kinderen, match: "\\bkind(?:er)?|\\bkids\\b|junior"}
+  - {label: dames,    match: "dames|\\bdame\\b|women|ladies|femme"}
+  - {label: heren,    match: "heren|\\bheer\\b|\\bmen\\b|\\bmannen\\b|homme"}
+  - {label: huis,     match: "huishoud|badtextiel|bedtextiel|beddengoed|keuken|wonen|\\bhome\\b|handdoek|dekbed|hoeslaken|badkamer|interieur"}
+
+product_type:
+  # specifiek vóór generiek: 'boxershort' moet ondergoed raken, niet broeken
+  - {label: "sokken & panty's", match: "\\bsok(?:ken)?\\b|panty|maillot|kousen|kniekous"}
+  - {label: ondergoed,          match: "ondergoed|boxer|\\bslips?\\b|\\bbh\\b|beha|hipster|lingerie|singlet|\\bhemd(?:je)?\\b|ondershirt|shapewear|string"}
+  - {label: nachtmode,          match: "pyjama|nachtmode|nachthemd|onesie|badjas|homewear|loungewear"}
+  - {label: badmode,            match: "badmode|badpak|bikini|zwembroek|zwemshort|\\bzwem|\\bswim"}
+  - {label: schoenen,           match: "schoen|sneaker|slipper|\\blaars|laarzen|pantoffel|sandaal|\\bboots?\\b|espadrille|gympen"}
+  - {label: huistextiel,        match: "handdoek|dekbed|kussen|hoeslaken|\\blaken\\b|plaid|\\bdeken\\b|theedoek|washand|badmat|beddengoed"}
+  - {label: "jurken & rokken",  match: "jurk|\\brok(?:je|ken)?\\b|dress|skirt|tuniek"}
+  - {label: "truien & vesten",  match: "trui|sweater|sweatshirt|\\bvest\\b|hoodie|cardigan|pullover|spencer"}
+  - {label: jassen,             match: "\\bjas(?:sen|je)?\\b|jacket|\\bcoat\\b|bodywarmer|parka|blazer|colbert"}
+  - {label: "broeken & jeans",  match: "broek|jeans|chino|legging|jogging|\\bshorts?\\b|bermuda|tregging"}
+  - {label: "shirts & tops",    match: "t-?shirt|\\bshirt\\b|\\btops?\\b|\\bpolo\\b|blouse|overhemd|longsleeve|hemdje"}
+  - {label: sport,              match: "\\bsport|fitness|voetbal|yoga"}
+  - {label: accessoires,        match: "\\briem(?:en)?\\b|sjaal|\\bmuts\\b|\\bpet(?:ten)?\\b|\\btas(?:sen)?\\b|handschoen|portemonnee|sieraad|zonnebril|paraplu|haarband"}
