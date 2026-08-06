@@ -11,6 +11,8 @@ class Product:
     url: str = ""
     brand: str = ""
     category_raw: str = ""
+    color: str = ""
+    sizes: str = ""      # aangeboden maten (kommagescheiden), géén voorraadinfo
     price: float | None = None
     was_price: float | None = None
 

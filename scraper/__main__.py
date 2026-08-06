@@ -15,6 +15,7 @@ from pathlib import Path
 
 from . import strategies
 from .config import OUT_DIR, load_retailers, week_monday
+from .enrich import enrich_products
 from .normalize import apply_focus, to_staging_rows
 
 
@@ -31,6 +32,21 @@ def cmd_scrape(args) -> int:
     for cfg in cfgs:
         print(f"→ {cfg.name} ({cfg.strategy}) …", flush=True)
         res = strategies.run(cfg, limit=args.limit)
+
+        # verrijken (kleur/maten) — alleen artikelen binnen de focus, nieuwe eerst
+        if cfg.enrich and not args.limit and res.products:
+            focus_keys = None
+            if cfg.focus_product_types:
+                focus_keys = {r["product_key"] for r in apply_focus(
+                    to_staging_rows(cfg.id, res.products), cfg.focus_product_types)}
+            known = None
+            if db is not None:
+                try:
+                    known = db.product_keys(cfg.id)
+                except Exception:
+                    known = None
+            enrich_products(cfg, res, known_keys=known, only_keys=focus_keys)
+
         all_rows = to_staging_rows(cfg.id, res.products)
         _dump_raw(week, cfg.id, all_rows)  # ruwe dump vóór het focusfilter
         rows = apply_focus(all_rows, cfg.focus_product_types)

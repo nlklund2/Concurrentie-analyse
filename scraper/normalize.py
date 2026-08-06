@@ -105,13 +105,25 @@ def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
             "category_raw": (p.category_raw or "")[:500],
             "audience": audience,
             "product_type": ptype,
+            "color": (p.color or "")[:200],
+            "sizes": (p.sizes or "")[:200],
             "price": p.price,
             "was_price": p.was_price if (p.was_price and p.price and p.was_price > p.price) else None,
         }
-        # bij dubbele sleutels: houd de rij mét prijs
+        # bij dubbele sleutels: rij mét prijs wint, daarna rij mét maten;
+        # ontbrekende velden worden aangevuld vanuit de andere waarneming
         old = seen.get(row["product_key"])
-        if old is None or (old["price"] is None and row["price"] is not None):
+        if old is None:
             seen[row["product_key"]] = row
+            continue
+        best, rest = old, row
+        if (old["price"] is None and row["price"] is not None) or \
+           (old["price"] is not None) == (row["price"] is not None) and not old["sizes"] and row["sizes"]:
+            best, rest = row, old
+        for field in ("color", "sizes", "brand", "category_raw", "url", "was_price"):
+            if not best.get(field):
+                best[field] = rest.get(field) or best.get(field)
+        seen[row["product_key"]] = best
     return list(seen.values())
 
 

@@ -16,13 +16,15 @@ def probe_one(cfg: RetailerCfg, limit: int = 40) -> dict:
     res = strategies.run(cfg, limit=limit)
     all_rows = to_staging_rows(cfg.id, res.products)
     rows = apply_focus(all_rows, cfg.focus_product_types)
-    priced = sum(1 for r in all_rows if r["price"] is not None)
+    n = len(all_rows) or 1
     return {
         "cfg": cfg,
         "result": res,
         "all_rows": all_rows,
         "rows": rows,
-        "price_coverage": round(priced / len(all_rows), 2) if all_rows else 0.0,
+        "price_coverage": round(sum(1 for r in all_rows if r["price"] is not None) / n, 2),
+        "color_coverage": round(sum(1 for r in all_rows if r["color"]) / n, 2),
+        "sizes_coverage": round(sum(1 for r in all_rows if r["sizes"]) / n, 2),
         "mapping": mapping_coverage(all_rows),
     }
 
@@ -48,14 +50,16 @@ def advies(p: dict) -> str:
 def probe_report(probes: list[dict], limit: int) -> str:
     md = ["# Validatierapport bronnen", "",
           f"*Proefscrape met maximaal {limit} artikelen per bron — een steekproef, "
-          "geen volledige telling.*", "",
-          "| Bron | Strategie | Categorieën | Artikelen | Binnen focus | Prijs­dekking | Mapping | Requests | Status |",
-          "|---|---|---:|---:|---:|---:|---:|---:|---|"]
+          "geen volledige telling. Kleur-/matendekking is gemeten op lijstniveau, "
+          "dus vóór de verrijking via productpagina's die in de weekrun draait.*", "",
+          "| Bron | Strategie | Categorieën | Artikelen | Binnen focus | Prijs­dekking | Kleur | Maten | Mapping | Requests | Status |",
+          "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
     for p in probes:
         cfg, res = p["cfg"], p["result"]
         status = f"🔴 {res.error[:90]}" if res.error else "🟢 ok"
         md.append(f"| {cfg.name} | {res.strategy or '–'} | {res.categories_found or '–'} "
                   f"| {len(p['all_rows'])} | {len(p['rows'])} | {p['price_coverage']:.0%} "
+                  f"| {p['color_coverage']:.0%} | {p['sizes_coverage']:.0%} "
                   f"| {p['mapping']:.0%} | {res.requests_done} | {status} |")
     md.append("")
     for p in probes:
@@ -70,12 +74,13 @@ def probe_report(probes: list[dict], limit: int) -> str:
                       + ", ".join(f"{k} {v}" for k, v in aud.most_common(6)))
             md.append("- Voorbeelden:")
             md.append("")
-            md.append("  | Artikel | Prijs | Was | Groep |")
-            md.append("  |---|---:|---:|---|")
+            md.append("  | Artikel | Prijs | Was | Kleur | Maten | Groep |")
+            md.append("  |---|---:|---:|---|---|---|")
             for r in p["rows"][:5]:
                 prijs = f"€{r['price']:.2f}" if r["price"] is not None else "–"
                 was = f"€{r['was_price']:.2f}" if r["was_price"] is not None else ""
-                md.append(f"  | {r['title'][:60]} | {prijs} | {was} "
+                md.append(f"  | {r['title'][:50]} | {prijs} | {was} "
+                          f"| {r['color'][:20]} | {r['sizes'][:25]} "
                           f"| {r['audience']} / {r['product_type']} |")
         md.append("")
     return "\n".join(md)

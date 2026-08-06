@@ -29,8 +29,11 @@ GitHub Actions (cron, ma ±06:30 NL)      Supabase (Postgres)
                                          Netlify: dashboard/index.html
 ```
 
-- Alleen **mutaties** worden opgeslagen (nieuw/prijswijziging/promo/verdwenen) plus
-  weekaggregaten — de database blijft jaren klein.
+- Opslag: **mutaties** (nieuw/prijswijziging/promo/verdwenen) + weekaggregaten voor de
+  trends, én per artikel per week een **artikelfoto** (artnr, naam, categorieën, kleur,
+  maten, van-/voor-prijs, URL) — exporteerbaar als CSV via de view `v_artikelen_week`
+  in Supabase. Ontbrekende kleur/maten worden via de productpagina aangevuld
+  (gecapt, `enrich_limit`).
 - Een **kwaliteitspoort** voorkomt vervuiling: levert een bron minder dan 50% van de
   vorige week, dan wordt die week niet verwerkt en kleurt de bron oranje in het rapport.
 - Bronnen en strategieën staan in [`scraper/retailers.yml`](scraper/retailers.yml);
@@ -43,7 +46,12 @@ GitHub Actions (cron, ma ±06:30 NL)      Supabase (Postgres)
    bestaat (regio eu-central-1, gratis tier), met het schema uit
    [`sql/schema.sql`](sql/schema.sql) toegepast én drie weken demo-data geladen
    (zie kopje *Demo-data* hieronder).
-2. ~~Schema uitvoeren~~ ✅ Al gebeurd (als migratie `init_schema`).
+2. ~~Schema uitvoeren~~ ✅ Al gebeurd (als migratie `init_schema`). **Let op — nog één
+   keer plakken (2 min):** de artikelfoto-uitbreiding (tabel `weekly_articles` + view
+   `v_artikelen_week` + kolommen kleur/maten) is daarna toegevoegd. Voer in de
+   **SQL-editor** achtereenvolgens uit: [`sql/migratie_artikelsnapshots.sql`](sql/migratie_artikelsnapshots.sql),
+   daarna [`sql/schema.sql`](sql/schema.sql) (idempotent) en tenslotte
+   [`sql/demo_seed.sql`](sql/demo_seed.sql) — dan staat ook de artikel-demo live.
 3. Noteer uit **Project Settings → API**: de *Project URL*, de *anon public* key en de
    *service_role* key (geheim!).
 4. **Authentication → Providers → Email**: laat *Email* aan; zet na het uitnodigen van
@@ -78,9 +86,11 @@ GitHub Actions (cron, ma ±06:30 NL)      Supabase (Postgres)
 Het Supabase-project bevat **drie weken fictieve dummydata** (weken 30–32 van 2026) om
 de werking te zien voordat de eerste echte scrape draait. Kijken: **Table Editor →
 `weekly_stats`** (omvang- en prijstrends per groep), `price_events` (mutaties, o.a. de
-Zeeman-prijsverlagingen), `products` (actuele artikelstand) en `scrape_runs`
-(gezondheid, met een 'afwijkend'-voorbeeld bij Action). Het bijbehorende maandagrapport
-staat in [`reports/voorbeeld-weekrapport.md`](reports/voorbeeld-weekrapport.md).
+Zeeman-prijsverlagingen), `products` (actuele artikelstand), `weekly_articles` /
+view **`v_artikelen_week`** (de artikelfoto: artnr t/m URL per artikel per week, na de
+migratiestap hierboven) en `scrape_runs` (gezondheid, met een 'afwijkend'-voorbeeld
+bij Action). Het bijbehorende maandagrapport staat in
+[`reports/voorbeeld-weekrapport.md`](reports/voorbeeld-weekrapport.md).
 
 - Demo opnieuw laden: [`sql/demo_seed.sql`](sql/demo_seed.sql) in de SQL-editor (herdraaibaar).
 - **Vóór de echte eerste meting:** [`sql/demo_wissen.sql`](sql/demo_wissen.sql) uitvoeren,
@@ -114,6 +124,8 @@ optioneel `RESEND_API_KEY`, `REPORT_EMAIL_TO`, `REPORT_EMAIL_FROM`.
 | Bron toevoegen | Blok in `scraper/retailers.yml` + "Validatie bronnen" draaien |
 | Bron uit de grafiekset | `enabled: false`; historie blijft bewaard |
 | Focus verbreden (bv. badmode of alles) | `focus_categories` / `focus_product_types` in de defaults van `retailers.yml` (leeg = volledig assortiment) |
+| Artikellijst exporteren (artnr t/m URL) | Supabase → Table Editor of SQL-editor → view `v_artikelen_week` → Export CSV |
+| Verrijking kleur/maten afstellen | `enrich` / `enrich_limit` in `retailers.yml` (per bron of in de defaults) |
 | Mapping verbeteren | Regels in `scraper/mapping.yml` (volgorde telt); test in `tests/` |
 | Grafiekkleur | `color_slot` (1–8) in `retailers.yml` én de `SLOTS`-map in `dashboard/index.html` — kleur volgt de bron, hergebruik een slot nooit voor een andere bron |
 | Signaaldrempels rapport | Constantes bovenin `scraper/report.py` |

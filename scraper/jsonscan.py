@@ -38,6 +38,36 @@ URL_KEYS = ("url", "productUrl", "link", "href", "slug", "seoUrl", "pdpUrl", "pa
 BRAND_KEYS = ("brand", "brandName", "vendor", "manufacturer")
 CATEGORY_KEYS = ("category", "categoryPath", "breadcrumb", "categories", "productType",
                  "primaryCategory", "categoryName")
+COLOR_KEYS = ("color", "colour", "kleur", "colorName", "colourName", "baseColor",
+              "colorDescription", "variantColor", "colorFamily", "mainColor")
+SIZE_KEYS = ("sizes", "maten", "availableSizes", "sizeVariants", "sizeList",
+             "availableSizeNames", "size")
+
+
+def _text_from(value) -> str:
+    """Kleur/maat-velden zijn strings, getallen, lijsten of {name/value}-dicts."""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    if isinstance(value, list):
+        parts = [_text_from(v) for v in value]
+        return ", ".join(p for p in parts if p)
+    if isinstance(value, dict):
+        for k in ("name", "value", "label", "text"):
+            v = value.get(k)
+            if isinstance(v, (str, int, float)):
+                return str(v).strip()
+    return ""
+
+
+def _attr_from(d: dict, keys) -> str:
+    for k in keys:
+        if k in d and d[k] is not None:
+            text = _text_from(d[k])
+            if text:
+                return text
+    return ""
 
 
 def url_key(url: str) -> str:
@@ -110,10 +140,17 @@ def products_from_jsonld(objs: list, base_url: str = "") -> list[Product]:
             cat = node.get("category") or ""
             if isinstance(cat, dict):
                 cat = cat.get("name", "")
+            color = _text_from(node.get("color"))
+            sizes = _text_from(node.get("size"))
+            offers = node.get("offers")
+            if not sizes and isinstance(offers, list):
+                offer_sizes = [_text_from(o.get("size")) for o in offers if isinstance(o, dict)]
+                sizes = ", ".join(dict.fromkeys(s for s in offer_sizes if s))
             name = str(node.get("name") or "").strip()
             if name and key:
                 found.append(Product(key=str(key), title=name, url=url,
                                      brand=str(brand or ""), category_raw=str(cat),
+                                     color=color, sizes=sizes,
                                      price=price, was_price=was))
         for v in node.values():
             if isinstance(v, (dict, list)):
@@ -198,6 +235,8 @@ def deep_find_products(obj, base_url: str = "", _depth: int = 0) -> list[Product
         if key and price is not None:
             found.append(Product(key=key, title=str(name).strip(), url=url,
                                  brand=str(brand or ""), category_raw=cat,
+                                 color=_attr_from(obj, COLOR_KEYS),
+                                 sizes=_attr_from(obj, SIZE_KEYS),
                                  price=price, was_price=was))
             return found  # niet verder afdalen in een gevonden product
 
@@ -221,6 +260,15 @@ def products_from_html(html: str, base_url: str = "") -> list[Product]:
     unique: dict[str, Product] = {}
     for p in products:
         cur = unique.get(p.key)
-        if cur is None or (cur.price is None and p.price is not None):
+        if cur is None:
             unique[p.key] = p
+            continue
+        if cur.price is None and p.price is not None:
+            unique[p.key], cur, p = p, p, cur
+        # ontbrekende velden aanvullen vanuit de andere waarneming
+        for field in ("color", "sizes", "brand", "category_raw", "url"):
+            if not getattr(cur, field) and getattr(p, field):
+                setattr(cur, field, getattr(p, field))
+        if cur.was_price is None and p.was_price is not None:
+            cur.was_price = p.was_price
     return list(unique.values())

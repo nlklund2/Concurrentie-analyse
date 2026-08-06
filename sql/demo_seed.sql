@@ -10,6 +10,7 @@ begin;
 
 delete from price_events where week in ('2026-07-20','2026-07-27','2026-08-03');
 delete from weekly_stats where week in ('2026-07-20','2026-07-27','2026-08-03');
+delete from weekly_articles where week in ('2026-07-20','2026-07-27','2026-08-03');
 delete from scrape_runs  where week in ('2026-07-20','2026-07-27','2026-08-03');
 delete from products where product_key in (
   '8712001','8712002','8712003','8712050','W-55831','W-55832','W-55833',
@@ -26,23 +27,58 @@ insert into retailers (id, name, website, segment, enabled) values
   ('c-and-a', 'C&A', 'https://www.c-and-a.com/nl/nl/shop', 'kern', true)
 on conflict (id) do update set name = excluded.name, website = excluded.website, segment = excluded.segment;
 
-insert into products (retailer_id, product_key, title, brand, category_raw, audience, product_type, first_seen, last_seen, status, current_price, current_was_price) values
-  ('zeeman', '8712001', 'Jongens boxers 3-pack katoen uni', '', 'jongens/ondergoed/boxers', 'jongens', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 2.99, null),
-  ('zeeman', '8712002', 'Jongens boxers 3-pack dino print', '', 'jongens/ondergoed/boxers', 'jongens', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 2.99, null),
-  ('zeeman', '8712003', 'Jongens hipsters 2-pack', '', 'jongens/ondergoed', 'jongens', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 3.49, null),
-  ('zeeman', '8712050', 'Meisjes hemdjes 2-pack', '', 'meisjes/ondergoed/hemden', 'meisjes', 'ondergoed', '2026-08-03', '2026-08-03', 'active', 3.99, null),
-  ('wibra', 'W-55831', 'Dames pyjama flanel ruit', '', 'dames/nachtmode/pyjamas', 'dames', 'nachtmode', '2026-08-03', '2026-08-03', 'active', 9.99, null),
-  ('wibra', 'W-55832', 'Dames nachthemd jersey', '', 'dames/nachtmode', 'dames', 'nachtmode', '2026-08-03', '2026-08-03', 'active', 7.99, null),
-  ('wibra', 'W-55833', 'Dames shortama katoen', '', 'dames/nachtmode', 'dames', 'nachtmode', '2026-08-03', '2026-08-03', 'active', 8.99, null),
-  ('hema', '1000245', 'Dames hipster micro 3-pack', 'HEMA', 'dames/ondergoed/slips', 'dames', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 7.0, 10.0),
-  ('hema', '1000246', 'Dames bh spacer naadloos', 'HEMA', 'dames/ondergoed/bhs', 'dames', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 17.5, 25.0),
-  ('c-and-a', '2201778', 'Meisjes pyjama unicorn', '', 'meisjes/nachtmode/pyjamas', 'meisjes', 'nachtmode', '2026-07-20', '2026-07-27', 'gone', 12.99, null),
-  ('c-and-a', '2201779', 'Meisjes nachthemd sterren', '', 'meisjes/nachtmode', 'meisjes', 'nachtmode', '2026-07-20', '2026-07-27', 'gone', 9.99, null),
-  ('terstal', 'T-4401', 'Heren boxers 2-pack uni', '', 'heren/ondergoed/boxers', 'heren', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 6.99, null),
-  ('terstal', 'T-3110', 'Jongens boxers 3-pack sport', '', 'jongens/ondergoed/boxers', 'jongens', 'ondergoed', '2026-08-03', '2026-08-03', 'active', 4.99, null),
-  ('action', 'A-7701', 'Herensokken 10-pack zwart', '', 'heren/sokken', 'heren', 'sokken & panty''s', '2026-07-20', '2026-07-27', 'active', 3.29, null),
-  ('primark', 'P-99012', 'Dames slips 5-pack microfiber', '', 'dames/ondergoed/slips', 'dames', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 4.0, null),
-  ('primark', 'P-99013', 'Dames bralette rib', '', 'dames/ondergoed/bhs', 'dames', 'ondergoed', '2026-08-03', '2026-08-03', 'active', 6.0, null);
+insert into products (retailer_id, product_key, title, brand, category_raw, audience, product_type, first_seen, last_seen, status, current_price, current_was_price, color, sizes, url) values
+  ('zeeman', '8712001', 'Jongens boxers 3-pack katoen uni', '', 'jongens/ondergoed/boxers', 'jongens', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 2.99, null, 'donkerblauw', '92, 104, 116, 128, 140', 'https://www.zeeman.com/nl/p/8712001'),
+  ('zeeman', '8712002', 'Jongens boxers 3-pack dino print', '', 'jongens/ondergoed/boxers', 'jongens', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 2.99, null, 'multicolor', '92, 104, 116, 128, 140', 'https://www.zeeman.com/nl/p/8712002'),
+  ('zeeman', '8712003', 'Jongens hipsters 2-pack', '', 'jongens/ondergoed', 'jongens', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 3.49, null, 'grijs melange', '92, 104, 116, 128', 'https://www.zeeman.com/nl/p/8712003'),
+  ('zeeman', '8712050', 'Meisjes hemdjes 2-pack', '', 'meisjes/ondergoed/hemden', 'meisjes', 'ondergoed', '2026-08-03', '2026-08-03', 'active', 3.99, null, 'wit', '110/116, 122/128, 134/140', 'https://www.zeeman.com/nl/p/8712050'),
+  ('wibra', 'W-55831', 'Dames pyjama flanel ruit', '', 'dames/nachtmode/pyjamas', 'dames', 'nachtmode', '2026-08-03', '2026-08-03', 'active', 9.99, null, 'bordeaux geruit', 'S, M, L, XL', 'https://www.wibra.nl/p/w-55831'),
+  ('wibra', 'W-55832', 'Dames nachthemd jersey', '', 'dames/nachtmode', 'dames', 'nachtmode', '2026-08-03', '2026-08-03', 'active', 7.99, null, 'lichtblauw', 'S, M, L, XL, XXL', 'https://www.wibra.nl/p/w-55832'),
+  ('wibra', 'W-55833', 'Dames shortama katoen', '', 'dames/nachtmode', 'dames', 'nachtmode', '2026-08-03', '2026-08-03', 'active', 8.99, null, 'roze', 'S, M, L, XL', 'https://www.wibra.nl/p/w-55833'),
+  ('hema', '1000245', 'Dames hipster micro 3-pack', 'HEMA', 'dames/ondergoed/slips', 'dames', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 7.0, 10.0, 'zwart', 'XS, S, M, L, XL', 'https://www.hema.nl/p/1000245'),
+  ('hema', '1000246', 'Dames bh spacer naadloos', 'HEMA', 'dames/ondergoed/bhs', 'dames', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 17.5, 25.0, 'huidskleur', '75B, 75C, 80B, 80C, 85B', 'https://www.hema.nl/p/1000246'),
+  ('c-and-a', '2201778', 'Meisjes pyjama unicorn', '', 'meisjes/nachtmode/pyjamas', 'meisjes', 'nachtmode', '2026-07-20', '2026-07-27', 'gone', 12.99, null, 'paars', '104, 116, 128, 140', 'https://www.c-and-a.com/nl/nl/shop/p/2201778'),
+  ('c-and-a', '2201779', 'Meisjes nachthemd sterren', '', 'meisjes/nachtmode', 'meisjes', 'nachtmode', '2026-07-20', '2026-07-27', 'gone', 9.99, null, 'navy', '104, 116, 128', 'https://www.c-and-a.com/nl/nl/shop/p/2201779'),
+  ('terstal', 'T-4401', 'Heren boxers 2-pack uni', '', 'heren/ondergoed/boxers', 'heren', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 6.99, null, 'zwart', 'M, L, XL, XXL', 'https://www.terstal.nl/p/t-4401'),
+  ('terstal', 'T-3110', 'Jongens boxers 3-pack sport', '', 'jongens/ondergoed/boxers', 'jongens', 'ondergoed', '2026-08-03', '2026-08-03', 'active', 4.99, null, 'blauw/groen', '98/104, 110/116, 122/128', 'https://www.terstal.nl/p/t-3110'),
+  ('action', 'A-7701', 'Herensokken 10-pack zwart', '', 'heren/sokken', 'heren', 'sokken & panty''s', '2026-07-20', '2026-07-27', 'active', 3.29, null, 'zwart', '39-42, 43-46', 'https://www.action.com/nl-nl/p/a-7701'),
+  ('primark', 'P-99012', 'Dames slips 5-pack microfiber', '', 'dames/ondergoed/slips', 'dames', 'ondergoed', '2026-07-20', '2026-08-03', 'active', 4.0, null, 'assorti', 'XS, S, M, L, XL', 'https://www.primark.com/nl-nl/p/p-99012'),
+  ('primark', 'P-99013', 'Dames bralette rib', '', 'dames/ondergoed/bhs', 'dames', 'ondergoed', '2026-08-03', '2026-08-03', 'active', 6.0, null, 'ecru', 'S, M, L', 'https://www.primark.com/nl-nl/p/p-99013');
+
+insert into weekly_articles (retailer_id, week, product_key, title, audience, product_type, category_raw, color, sizes, price, was_price, url) values
+  ('zeeman', '2026-07-20', '8712001', 'Jongens boxers 3-pack katoen uni', 'jongens', 'ondergoed', 'jongens/ondergoed/boxers', 'donkerblauw', '92, 104, 116, 128, 140', 3.99, null, 'https://www.zeeman.com/nl/p/8712001'),
+  ('zeeman', '2026-07-27', '8712001', 'Jongens boxers 3-pack katoen uni', 'jongens', 'ondergoed', 'jongens/ondergoed/boxers', 'donkerblauw', '92, 104, 116, 128, 140', 3.99, null, 'https://www.zeeman.com/nl/p/8712001'),
+  ('zeeman', '2026-08-03', '8712001', 'Jongens boxers 3-pack katoen uni', 'jongens', 'ondergoed', 'jongens/ondergoed/boxers', 'donkerblauw', '92, 104, 116, 128, 140', 2.99, null, 'https://www.zeeman.com/nl/p/8712001'),
+  ('zeeman', '2026-07-20', '8712002', 'Jongens boxers 3-pack dino print', 'jongens', 'ondergoed', 'jongens/ondergoed/boxers', 'multicolor', '92, 104, 116, 128, 140', 3.99, null, 'https://www.zeeman.com/nl/p/8712002'),
+  ('zeeman', '2026-07-27', '8712002', 'Jongens boxers 3-pack dino print', 'jongens', 'ondergoed', 'jongens/ondergoed/boxers', 'multicolor', '92, 104, 116, 128, 140', 3.99, null, 'https://www.zeeman.com/nl/p/8712002'),
+  ('zeeman', '2026-08-03', '8712002', 'Jongens boxers 3-pack dino print', 'jongens', 'ondergoed', 'jongens/ondergoed/boxers', 'multicolor', '92, 104, 116, 128, 140', 2.99, null, 'https://www.zeeman.com/nl/p/8712002'),
+  ('zeeman', '2026-07-20', '8712003', 'Jongens hipsters 2-pack', 'jongens', 'ondergoed', 'jongens/ondergoed', 'grijs melange', '92, 104, 116, 128', 3.99, null, 'https://www.zeeman.com/nl/p/8712003'),
+  ('zeeman', '2026-07-27', '8712003', 'Jongens hipsters 2-pack', 'jongens', 'ondergoed', 'jongens/ondergoed', 'grijs melange', '92, 104, 116, 128', 3.99, null, 'https://www.zeeman.com/nl/p/8712003'),
+  ('zeeman', '2026-08-03', '8712003', 'Jongens hipsters 2-pack', 'jongens', 'ondergoed', 'jongens/ondergoed', 'grijs melange', '92, 104, 116, 128', 3.49, null, 'https://www.zeeman.com/nl/p/8712003'),
+  ('zeeman', '2026-08-03', '8712050', 'Meisjes hemdjes 2-pack', 'meisjes', 'ondergoed', 'meisjes/ondergoed/hemden', 'wit', '110/116, 122/128, 134/140', 3.99, null, 'https://www.zeeman.com/nl/p/8712050'),
+  ('wibra', '2026-08-03', 'W-55831', 'Dames pyjama flanel ruit', 'dames', 'nachtmode', 'dames/nachtmode/pyjamas', 'bordeaux geruit', 'S, M, L, XL', 9.99, null, 'https://www.wibra.nl/p/w-55831'),
+  ('wibra', '2026-08-03', 'W-55832', 'Dames nachthemd jersey', 'dames', 'nachtmode', 'dames/nachtmode', 'lichtblauw', 'S, M, L, XL, XXL', 7.99, null, 'https://www.wibra.nl/p/w-55832'),
+  ('wibra', '2026-08-03', 'W-55833', 'Dames shortama katoen', 'dames', 'nachtmode', 'dames/nachtmode', 'roze', 'S, M, L, XL', 8.99, null, 'https://www.wibra.nl/p/w-55833'),
+  ('hema', '2026-07-20', '1000245', 'Dames hipster micro 3-pack', 'dames', 'ondergoed', 'dames/ondergoed/slips', 'zwart', 'XS, S, M, L, XL', 10.0, null, 'https://www.hema.nl/p/1000245'),
+  ('hema', '2026-07-27', '1000245', 'Dames hipster micro 3-pack', 'dames', 'ondergoed', 'dames/ondergoed/slips', 'zwart', 'XS, S, M, L, XL', 10.0, null, 'https://www.hema.nl/p/1000245'),
+  ('hema', '2026-08-03', '1000245', 'Dames hipster micro 3-pack', 'dames', 'ondergoed', 'dames/ondergoed/slips', 'zwart', 'XS, S, M, L, XL', 7.0, 10.0, 'https://www.hema.nl/p/1000245'),
+  ('hema', '2026-07-20', '1000246', 'Dames bh spacer naadloos', 'dames', 'ondergoed', 'dames/ondergoed/bhs', 'huidskleur', '75B, 75C, 80B, 80C, 85B', 25.0, null, 'https://www.hema.nl/p/1000246'),
+  ('hema', '2026-07-27', '1000246', 'Dames bh spacer naadloos', 'dames', 'ondergoed', 'dames/ondergoed/bhs', 'huidskleur', '75B, 75C, 80B, 80C, 85B', 25.0, null, 'https://www.hema.nl/p/1000246'),
+  ('hema', '2026-08-03', '1000246', 'Dames bh spacer naadloos', 'dames', 'ondergoed', 'dames/ondergoed/bhs', 'huidskleur', '75B, 75C, 80B, 80C, 85B', 17.5, 25.0, 'https://www.hema.nl/p/1000246'),
+  ('c-and-a', '2026-07-20', '2201778', 'Meisjes pyjama unicorn', 'meisjes', 'nachtmode', 'meisjes/nachtmode/pyjamas', 'paars', '104, 116, 128, 140', 12.99, null, 'https://www.c-and-a.com/nl/nl/shop/p/2201778'),
+  ('c-and-a', '2026-07-27', '2201778', 'Meisjes pyjama unicorn', 'meisjes', 'nachtmode', 'meisjes/nachtmode/pyjamas', 'paars', '104, 116, 128, 140', 12.99, null, 'https://www.c-and-a.com/nl/nl/shop/p/2201778'),
+  ('c-and-a', '2026-07-20', '2201779', 'Meisjes nachthemd sterren', 'meisjes', 'nachtmode', 'meisjes/nachtmode', 'navy', '104, 116, 128', 9.99, null, 'https://www.c-and-a.com/nl/nl/shop/p/2201779'),
+  ('c-and-a', '2026-07-27', '2201779', 'Meisjes nachthemd sterren', 'meisjes', 'nachtmode', 'meisjes/nachtmode', 'navy', '104, 116, 128', 9.99, null, 'https://www.c-and-a.com/nl/nl/shop/p/2201779'),
+  ('terstal', '2026-07-20', 'T-4401', 'Heren boxers 2-pack uni', 'heren', 'ondergoed', 'heren/ondergoed/boxers', 'zwart', 'M, L, XL, XXL', 5.99, null, 'https://www.terstal.nl/p/t-4401'),
+  ('terstal', '2026-07-27', 'T-4401', 'Heren boxers 2-pack uni', 'heren', 'ondergoed', 'heren/ondergoed/boxers', 'zwart', 'M, L, XL, XXL', 5.99, null, 'https://www.terstal.nl/p/t-4401'),
+  ('terstal', '2026-08-03', 'T-4401', 'Heren boxers 2-pack uni', 'heren', 'ondergoed', 'heren/ondergoed/boxers', 'zwart', 'M, L, XL, XXL', 6.99, null, 'https://www.terstal.nl/p/t-4401'),
+  ('terstal', '2026-08-03', 'T-3110', 'Jongens boxers 3-pack sport', 'jongens', 'ondergoed', 'jongens/ondergoed/boxers', 'blauw/groen', '98/104, 110/116, 122/128', 4.99, null, 'https://www.terstal.nl/p/t-3110'),
+  ('action', '2026-07-20', 'A-7701', 'Herensokken 10-pack zwart', 'heren', 'sokken & panty''s', 'heren/sokken', 'zwart', '39-42, 43-46', 3.29, null, 'https://www.action.com/nl-nl/p/a-7701'),
+  ('action', '2026-07-27', 'A-7701', 'Herensokken 10-pack zwart', 'heren', 'sokken & panty''s', 'heren/sokken', 'zwart', '39-42, 43-46', 3.29, null, 'https://www.action.com/nl-nl/p/a-7701'),
+  ('primark', '2026-07-20', 'P-99012', 'Dames slips 5-pack microfiber', 'dames', 'ondergoed', 'dames/ondergoed/slips', 'assorti', 'XS, S, M, L, XL', 4.0, null, 'https://www.primark.com/nl-nl/p/p-99012'),
+  ('primark', '2026-07-27', 'P-99012', 'Dames slips 5-pack microfiber', 'dames', 'ondergoed', 'dames/ondergoed/slips', 'assorti', 'XS, S, M, L, XL', 4.0, null, 'https://www.primark.com/nl-nl/p/p-99012'),
+  ('primark', '2026-08-03', 'P-99012', 'Dames slips 5-pack microfiber', 'dames', 'ondergoed', 'dames/ondergoed/slips', 'assorti', 'XS, S, M, L, XL', 4.0, null, 'https://www.primark.com/nl-nl/p/p-99012'),
+  ('primark', '2026-08-03', 'P-99013', 'Dames bralette rib', 'dames', 'ondergoed', 'dames/ondergoed/bhs', 'ecru', 'S, M, L', 6.0, null, 'https://www.primark.com/nl-nl/p/p-99013');
 
 insert into price_events (retailer_id, product_key, week, event, price, was_price, prev_price) values
   ('zeeman', '8712001', '2026-08-03', 'price_down', 2.99, null, 3.99),

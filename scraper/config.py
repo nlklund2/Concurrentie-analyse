@@ -31,6 +31,8 @@ class RetailerCfg:
     sitemap_page_cap: int = 2500   # boven deze omvang geen productpagina-strategie
     min_products_expected: int = 25
     respect_robots: bool = True
+    enrich: bool = True            # kleur/maten aanvullen via productpagina's
+    enrich_limit: int = 150        # max productpagina's per bron per week
     focus_categories: str = ""     # regex: beperk de crawl tot deze categorieën
     focus_product_types: list[str] = field(default_factory=list)  # filter na mapping
     notes: str = ""

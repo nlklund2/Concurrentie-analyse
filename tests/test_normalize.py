@@ -60,3 +60,17 @@ def test_to_staging_rows_dedupe_en_schoonmaak():
     assert set(by_key) == {"a", "b"}
     assert by_key["a"]["price"] == 4.99
     assert by_key["b"]["was_price"] is None
+
+
+def test_to_staging_rows_kleur_maten_en_samenvoegen():
+    ps = [
+        Product(key="a", title="Boxers", price=4.99, color="zwart"),
+        Product(key="a", title="Boxers", price=4.99, sizes="S, M, L"),  # maten winnen
+        Product(key="b", title="Sokken", price=2.99, color="wit", sizes="39-42"),
+    ]
+    rows = to_staging_rows("test", ps)
+    by_key = {r["product_key"]: r for r in rows}
+    assert by_key["a"]["sizes"] == "S, M, L"
+    assert by_key["a"]["color"] == "zwart"      # aangevuld vanuit de andere rij
+    assert by_key["b"]["color"] == "wit"
+    assert by_key["b"]["sizes"] == "39-42"

@@ -52,6 +52,9 @@ Binnen de huidige focus vullen alleen **ondergoed, nachtmode en sokken & panty's
 
 Wat niet mapt, valt zichtbaar in "onbekend/overig" — dat is een werklijst om de mappingregels aan te scherpen, geen vuilnisbak om te negeren. Streefwaarde: ≥85% gemapt per bron.
 
+### Vastlegging op artikelniveau
+Naast de aggregaten wordt **per artikel per week** een regel bewaard: artnr · artnaam · hoofdcategorie (doelgroep) · categorie (producttype) · bron-categoriepad · kleur · maten · van-prijs · voor-prijs · URL. Opvragen en exporteren (CSV) kan direct via de view `v_artikelen_week` in Supabase. Kleur en maten zijn per bron *best effort*: lijstpagina's tonen ze zelden, dus een gecapte verrijkingsstap haalt ze van de productpagina's van vooral nieuwe artikelen; het validatierapport toont de dekking per bron. Let op: "maten" betekent *aangeboden* maten, geen voorraad per maat.
+
 ## 3. Het concurrentieveld — het gekozen speelveld ondergoedmode
 
 **Kern (wekelijks gevolgd):**
@@ -79,8 +82,8 @@ Het veld dekt zo bewust de hele prijsladder: Action/KiK-niveau onderin, Zeeman/W
 ### Online is een steekproef, geen volkstelling
 De webshop van Zeeman of Wibra toont niet 1-op-1 het winkelschap; actie-artikelen en winkel-exclusives ontbreken deels. Dat is acceptabel omdat we **trends** meten (richting en tempo), geen absolute waarheid. De bias is per concurrent redelijk constant, dus week-op-week-vergelijkingen blijven valide. We zeggen dus nooit "Zeeman heeft 412 damesartikelen" maar "Zeeman's damesassortiment online groeide 12% in 4 weken".
 
-### Artikelniveau, geen maten/kleuren (fase 1)
-Voorraad per maat is een prachtig dieptesignaal (uitverkochte maten = harde loper) maar vertienvoudigt de datalast en de foutkans. Eerst het ritueel laten werken op artikelniveau; maatdiepte is een fase-3-kandidaat voor een handjevol vechtartikelen.
+### Artikelniveau mét kleur en maten — voorraaddiepte niet
+Per artikel leggen we wekelijks ook kleur en aangeboden maten vast. Omdat lijstpagina's die zelden tonen, worden ontbrekende kleur/maten via de productpagina aangevuld met een cap per bron (`enrich_limit`, standaard 150/week) — minuten extra, geen uren, en de bron blijft te vriend. Wat we bewust níet doen: **voorraad per maat** volgen (uitverkochte maten = harde loper). Dat is een prachtig dieptesignaal maar vertienvoudigt de datalast; het blijft een fase-3-kandidaat voor een handjevol vechtartikelen.
 
 ### Wekelijks, niet dagelijks
 Mode in het waardesegment beweegt in weken, niet in uren. Dagelijks scrapen kost 7× zoveel, irriteert de bron en produceert vooral ruis. Eén nachtelijke run in de nacht van zondag op maandag is het juiste ritme bij het maandagritueel.
@@ -117,7 +120,7 @@ GitHub Actions (cron, ma 06:30)          Supabase (Postgres, gratis tier)
 ```
 
 **Waarom deze verdeling zuinig is:**
-- **Alleen mutaties opslaan.** Niet elke week 60.000 snapshotrijen, maar: actuele stand per artikel + een event bij elke wijziging (nieuw/prijs op/prijs af/promo/weg) + kant-en-klare weekaggregaten. De database blijft jaren binnen de gratis 500 MB.
+- **Compact opslaan.** Voor de trends: actuele stand per artikel + een event bij elke wijziging (nieuw/prijs op/prijs af/promo/weg) + kant-en-klare weekaggregaten. Daarnaast — binnen de ondergoedfocus goed betaalbaar — een **wekelijkse artikelfoto** (`weekly_articles`): per artikel per week artnr, naam, hoofdcategorie, categorie, kleur, maten, van-/voor-prijs en URL, opvraagbaar via de Nederlandstalige view `v_artikelen_week` (±35 MB/jaar; bij verbreding naar het volledige assortiment hoort een bewaartermijn — zie het commentaar in `sql/schema.sql`). De database blijft jaren binnen de gratis 500 MB.
 - **Zware verwerking in één SQL-functie** in Supabase (set-based), niet in Python-lusjes — sneller én minder rekenminuten.
 - **Dashboard leest alleen aggregaten** — laadt in milliseconden, geen serverkosten.
 - **Ruwe dumps** (jsonl.gz) als Actions-artifact met 60 dagen retentie: gratis herberekenbaarheid zonder database-vervuiling.

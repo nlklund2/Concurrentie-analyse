@@ -16,10 +16,14 @@ def test_products_from_html_combineert_jsonld_en_nextdata():
     assert pyjama.price == 12.99
     assert pyjama.url == "https://www.voorbeeldshop.nl/p/dames-pyjama-123"
 
+    assert pyjama.color == "roze"
+
     sokken = by_key["789"]
     assert sokken.price == 3.99
     assert sokken.was_price == 5.99
     assert sokken.category_raw == "Kinderen > Sokken"
+    assert sokken.color == "blauw"
+    assert sokken.sizes == "23-26, 27-30, 31-34"
 
     # dubbel aanwezig (JSON-LD én __NEXT_DATA__) → één product met prijs
     assert by_key["456"].price == 7.99

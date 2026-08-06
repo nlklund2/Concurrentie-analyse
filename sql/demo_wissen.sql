@@ -8,6 +8,7 @@
 begin;
 delete from price_events;
 delete from weekly_stats;
+delete from weekly_articles;
 delete from scrape_runs;
 delete from staging_products;
 delete from products;

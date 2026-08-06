@@ -89,6 +89,12 @@ class Db:
         total = content_range.rsplit("/", 1)[-1]
         return int(total) if total.isdigit() else 0
 
+    def product_keys(self, retailer_id: str) -> set[str]:
+        """Bekende artikelsleutels van een bron (voor 'nieuwe eerst' bij verrijking)."""
+        rows = self.get_all("products", {"retailer_id": f"eq.{retailer_id}",
+                                         "select": "product_key"})
+        return {r["product_key"] for r in rows}
+
     def weeks(self) -> list[date]:
         rows = self.get_all("v_weeks", {"select": "week", "order": "week.desc"})
         return [date.fromisoformat(r["week"]) for r in rows]
