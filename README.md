@@ -39,8 +39,11 @@ GitHub Actions (cron, ma ±06:30 NL)      Supabase (Postgres)
 ## Installatie (eenmalig, ±30 minuten)
 
 ### 1. Supabase (database + login)
-1. Maak een gratis project op [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, plak de inhoud van [`sql/schema.sql`](sql/schema.sql) en voer uit.
+1. ~~Maak een gratis project~~ ✅ **Al gebeurd:** project **`concurrentiemonitor-terstal`**
+   bestaat (regio eu-central-1, gratis tier), met het schema uit
+   [`sql/schema.sql`](sql/schema.sql) toegepast én drie weken demo-data geladen
+   (zie kopje *Demo-data* hieronder).
+2. ~~Schema uitvoeren~~ ✅ Al gebeurd (als migratie `init_schema`).
 3. Noteer uit **Project Settings → API**: de *Project URL*, de *anon public* key en de
    *service_role* key (geheim!).
 4. **Authentication → Providers → Email**: laat *Email* aan; zet na het uitnodigen van
@@ -69,6 +72,19 @@ GitHub Actions (cron, ma ±06:30 NL)      Supabase (Postgres)
    `SUPABASE_URL` en `SUPABASE_ANON_KEY` (de *anon public* key — dit is een publieke
    client-sleutel; de databeveiliging zit in Row Level Security + login).
 3. Deploy. Log in op het dashboard met een uitgenodigd e-mailadres (magic link).
+
+## Demo-data
+
+Het Supabase-project bevat **drie weken fictieve dummydata** (weken 30–32 van 2026) om
+de werking te zien voordat de eerste echte scrape draait. Kijken: **Table Editor →
+`weekly_stats`** (omvang- en prijstrends per groep), `price_events` (mutaties, o.a. de
+Zeeman-prijsverlagingen), `products` (actuele artikelstand) en `scrape_runs`
+(gezondheid, met een 'afwijkend'-voorbeeld bij Action). Het bijbehorende maandagrapport
+staat in [`reports/voorbeeld-weekrapport.md`](reports/voorbeeld-weekrapport.md).
+
+- Demo opnieuw laden: [`sql/demo_seed.sql`](sql/demo_seed.sql) in de SQL-editor (herdraaibaar).
+- **Vóór de echte eerste meting:** [`sql/demo_wissen.sql`](sql/demo_wissen.sql) uitvoeren,
+  zodat de trends schoon beginnen.
 
 ## Wekelijks gebruik
 
