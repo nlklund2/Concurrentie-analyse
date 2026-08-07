@@ -3,13 +3,19 @@ hun pagina's client-side renderen of eenvoudige botfilters hanteren.
 
 Zwaarder en trager dan de HTTP-strategieën (±3-5 s per pagina), daarom alleen
 expliciet via `strategy: render` en met eigen, krappere caps in retailers.yml.
-Werkwijze per categorie: pagina laden, laten renderen, en dan dezelfde
-JSON-extractie als altijd op de gerenderde HTML — met een generieke
-DOM-kaartjes-extractie (links met een €-prijs) als vangnet.
+Per categoriepagina worden drie bronnen van productdata gecombineerd, van
+schoon naar rommelig:
+  1. onderschepte JSON-API-calls die de webshop zélf maakt (Algolia, eigen
+     product-/zoek-API) — de schoonste route, vangt data die nooit in de HTML komt;
+  2. ingebedde JSON in de gerenderde HTML (JSON-LD / __NEXT_DATA__);
+  3. een generieke DOM-kaartjes-extractie (links met een €-prijs) als vangnet.
+Plus lichte anti-detectie (webdriver-vlag verbergen, echte headers) zodat
+client-side renderers en eenvoudige botfilters passeerbaar worden.
 
-Eerlijke verwachting: JavaScript-renderers (bv. C&A, KiK) lost dit op;
-zware botmuren met challenges (bv. Akamai) mogelijk niet — dat blijkt uit
-de Validatie bronnen-run en blijft dan zichtbaar in de gezondheidstabel.
+Eerlijke verwachting: JavaScript-renderers en API-gedreven shops lost dit op;
+zware challenge-muren (bv. Akamai/DataDome) die de browser al bij het laden
+tegenhouden, mogelijk niet — dat blijkt uit de Validatie bronnen-run en blijft
+dan zichtbaar in de gezondheidstabel.
 """
 from __future__ import annotations
 
@@ -20,9 +26,20 @@ from urllib.parse import urlsplit
 from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
-from ..jsonscan import products_from_html, url_key
+from ..jsonscan import deep_find_products, products_from_html, url_key
 from ..models import Product, ScrapeResult
 from ..normalize import parse_price
+
+# API-endpoints die productlijsten teruggeven, herkenbaar aan de URL.
+API_URL_RE = re.compile(r"product|search|catalog|listing|/plp|/api/|graphql|"
+                        r"algolia|findify|bloomreach|/browse|/category", re.I)
+
+STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+window.chrome = window.chrome || { runtime: {} };
+Object.defineProperty(navigator, 'languages', {get: () => ['nl-NL', 'nl', 'en']});
+Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+"""
 
 PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)")
 BLOCK_HINTS = re.compile(r"access denied|just a moment|are you human|captcha|"
@@ -46,6 +63,36 @@ DOM_SCAN_JS = """
 """
 
 
+class _ApiSink:
+    """Vangt productdata op uit JSON-responses die de pagina zelf ophaalt."""
+
+    def __init__(self):
+        self._buf: list[Product] = []
+
+    def reset(self):
+        self._buf = []
+
+    @property
+    def products(self) -> list[Product]:
+        return self._buf
+
+    def handle(self, response):
+        try:
+            url = response.url
+            if not API_URL_RE.search(url):
+                return
+            ctype = (response.headers or {}).get("content-type", "")
+            if "json" not in ctype.lower():
+                return
+            data = response.json()
+        except Exception:
+            return
+        try:
+            self._buf.extend(deep_find_products(data, url))
+        except Exception:
+            pass
+
+
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
     res = ScrapeResult(retailer_id=cfg.id, strategy="render")
     try:
@@ -59,17 +106,24 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     cats = _category_urls_via_http(cfg, http, res)
     seen: dict[str, Product] = {}
     pause = max(cfg.min_delay, 1.0)
+    api_hits = 0
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
-            args=["--disable-blink-features=AutomationControlled"])
+            args=["--disable-blink-features=AutomationControlled",
+                  "--disable-features=IsolateOrigins,site-per-process"])
         context = browser.new_context(
             locale="nl-NL",
+            timezone_id="Europe/Amsterdam",
             viewport={"width": 1366, "height": 900},
+            extra_http_headers={"Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8"},
             user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                         "AppleWebKit/537.36 (KHTML, like Gecko) "
                         "Chrome/126.0.0.0 Safari/537.36"))
+        context.add_init_script(STEALTH_JS)
+        sink = _ApiSink()
         page = context.new_page()
+        page.on("response", sink.handle)
         try:
             if not cats:
                 cats = _nav_categories_via_browser(page, cfg)
@@ -87,12 +141,18 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 for n in range(1, cfg.max_pages_per_category + 1):
                     url = cat_url if n == 1 else \
                         f"{cat_url}{'&' if '?' in cat_url else '?'}page={n}"
+                    sink.reset()
                     html = _load(page, url)
                     time.sleep(pause)
                     if html is None:
                         blocked_pages += 1
                         break
-                    found = products_from_html(html, url) or _dom_products(page)
+                    # 1) onderschepte API-JSON, 2) ingebedde JSON, 3) DOM-vangnet
+                    from_api = list(sink.products)
+                    api_hits += len(from_api)
+                    found = from_api + products_from_html(html, url)
+                    if not found:
+                        found = _dom_products(page)
                     new = _absorb(seen, found, cat_path)
                     if not new:
                         break
@@ -102,6 +162,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     break
             if blocked_pages:
                 res.notes.append(f"{blocked_pages} pagina('s) geblokkeerd of niet geladen")
+            if api_hits:
+                res.notes.append(f"{api_hits} artikelen uit onderschepte API-calls")
         except PwError as e:
             res.error = f"browserfout: {str(e)[:200]}"
         finally:
