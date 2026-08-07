@@ -170,7 +170,7 @@ Het reële kostenrisico is niet geld maar **stilte**: een scraper die stuk gaat 
 
 | Risico | Impact | Beheersing |
 |---|---|---|
-| Bot-bescherming (m.n. Action, C&A) | Bron valt uit | Waterval-strategie; bron-gezondheid in rapport; fase-2: headless browser voor hardnekkige gevallen |
+| Bot-bescherming (m.n. Action, Wibra, HEMA) | Bron valt uit | Waterval-strategie; bron-gezondheid in rapport; render-strategie (headless browser) actief voor de geblokkeerde bronnen — zware challenge-muren kunnen ook die tegenhouden, dan folder-/winkelflankering |
 | Site-redesign bij concurrent | Bron valt uit of telt raar | Autodetectie + harde afwijkingsdrempel: bij <50% van vorige week wordt de week **niet** verwerkt (geen vervuilde trends) en kleurt de bron rood |
 | Mapping-ruis | Verkeerde groepstoedeling | "Onbekend"-bak zichtbaar; maandelijks 15 min onderhoud; mappingregels in één YAML-bestand |
 | Online ≠ winkel | Verkeerde absolute conclusies | Alleen trends communiceren; folder- en winkelflankering |
@@ -184,7 +184,7 @@ Het reële kostenrisico is niet geld maar **stilte**: een scraper die stuk gaat 
 | **0. Setup** | Week 1 | Supabase + Netlify aansluiten (zie README), Validatie-workflow draaien, bronnen kalibreren |
 | **1. Ritueel** | Week 2–5 | Wekelijkse run + maandagoverleg; mapping aanscherpen; drempels afstellen |
 | **2. Verdieping** | Week 6–12 | KVI-koppeltabel (§6.3), fase-2-bronnen aanzetten waar gevalideerd, trendwoorden op instroom |
-| **3. Volwassen** | Kwartaal 2+ | Jaar-op-jaar-seizoensklok, folder-archief, evt. maatdiepte op vechtartikelen, headless browser voor geblokkeerde bronnen |
+| **3. Volwassen** | Kwartaal 2+ | Jaar-op-jaar-seizoensklok, folder-archief, evt. maatdiepte op vechtartikelen |
 
 ---
 

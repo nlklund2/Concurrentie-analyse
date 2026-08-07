@@ -4,12 +4,13 @@ from __future__ import annotations
 from ..config import RetailerCfg
 from ..http import BlockedError, Http
 from ..models import ScrapeResult
-from . import listing_crawl, shopify, sitemap_pages
+from . import listing_crawl, render_listing, shopify, sitemap_pages
 
 FIXED = {
     "shopify": shopify.scrape,
     "listing": listing_crawl.scrape,
     "sitemap_pages": sitemap_pages.scrape,
+    "render": render_listing.scrape,   # fase-2: headless browser (Playwright)
 }
 
 

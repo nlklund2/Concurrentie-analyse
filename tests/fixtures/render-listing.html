@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <title>Client-side gerenderde categorielijst (fixture)</title>
+  <style>a span, a s { display: block; }</style>
+  <script>
+    // Bootst een client-side webshop na: zonder JavaScript is de pagina leeg,
+    // ná rendering staan er JSON-LD én DOM-productkaarten.
+    document.addEventListener('DOMContentLoaded', () => {
+      const ld = document.createElement('script');
+      ld.type = 'application/ld+json';
+      ld.textContent = JSON.stringify({
+        "@context": "https://schema.org", "@type": "Product",
+        "name": "Dames hipster 3-pack", "sku": "RH-001",
+        "offers": {"@type": "Offer", "price": "6.99", "priceCurrency": "EUR"}
+      });
+      document.head.appendChild(ld);
+
+      document.getElementById('grid').innerHTML = `
+        <a href="/p/jongens-boxers-2pack">
+          <span>Jongens boxers 2-pack</span>
+          <span>€ 4,99</span>
+        </a>
+        <a href="/p/meisjes-pyjama-sterren">
+          <span>Meisjes pyjama sterren</span>
+          <span>€ 9,99</span>
+          <s>€ 14,99</s>
+        </a>`;
+    });
+  </script>
+</head>
+<body>
+  <h1>Ondergoed</h1>
+  <div id="grid">(laden…)</div>
+</body>
+</html>

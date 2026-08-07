@@ -125,6 +125,7 @@ optioneel `RESEND_API_KEY`, `REPORT_EMAIL_TO`, `REPORT_EMAIL_FROM`.
 | Focus verbreden (bv. badmode of alles) | `focus_categories` / `focus_product_types` in de defaults van `retailers.yml` (leeg = volledig assortiment) |
 | Artikellijst exporteren (artnr t/m URL) | Supabase → Table Editor of SQL-editor → view `v_artikelen_week` → Export CSV |
 | Verrijking kleur/maten afstellen | `enrich` / `enrich_limit` in `retailers.yml` (per bron of in de defaults) |
+| Geblokkeerde/client-side bron | `strategy: render` in `retailers.yml` — headless browser (Playwright); zwaarder, dus eigen krappere caps per bron |
 | Mapping verbeteren | Regels in `scraper/mapping.yml` (volgorde telt); test in `tests/` |
 | Grafiekkleur | `color_slot` (1–8) in `retailers.yml` én de `SLOTS`-map in `dashboard/index.html` — kleur volgt de bron, hergebruik een slot nooit voor een andere bron |
 | Signaaldrempels rapport | Constantes bovenin `scraper/report.py` |
