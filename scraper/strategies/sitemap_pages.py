@@ -31,12 +31,16 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     if not product_urls:
         res.error = "geen product-URLs in sitemap gevonden"
         return res
-    if len(product_urls) > cfg.sitemap_page_cap and not limit:
-        res.error = (f"{len(product_urls)} productpagina's is te veel voor deze strategie "
-                     f"(cap {cfg.sitemap_page_cap}); gebruik listing of verhoog de cap bewust")
-        return res
 
+    # Boven de cap: vaste (gesorteerde) steekproef i.p.v. weigeren — een stabiele
+    # deelwaarneming geeft bruikbare week-op-week-trends; tellingen zijn dan wel
+    # een ondergrens, geen totaal (zichtbaar via de notitie in het rapport).
     cap = limit or cfg.sitemap_page_cap
+    if len(product_urls) > cap:
+        product_urls.sort()
+        res.notes.append(f"{len(product_urls)} product-URLs binnen focus; vaste "
+                         f"steekproef van {cap} pagina's — tellingen zijn een "
+                         "deelwaarneming, trends blijven vergelijkbaar")
     for url in product_urls[:cap]:
         resp = http.get(url)
         if resp is None:

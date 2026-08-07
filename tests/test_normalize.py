@@ -35,6 +35,16 @@ def test_boxershort_is_ondergoed_geen_broek():
     assert ptype == "ondergoed"
 
 
+def test_pyjama_in_ondergoedpad_is_nachtmode():
+    # gevalideerd op Primark: pyjama's hangen onder "lingerie & ondergoed"
+    _, ptype = map_category("dames/lingerie-en-ondergoed",
+                            title="Korte pyjama met print")
+    assert ptype == "nachtmode"
+    # maar een gewone slip in datzelfde pad blijft ondergoed
+    _, ptype = map_category("dames/lingerie-en-ondergoed", title="Slips 5-pack")
+    assert ptype == "ondergoed"
+
+
 def test_apply_focus_ondergoedmode():
     rows = to_staging_rows("test", [
         Product(key="1", title="Dames hipsters 2-pack", category_raw="dames/ondergoed", price=4.99),

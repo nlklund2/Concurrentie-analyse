@@ -14,10 +14,12 @@ audience:
   - {label: huis,     match: "huishoud|badtextiel|bedtextiel|beddengoed|keuken|wonen|\\bhome\\b|handdoek|dekbed|hoeslaken|badkamer|interieur"}
 
 product_type:
-  # specifiek vóór generiek: 'boxershort' moet ondergoed raken, niet broeken
+  # specifiek vóór generiek: 'boxershort' moet ondergoed raken, niet broeken;
+  # nachtmode vóór ondergoed: pyjama's hangen bij veel bronnen onder
+  # "lingerie & ondergoed" en moeten op titel alsnog nachtmode worden
   - {label: "sokken & panty's", match: "\\bsok(?:ken)?\\b|panty|maillot|kousen|kniekous"}
+  - {label: nachtmode,          match: "pyjama|nachtmode|nachthemd|onesie|badjas|homewear|loungewear|shortama"}
   - {label: ondergoed,          match: "ondergoed|boxer|\\bslips?\\b|\\bbh\\b|beha|hipster|lingerie|singlet|\\bhemd(?:je)?\\b|ondershirt|shapewear|string"}
-  - {label: nachtmode,          match: "pyjama|nachtmode|nachthemd|onesie|badjas|homewear|loungewear"}
   - {label: badmode,            match: "badmode|badpak|bikini|zwembroek|zwemshort|\\bzwem|\\bswim"}
   - {label: schoenen,           match: "schoen|sneaker|slipper|\\blaars|laarzen|pantoffel|sandaal|\\bboots?\\b|espadrille|gympen"}
   - {label: huistextiel,        match: "handdoek|dekbed|kussen|hoeslaken|\\blaken\\b|plaid|\\bdeken\\b|theedoek|washand|badmat|beddengoed"}

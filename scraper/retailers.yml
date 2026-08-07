@@ -44,7 +44,8 @@ retailers:
     base: https://www.terstal.nl
     segment: referentie
     color_slot: 1
-    notes: Eigen winkel — referentielijn voor alle indexcijfers.
+    notes: >-
+      Eigen winkel — referentielijn voor alle indexcijfers.
 
   # ---- kern: het gevraagde concurrentieveld ondergoedmode ----
   zeeman:
@@ -53,42 +54,58 @@ retailers:
     segment: kern
     url_filter: "/nl"
     color_slot: 2
-    notes: Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
+    notes: >-
+      Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
+      GEVALIDEERD 07-08: werkt via productpagina's; 9.672 focus-URLs → vaste
+      steekproef van 2.500/week (deelwaarneming, trends vergelijkbaar).
   wibra:
     name: Wibra
     base: https://www.wibra.nl
     segment: kern
     color_slot: 3
-    notes: Zelfde klant, zelfde prijspunten; ondergoed/nachtmode kerncategorie.
+    notes: >-
+      Zelfde klant, zelfde prijspunten; ondergoed/nachtmode kerncategorie.
+      GEVALIDEERD 07-08: blokkeert bots (403 op alles) — fase-2 headless nodig;
+      staat aan zodat de uitval zichtbaar blijft in de gezondheidstabel.
   primark:
     name: Primark
     base: https://www.primark.com/nl-nl
     segment: kern
     url_filter: "/nl-nl"
     color_slot: 4
-    notes: Geen webshop-verkoop, wel productpagina's met prijzen — prijsreferentie;
+    notes: >-
+      Geen webshop-verkoop, wel productpagina's met prijzen — prijsreferentie;
       online dekking kan kleiner zijn dan het winkelschap.
+      GEVALIDEERD 07-08: werkt via lijstpagina's, kleurdekking 100%.
   action:
     name: Action
     base: https://www.action.com/nl-nl
     segment: kern
     url_filter: "/nl-nl"
     color_slot: 5
-    notes: Prijszetter in sokken/boxers-multipacks; zware bot-bescherming —
-      uitval mogelijk (fase-2 headless).
+    notes: >-
+      Prijszetter in sokken/boxers-multipacks.
+      GEVALIDEERD 07-08: sitemap open, productpagina's blokkeren (403) —
+      fase-2 headless nodig; blijft aan voor zichtbare uitval.
   hema:
     name: HEMA
     base: https://www.hema.nl
     segment: kern
     color_slot: 6
-    notes: Sterk in ondergoed/bh's; hoger prijspunt — bovengrens van het speelveld.
+    notes: >-
+      Sterk in ondergoed/bh's; hoger prijspunt — bovengrens van het speelveld.
+      GEVALIDEERD 07-08: blokkeert bots (403) — fase-2 headless nodig;
+      blijft aan voor zichtbare uitval.
   c-and-a:
     name: C&A
     base: https://www.c-and-a.com/nl/nl/shop
     segment: kern
     url_filter: "/nl/nl/"
     color_slot: 7
-    notes: Gezinsmode incl. breed ondergoed; bot-bescherming mogelijk.
+    notes: >-
+      Gezinsmode incl. breed ondergoed.
+      GEVALIDEERD 07-08: sitemap bereikbaar maar pagina's renderen client-side
+      (geen ingebedde productdata) — fase-2 headless nodig; blijft aan.
 
   # ---- fase 2: breder veld (aanzetten kan altijd; zie PLAN.md §3) ----
   takko:
@@ -97,34 +114,47 @@ retailers:
     segment: breed
     enabled: false
     url_filter: "/nl-nl"
-    notes: Duitse discounter gezinsmode.
+    notes: >-
+      Duitse discounter gezinsmode.
+      GEVALIDEERD 07-08: WERKT (100% prijsdekking) — sterke kandidaat om aan
+      te zetten als vervanger zolang Wibra/KiK geblokkeerd zijn.
   kik:
     name: KiK
     base: https://www.kik.nl
     segment: breed
     enabled: false
-    notes: Laagste prijspunten van de markt.
+    notes: >-
+      Laagste prijspunten van de markt.
+      GEVALIDEERD 07-08: pagina's renderen client-side, geen data — fase-2.
   scapino:
     name: Scapino
     base: https://www.scapino.nl
     segment: breed
     enabled: false
-    notes: Waardesegment schoenen + casual; sokken relevant.
+    notes: >-
+      Waardesegment schoenen + casual; sokken relevant.
+      GEVALIDEERD 07-08: scraper werkt, maar steekproef raakte geen bodywear.
   shoeby:
     name: Shoeby
     base: https://www.shoeby.nl
     segment: breed
     enabled: false
-    notes: Middensegment gezinsmode.
+    notes: >-
+      Middensegment gezinsmode.
+      GEVALIDEERD 07-08: werkt; beperkt bodywear-aanbod.
   msmode:
     name: MS Mode
     base: https://www.msmode.nl
     segment: breed
     enabled: false
-    notes: Damesmode; lingerie beperkt relevant.
+    notes: >-
+      Damesmode; panty's/shapewear relevant, hoger prijspunt.
+      GEVALIDEERD 07-08: WERKT — kandidaat voor de bovenkant van het veld.
   bonprix:
     name: Bonprix
     base: https://www.bonprix.nl
     segment: breed
     enabled: false
-    notes: Online gezinsmode; grote maten sterk.
+    notes: >-
+      Online gezinsmode; grote maten sterk.
+      GEVALIDEERD 07-08: WERKT goed (34/40 binnen focus) — sterke kandidaat.
