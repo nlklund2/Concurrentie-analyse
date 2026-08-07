@@ -46,12 +46,11 @@ GitHub Actions (cron, ma ±06:30 NL)      Supabase (Postgres)
    bestaat (regio eu-central-1, gratis tier), met het schema uit
    [`sql/schema.sql`](sql/schema.sql) toegepast én drie weken demo-data geladen
    (zie kopje *Demo-data* hieronder).
-2. ~~Schema uitvoeren~~ ✅ Al gebeurd (als migratie `init_schema`). **Let op — nog één
-   keer plakken (2 min):** de artikelfoto-uitbreiding (tabel `weekly_articles` + view
-   `v_artikelen_week` + kolommen kleur/maten) is daarna toegevoegd. Voer in de
-   **SQL-editor** achtereenvolgens uit: [`sql/migratie_artikelsnapshots.sql`](sql/migratie_artikelsnapshots.sql),
-   daarna [`sql/schema.sql`](sql/schema.sql) (idempotent) en tenslotte
-   [`sql/demo_seed.sql`](sql/demo_seed.sql) — dan staat ook de artikel-demo live.
+2. ~~Schema uitvoeren~~ ✅ Al gebeurd — als migraties `init_schema` en
+   `artikel_snapshots` (incl. tabel `weekly_articles`, view `v_artikelen_week` en de
+   kolommen kleur/maten); de artikel-demo staat ook al live. Het bestand
+   [`sql/migratie_artikelsnapshots.sql`](sql/migratie_artikelsnapshots.sql) is alleen
+   nog relevant voor een eventuele nieuwe, tweede installatie.
 3. Noteer uit **Project Settings → API**: de *Project URL*, de *anon public* key en de
    *service_role* key (geheim!).
 4. **Authentication → Providers → Email**: laat *Email* aan; zet na het uitnodigen van
