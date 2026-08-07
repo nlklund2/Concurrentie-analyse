@@ -63,14 +63,15 @@ retailers:
     base: https://www.wibra.nl
     segment: kern
     color_slot: 3
-    strategy: render
+    strategy: firecrawl
     enrich: false
     max_categories: 20
-    max_pages_per_category: 15
     notes: >-
       Zelfde klant, zelfde prijspunten; ondergoed/nachtmode kerncategorie.
-      GEVALIDEERD 07-08: HTTP geeft 403 op alles — sinds 07-08 via de
-      render-strategie (headless browser); uitkomst zichtbaar in Validatie bronnen.
+      GEVALIDEERD 07-08: blokkeert ook een echte headless browser al bij het
+      laden — het datacenter-IP van GitHub Actions wordt geweerd. Enige route
+      is een residentiële proxy: strategy 'firecrawl' (betaald, activeer met
+      FIRECRAWL_API_KEY). Zonder sleutel blijft de bron rood in de tabel.
   primark:
     name: Primark
     base: https://www.primark.com/nl-nl
@@ -93,22 +94,21 @@ retailers:
     max_pages_per_category: 15
     notes: >-
       Prijszetter in sokken/boxers-multipacks.
-      GEVALIDEERD 07-08: sitemap open, productpagina's blokkeren (403) — sinds
-      07-08 via de render-strategie; Akamai-achtige muren houden mogelijk ook
-      een browser tegen, dan blijft de bron eerlijk rood.
+      GEVALIDEERD 07-08: WERKT via de render-strategie nadat de cookiemuur wordt
+      weggeklikt (24 artikelen, 100% prijsdekking in de proef).
   hema:
     name: HEMA
     base: https://www.hema.nl
     segment: kern
     color_slot: 6
-    strategy: render
+    strategy: firecrawl
     enrich: false
     max_categories: 20
-    max_pages_per_category: 15
     notes: >-
       Sterk in ondergoed/bh's; hoger prijspunt — bovengrens van het speelveld.
-      GEVALIDEERD 07-08: HTTP geeft 403 — sinds 07-08 via de render-strategie;
-      uitkomst zichtbaar in Validatie bronnen.
+      GEVALIDEERD 07-08: weert ook een echte headless browser al bij het laden
+      (datacenter-IP geblokkeerd). Route: strategy 'firecrawl' (betaald,
+      FIRECRAWL_API_KEY). Zonder sleutel blijft de bron rood.
   c-and-a:
     name: C&A
     base: https://www.c-and-a.com/nl/nl/shop
@@ -121,8 +121,9 @@ retailers:
     max_pages_per_category: 15
     notes: >-
       Gezinsmode incl. breed ondergoed.
-      GEVALIDEERD 07-08: pagina's renderen client-side — sinds 07-08 via de
-      render-strategie (beste kandidaat om hiermee los te komen).
+      GEVALIDEERD 07-08: pagina's laden volledig via de render-strategie (141
+      links, prijzen aanwezig); productkaart-extractie verbeterd 07-08 zodat de
+      prijs-buiten-de-link wordt opgepikt. Hervalidatie loopt.
 
   # ---- fase 2: breder veld (aanzetten kan altijd; zie PLAN.md §3) ----
   takko:
@@ -139,15 +140,17 @@ retailers:
     name: KiK
     base: https://www.kik.nl
     segment: breed
-    enabled: false
+    enabled: true
     strategy: render
     enrich: false
     max_categories: 20
     max_pages_per_category: 15
     notes: >-
       Laagste prijspunten van de markt.
-      GEVALIDEERD 07-08: pagina's renderen client-side — render-strategie
-      geconfigureerd; goede kandidaat zodra fase 2 start.
+      GEVALIDEERD 07-08: WERKT via de render-strategie na cookiemuur (25
+      artikelen); titel-/prijsextractie verbeterd 07-08 (losse getallen als
+      '599' worden niet meer als prijs of titel gelezen). Aangezet als
+      werkende discounter naast Zeeman/Wibra.
   scapino:
     name: Scapino
     base: https://www.scapino.nl

@@ -75,6 +75,40 @@ def test_cookiemuur_wordt_weggeklikt_en_producten_verschijnen():
         browser.close()
 
 
+def test_dom_kaart_met_prijs_buiten_de_link():
+    """C&A/KiK-patroon: prijs in een apart kaart-element, titel uit aria-label."""
+    from playwright.sync_api import sync_playwright
+    fixture = (Path(__file__).parent / "fixtures" / "card-listing.html").resolve()
+    with sync_playwright() as pw:
+        browser = _browser(pw)
+        page = browser.new_page()
+        _load(page, fixture.as_uri(), consent=False)
+        found = {p.title: p for p in _dom_products(page)}
+
+        assert found["Dames hipster 3-pack"].price == 9.99
+        boxers = found["Heren boxers 2-pack"]
+        assert boxers.price == 8.99 and boxers.was_price == 12.99
+        # het losse getal 599 mag geen prijs of titel worden
+        sokken = found["Kindersokken 5-pack"]
+        assert sokken.price == 3.99
+        assert all("599" not in t for t in found)
+        browser.close()
+
+
+def test_firecrawl_zonder_sleutel_faalt_netjes(monkeypatch):
+    """Zonder FIRECRAWL_API_KEY blijft de bron rood met een duidelijke uitleg,
+    zonder de weekrun te breken."""
+    monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
+    from scraper.config import RetailerCfg
+    from scraper.http import Http
+    from scraper.strategies import firecrawl_api
+
+    cfg = RetailerCfg(id="wibra", name="Wibra", base="https://www.wibra.nl")
+    res = firecrawl_api.scrape(cfg, Http(min_delay=0), limit=5)
+    assert res.products == []
+    assert "FIRECRAWL_API_KEY" in res.error
+
+
 def test_api_sink_vangt_json_response():
     """De sink haalt producten uit een onderschepte JSON-API-response."""
     sink = _ApiSink()

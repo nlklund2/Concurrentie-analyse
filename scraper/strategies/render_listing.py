@@ -71,14 +71,33 @@ DOM_SCAN_JS = """
 () => {
   const out = [];
   const seen = new Set();
-  for (const a of document.querySelectorAll('a[href]')) {
-    const t = (a.innerText || '').trim();
-    if (!t || !/€\\s*\\d/.test(t)) continue;
+  const priceRe = /€\\s*\\d/;
+  // Productkaart = een link naar een productpagina, met ergens in de
+  // omliggende kaart een prijs. Titel komt uit aria-label / img-alt /
+  // heading, niet uit de ruwe kaarttekst (die is vervuild met prijs/labels).
+  const links = document.querySelectorAll(
+    'a[href*="/p/"],a[href*="/p-"],a[href*="/product"],a[href*="/artikel"],a[href]');
+  for (const a of links) {
     const href = a.href;
     if (!href || href.startsWith('javascript:') || seen.has(href)) continue;
+    let card = a, hops = 0;
+    while (card && hops < 5 && !priceRe.test(card.innerText || '')) {
+      card = card.parentElement; hops++;
+    }
+    if (!card || !priceRe.test(card.innerText || '')) continue;
+    let title = (a.getAttribute('aria-label') || '').trim();
+    if (!title) {
+      const img = a.querySelector('img[alt]') || card.querySelector('img[alt]');
+      if (img) title = (img.getAttribute('alt') || '').trim();
+    }
+    if (!title) title = (a.textContent || '').trim();
+    if (!title) {
+      const h = card.querySelector('h1,h2,h3,h4,[class*="title" i],[class*="name" i]');
+      if (h) title = (h.textContent || '').trim();
+    }
     seen.add(href);
-    out.push({ href, text: t.slice(0, 300) });
-    if (out.length >= 200) break;
+    out.push({ href, title: title.slice(0, 200), text: (card.innerText || '').slice(0, 400) });
+    if (out.length >= 250) break;
   }
   return out;
 }
@@ -328,32 +347,42 @@ def _diagnose(page) -> str:
         return "pagina niet leesbaar"
 
 
+def _clean_title(raw_title: str, card_text: str) -> str:
+    """Titel opschonen; valt terug op de kaarttekst als er geen echte titel is."""
+    for bron in (raw_title, card_text):
+        for line in (bron or "").splitlines():
+            kandidaat = PRICE_STRIP_RE.sub(" ", line)
+            kandidaat = re.sub(r"\(\s*/?\s*stuk\s*\)|/\s*stuk|per stuk", " ", kandidaat, flags=re.I)
+            kandidaat = re.sub(r"\s{2,}", " ", kandidaat).strip(" -–|,.\t")
+            # een echte titel bevat een letter en is geen los getal/label
+            if len(kandidaat) >= 3 and re.search(r"[a-zA-Z]", kandidaat):
+                return kandidaat[:200]
+    return ""
+
+
 def _dom_products(page) -> list[Product]:
-    """Vangnet: productkaarten uit de gerenderde DOM (links met een €-prijs)."""
+    """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel)."""
     try:
         raw = page.evaluate(DOM_SCAN_JS)
     except Exception:
         return []
     products: list[Product] = []
     for item in raw:
-        href, text = item.get("href", ""), item.get("text", "")
-        prices = [parse_price(m) for m in PRICE_TEXT_RE.findall(text)]
-        prices = [p for p in prices if p]
+        href = item.get("href", "")
+        text = item.get("text", "")
+        prices = [p for p in (parse_price(m) for m in PRICE_TEXT_RE.findall(text)) if p]
+        # ondergoed/nachtmode/sokken: prijzen boven €200 zijn vrijwel zeker ruis
+        # (artikelnummers, postcodes) uit een verkeerd kaart-element
+        prices = [p for p in prices if p <= 200]
         if not prices:
             continue
         price, was = min(prices), None
         if len(prices) > 1 and max(prices) > min(prices):
             was = max(prices)
-        title = ""
-        for line in text.splitlines():
-            kandidaat = PRICE_STRIP_RE.sub(" ", line).strip(" -–|,\t")
-            kandidaat = re.sub(r"\s{2,}", " ", kandidaat)
-            if len(kandidaat) >= 3:
-                title = kandidaat
-                break
+        title = _clean_title(item.get("title", ""), text)
         if not title:
             continue
-        products.append(Product(key=url_key(href), title=title[:200], url=href,
+        products.append(Product(key=url_key(href), title=title, url=href,
                                 price=price, was_price=was))
     return products
 

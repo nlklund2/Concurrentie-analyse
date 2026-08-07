@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <title>Productkaarten met prijs buiten de link (C&A/KiK-patroon)</title>
+</head>
+<body>
+  <h1>Ondergoed</h1>
+  <div class="grid">
+    <!-- Kaart 1: prijs staat in een apart element náást de link;
+         titel alleen in aria-label + img alt (link-tekst is leeg) -->
+    <article class="card">
+      <a href="/nl/nl/shop/p/dames-hipster-3pack-123" aria-label="Dames hipster 3-pack">
+        <img src="x.jpg" alt="Dames hipster 3-pack">
+      </a>
+      <div class="price">€ 9,99</div>
+    </article>
+    <!-- Kaart 2: met doorstreepte prijs, titel in een heading -->
+    <article class="card">
+      <a href="/nl/nl/shop/p/heren-boxers-456"></a>
+      <h3 class="product-name">Heren boxers 2-pack</h3>
+      <div class="price"><span class="old">€ 12,99</span> <span class="now">€ 8,99</span></div>
+    </article>
+    <!-- Kaart 3: KiK-valkuil — een los getal dat geen prijs is (599) mag
+         de titel niet worden; echte prijs €3,99 staat in het prijs-element -->
+    <article class="card">
+      <a href="/p/kindersokken-789" aria-label="Kindersokken 5-pack">Kindersokken 5-pack</a>
+      <div class="meta">Art. 599 / Stuk</div>
+      <div class="price">€ 3,99</div>
+    </article>
+  </div>
+</body>
+</html>
