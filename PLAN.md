@@ -166,11 +166,18 @@ Het reële kostenrisico is niet geld maar **stilte**: een scraper die stuk gaat 
 - Prijsmonitoring van concurrenten is **staande praktijk in retail** (er bestaat een hele industrie omheen); het Europese databankenrecht en site-voorwaarden vormen in theorie een restrisico. De volumes hier zijn minimaal en de data wordt niet herpubliceerd — intern beslisgebruik. **Advies: laat dit één keer formeel toetsen door de huisjurist en leg het besluit vast.**
 - De scraper gebruikt een standaard browser-identificatie. Alternatief is een herkenbare eigen user-agent met contactgegevens — netter, maar het maakt zichtbaar dát en wát je monitort. Dat is een beleidskeuze voor de eigenaar; technisch is het één regel in de configuratie.
 
+### Bronnen die het datacenter-IP weren (Wibra, HEMA) — de proxy-afweging
+Sommige retailers blokkeren niet de scraper-*techniek* maar het *IP-adres*: verkeer vanaf de datacenter-IP's van GitHub Actions (Azure) wordt categorisch geweigerd, óók van een volwaardige headless browser. Zelf een betere scraper bouwen lost dit principieel niet op — het probleem zit in het herkenbare server-IP, niet in de browser. De enige technische route is het verkeer via **residentiële/roterende proxies** laten lopen, en dat levert een externe dienst (Firecrawl, ScrapingBee, ScraperAPI, Zyte) kant-en-klaar. De monitor heeft hiervoor een `firecrawl`-strategie klaarstaan, die **alleen activeert met een `FIRECRAWL_API_KEY`**. Afweging voor de eigenaar:
+- **Kosten:** gratis start (~500 pagina's eenmalig), daarna ±€16/mnd (hobby-tier). Dit is de eerste post die de €0-opzet doorbreekt.
+- **Privacy/juridisch:** de te scrapen product-URL's gaan naar een derde partij; de proxy-aanpak omzeilt bewust een IP-blokkade, wat het "publiek toegankelijk"-argument iets minder sterk maakt. Neem dit mee in de juridische toetsing hierboven.
+- **Waarde:** Wibra is een directe kernconcurrent (zelfde klant, zelfde straat); die missen doet pijn. HEMA markeert de bovenkant. Voor die twee kan ±€16/mnd verdedigbaar zijn — maar het is een **business**beslissing, geen technische.
+- **Alternatief zonder kosten:** Wibra/HEMA afdekken via de weekfolder-check en het gerichte winkelbezoek (§7), en leunen op de wél-werkende bronnen die hetzelfde prijssegment beslaan (Zeeman, KiK, Action, C&A).
+
 ## 9. Beperkingen & risico's — eerlijk benoemd
 
 | Risico | Impact | Beheersing |
 |---|---|---|
-| Bot-bescherming (m.n. Action, C&A) | Bron valt uit | Waterval-strategie; bron-gezondheid in rapport; fase-2: headless browser voor hardnekkige gevallen |
+| Bot-bescherming (m.n. Action, Wibra, HEMA) | Bron valt uit | Waterval-strategie; bron-gezondheid in rapport; render-strategie (headless browser) actief voor de geblokkeerde bronnen — zware challenge-muren kunnen ook die tegenhouden, dan folder-/winkelflankering |
 | Site-redesign bij concurrent | Bron valt uit of telt raar | Autodetectie + harde afwijkingsdrempel: bij <50% van vorige week wordt de week **niet** verwerkt (geen vervuilde trends) en kleurt de bron rood |
 | Mapping-ruis | Verkeerde groepstoedeling | "Onbekend"-bak zichtbaar; maandelijks 15 min onderhoud; mappingregels in één YAML-bestand |
 | Online ≠ winkel | Verkeerde absolute conclusies | Alleen trends communiceren; folder- en winkelflankering |
@@ -184,7 +191,7 @@ Het reële kostenrisico is niet geld maar **stilte**: een scraper die stuk gaat 
 | **0. Setup** | Week 1 | Supabase + Netlify aansluiten (zie README), Validatie-workflow draaien, bronnen kalibreren |
 | **1. Ritueel** | Week 2–5 | Wekelijkse run + maandagoverleg; mapping aanscherpen; drempels afstellen |
 | **2. Verdieping** | Week 6–12 | KVI-koppeltabel (§6.3), fase-2-bronnen aanzetten waar gevalideerd, trendwoorden op instroom |
-| **3. Volwassen** | Kwartaal 2+ | Jaar-op-jaar-seizoensklok, folder-archief, evt. maatdiepte op vechtartikelen, headless browser voor geblokkeerde bronnen |
+| **3. Volwassen** | Kwartaal 2+ | Jaar-op-jaar-seizoensklok, folder-archief, evt. maatdiepte op vechtartikelen |
 
 ---
 

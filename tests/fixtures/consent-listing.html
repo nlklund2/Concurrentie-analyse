@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <title>Categorielijst achter cookiemuur (fixture)</title>
+  <style>
+    #wall { position: fixed; inset: 0; background: #fff; z-index: 99; }
+    #grid { display: none; }
+  </style>
+  <script>
+    // Bootst een NL-webshop na: de productlijst rendert pas nadat de
+    // cookiemuur is geaccepteerd.
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('accept').addEventListener('click', () => {
+        document.getElementById('wall').remove();
+        const grid = document.getElementById('grid');
+        grid.style.display = 'block';
+        grid.innerHTML = `
+          <a href="/p/dames-slip-5pack">
+            <span>Dames slip 5-pack</span><span>€ 5,99</span>
+          </a>
+          <a href="/p/heren-boxers-3pack">
+            <span>Heren boxers 3-pack</span><span>€ 8,99</span><s>€ 11,99</s>
+          </a>`;
+      });
+    });
+  </script>
+</head>
+<body>
+  <div id="wall">
+    <h2>Wij gebruiken cookies</h2>
+    <button id="accept">Alles accepteren</button>
+    <button id="reject">Weigeren</button>
+  </div>
+  <h1>Ondergoed</h1>
+  <div id="grid"></div>
+</body>
+</html>

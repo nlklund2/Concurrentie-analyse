@@ -33,6 +33,11 @@ jobs:
       - name: Afhankelijkheden installeren
         run: pip install -r requirements.txt
 
+      - name: Headless browser voor render-bronnen
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
       - name: Proefscrape per bron
         run: |
           EXTRA=""
