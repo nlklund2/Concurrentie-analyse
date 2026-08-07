@@ -41,7 +41,29 @@ Object.defineProperty(navigator, 'languages', {get: () => ['nl-NL', 'nl', 'en']}
 Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
 """
 
+# Nederlandse webshops zetten vrijwel altijd een cookiemuur vóór de inhoud;
+# zolang die er staat, rendert de productlijst niet. Eerst de bekende
+# knop-id's (OneTrust, Cookiebot, Usercentrics), dan op knoptekst.
+CONSENT_SELECTORS = (
+    "#onetrust-accept-btn-handler",
+    "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
+    "#CybotCookiebotDialogBodyButtonAccept",
+    "#usercentrics-root >>> button[data-testid='uc-accept-all-button']",
+    "button[data-testid='uc-accept-all-button']",
+    "button[id*='accept-all' i]",
+    "button[class*='accept-all' i]",
+    "[data-cy='cookie-accept-all']",
+    "[data-test-id='cookie-accept-all']",
+)
+CONSENT_TEXTS = ("alles accepteren", "accepteer alles", "alle cookies accepteren",
+                 "cookies accepteren", "accepteren", "akkoord", "ik ga akkoord",
+                 "accept all", "allow all")
+
 PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)")
+# prijsdelen uit de kaarttekst knippen om de titel over te houden — titel en
+# prijs staan lang niet altijd op een eigen regel
+PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
+                            r"\b(?:van|nu|nu voor|vanaf|adviesprijs)\b", re.I)
 BLOCK_HINTS = re.compile(r"access denied|just a moment|are you human|captcha|"
                          r"request blocked|pardon our interruption", re.I)
 
@@ -136,6 +158,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 return res
 
             blocked_pages = 0
+            diagnose_gedaan = False
             for cat_url in cats:
                 cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
                 for n in range(1, cfg.max_pages_per_category + 1):
@@ -155,6 +178,9 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                         found = _dom_products(page)
                     new = _absorb(seen, found, cat_path)
                     if not new:
+                        if not diagnose_gedaan and not seen:
+                            res.notes.append(f"diagnose {cat_path[:40]}: {_diagnose(page)}")
+                            diagnose_gedaan = True
                         break
                     if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
                         break
@@ -230,14 +256,44 @@ def _nav_categories_via_browser(page, cfg: RetailerCfg) -> list[str]:
     return ranked
 
 
-def _load(page, url: str) -> str | None:
-    """Pagina laden en laten renderen; None bij fout of blokkadepagina."""
+def accept_consent(page) -> bool:
+    """Cookiemuur wegklikken (ook in een iframe). True als er geklikt is."""
+    for sel in CONSENT_SELECTORS:
+        try:
+            el = page.locator(sel).first
+            if el.is_visible(timeout=700):
+                el.click(timeout=2500)
+                page.wait_for_timeout(900)
+                return True
+        except Exception:
+            continue
+    for frame in page.frames:
+        for txt in CONSENT_TEXTS:
+            try:
+                btn = frame.get_by_role("button", name=re.compile(txt, re.I)).first
+                if btn.is_visible(timeout=500):
+                    btn.click(timeout=2500)
+                    page.wait_for_timeout(900)
+                    return True
+            except Exception:
+                continue
+    return False
+
+
+def _load(page, url: str, consent: bool = True) -> str | None:
+    """Pagina laden, cookiemuur wegklikken en laten renderen.
+    None bij fout of blokkadepagina."""
     try:
         resp = page.goto(url, wait_until="domcontentloaded", timeout=30000)
     except Exception:
         return None
     if resp is not None and resp.status in (403, 429, 503):
         return None
+    if consent:
+        try:
+            accept_consent(page)
+        except Exception:
+            pass
     try:
         page.wait_for_load_state("networkidle", timeout=12000)
     except Exception:
@@ -246,7 +302,7 @@ def _load(page, url: str) -> str | None:
         page.evaluate("() => window.scrollTo(0, document.body.scrollHeight / 2)")
         page.wait_for_timeout(700)
         page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
-        page.wait_for_timeout(700)
+        page.wait_for_timeout(900)
         html = page.content()
     except Exception:
         return None
@@ -254,6 +310,22 @@ def _load(page, url: str) -> str | None:
     if BLOCK_HINTS.search(head) and "product" not in head.lower():
         return None
     return html
+
+
+def _diagnose(page) -> str:
+    """Korte diagnose als een pagina wél laadt maar niets oplevert — zodat het
+    validatierapport vertelt wat er ís in plaats van alleen wat ontbreekt."""
+    try:
+        info = page.evaluate("""() => ({
+          titel: (document.title || '').slice(0, 60),
+          links: document.querySelectorAll('a[href]').length,
+          prijzen: (document.body.innerText.match(/€/g) || []).length,
+          tekst: (document.body.innerText || '').trim().length,
+        })""")
+        return (f"titel='{info['titel']}', {info['links']} links, "
+                f"{info['prijzen']} €-tekens, {info['tekst']} tekens tekst")
+    except Exception:
+        return "pagina niet leesbaar"
 
 
 def _dom_products(page) -> list[Product]:
@@ -272,8 +344,13 @@ def _dom_products(page) -> list[Product]:
         price, was = min(prices), None
         if len(prices) > 1 and max(prices) > min(prices):
             was = max(prices)
-        lines = [l.strip() for l in text.splitlines() if l.strip() and "€" not in l]
-        title = lines[0] if lines else ""
+        title = ""
+        for line in text.splitlines():
+            kandidaat = PRICE_STRIP_RE.sub(" ", line).strip(" -–|,\t")
+            kandidaat = re.sub(r"\s{2,}", " ", kandidaat)
+            if len(kandidaat) >= 3:
+                title = kandidaat
+                break
         if not title:
             continue
         products.append(Product(key=url_key(href), title=title[:200], url=href,

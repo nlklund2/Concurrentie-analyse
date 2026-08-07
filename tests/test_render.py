@@ -10,6 +10,17 @@ from scraper.jsonscan import products_from_html
 from scraper.strategies.render_listing import _ApiSink, _dom_products, _load
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "render-listing.html").resolve()
+CONSENT_FIXTURE = (Path(__file__).parent / "fixtures" / "consent-listing.html").resolve()
+
+
+def _browser(pw):
+    try:
+        return pw.chromium.launch()
+    except Exception:
+        alt = Path("/opt/pw-browsers/chromium")
+        if not alt.exists():
+            pytest.skip("chromium niet beschikbaar")
+        return pw.chromium.launch(executable_path=str(alt))
 
 
 def test_render_pijplijn_op_js_pagina():
@@ -39,6 +50,27 @@ def test_render_pijplijn_op_js_pagina():
         pyjama = dom["Meisjes pyjama sterren"]
         assert pyjama.price == 9.99
         assert pyjama.was_price == 14.99
+
+        browser.close()
+
+
+def test_cookiemuur_wordt_weggeklikt_en_producten_verschijnen():
+    """Zonder consent blijft de lijst leeg; mét consent komen de producten."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        browser = _browser(pw)
+        page = browser.new_page()
+
+        # zonder consent: muur staat er, geen producten
+        _load(page, CONSENT_FIXTURE.as_uri(), consent=False)
+        assert _dom_products(page) == []
+
+        # mét consent: muur weg, producten zichtbaar incl. was-prijs
+        _load(page, CONSENT_FIXTURE.as_uri(), consent=True)
+        found = {p.title: p for p in _dom_products(page)}
+        assert found["Dames slip 5-pack"].price == 5.99
+        boxers = found["Heren boxers 3-pack"]
+        assert boxers.price == 8.99 and boxers.was_price == 11.99
 
         browser.close()
 
