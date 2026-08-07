@@ -70,23 +70,33 @@ def _rules() -> dict:
 def map_category(category_raw: str, title: str = "", url: str = "") -> tuple[str, str]:
     """(audience, product_type) volgens de regels in mapping.yml.
 
-    Regelvolgorde is betekenisvol: de eerste match wint. category_raw weegt
-    zwaarder dan titel/URL, dus die wordt eerst apart geprobeerd.
+    Doelgroep: het bronpad weegt zwaarder dan titel/URL (two-pass).
+    Producttype: regelvolgorde wint over pad-vs-titel — een pyjama in een
+    "lingerie & ondergoed"-pad is nachtmode; de specifiekere regel mag van
+    pad óf titel komen (gevalideerd op o.a. Primark).
     """
     rules = _rules()
     primary = (category_raw or "").lower()
     fallback = f"{title or ''} {url or ''}".lower()
 
-    def find(kind: str, default: str) -> str:
-        for label, rx in rules[kind]:
-            if rx.search(primary):
-                return label
-        for label, rx in rules[kind]:
+    audience = "onbekend"
+    for label, rx in rules["audience"]:
+        if rx.search(primary):
+            audience = label
+            break
+    else:
+        for label, rx in rules["audience"]:
             if rx.search(fallback):
-                return label
-        return default
+                audience = label
+                break
 
-    return find("audience", "onbekend"), find("product_type", "overig")
+    ptype = "overig"
+    for label, rx in rules["product_type"]:
+        if rx.search(primary) or rx.search(fallback):
+            ptype = label
+            break
+
+    return audience, ptype
 
 
 def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
