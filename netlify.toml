@@ -1,0 +1,12 @@
+# Netlify: statisch dashboard, geen framework-build.
+# Koppel de repo in Netlify; de buildstap genereert alleen config.js.
+[build]
+  publish = "dashboard"
+  command = "bash dashboard/build.sh"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"

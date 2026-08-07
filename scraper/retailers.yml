@@ -1,0 +1,130 @@
+# =====================================================================
+# Bronconfiguratie concurrentiemonitor terStal — focus: ONDERGOEDMODE
+# ---------------------------------------------------------------------
+# strategy: auto | shopify | listing | sitemap_pages
+#   'auto' probeert: Shopify-JSON → categorielijstpagina's → productpagina's.
+# seeds: handmatige categorie-URLs; vult/vervangt automatische ontdekking.
+# url_filter: substring waaraan URLs uit sitemaps moeten voldoen
+#   (essentieel bij internationale sites: houdt alleen het NL-deel over).
+# color_slot: vaste grafiekkleur in het dashboard (1-8); kleur volgt de
+#   bron, nooit de selectie — niet hergebruiken voor een andere bron.
+#   Houd gelijk aan de SLOTS-map in dashboard/index.html.
+#
+# FOCUS: focus_categories beperkt de crawl tot ondergoed-achtige
+# categorieën (scheelt ~80-90% requests); focus_product_types houdt na
+# de mapping alleen bodywear over. Verbreden naar het hele assortiment =
+# beide regels leegmaken. Badmode meenemen = 'badmode' aan de lijst
+# toevoegen en '|badmode|bikini|zwem' aan de regex plakken.
+#
+# Validatiestatus: draai de workflow "Validatie bronnen" (GitHub > Actions)
+# voor een actueel proefrapport per bron. Vanuit de ontwikkelomgeving is
+# het netwerk beperkt; de definitieve validatie gebeurt dus op GitHub.
+# =====================================================================
+
+defaults:
+  strategy: auto
+  min_delay: 0.7
+  max_categories: 40
+  max_pages_per_category: 40
+  max_products: 30000
+  sitemap_page_cap: 2500
+  min_products_expected: 25
+  respect_robots: true
+  # Verrijking: artikelen zonder kleur én maten worden via hun productpagina
+  # aangevuld, nieuwe artikelen eerst. Cap houdt de run kort (±2 min per bron).
+  enrich: true
+  enrich_limit: 150
+  focus_categories: "ondergoed|lingerie|onderkleding|underwear|nachtmode|nachthemd|pyjama|homewear|lounge|\\bsok|kousen|panty|maillot|boxer|\\bbh\\b|beha|\\bslip|hemd|singlet|shapewear|ondermode"
+  focus_product_types: [ondergoed, nachtmode, "sokken & panty's"]
+
+retailers:
+  # ---- referentie: eigen assortiment (verplicht voor de prijsindex) ----
+  terstal:
+    name: terStal familiemode
+    base: https://www.terstal.nl
+    segment: referentie
+    color_slot: 1
+    notes: Eigen winkel — referentielijn voor alle indexcijfers.
+
+  # ---- kern: het gevraagde concurrentieveld ondergoedmode ----
+  zeeman:
+    name: Zeeman
+    base: https://www.zeeman.com/nl
+    segment: kern
+    url_filter: "/nl"
+    color_slot: 2
+    notes: Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
+  wibra:
+    name: Wibra
+    base: https://www.wibra.nl
+    segment: kern
+    color_slot: 3
+    notes: Zelfde klant, zelfde prijspunten; ondergoed/nachtmode kerncategorie.
+  primark:
+    name: Primark
+    base: https://www.primark.com/nl-nl
+    segment: kern
+    url_filter: "/nl-nl"
+    color_slot: 4
+    notes: Geen webshop-verkoop, wel productpagina's met prijzen — prijsreferentie;
+      online dekking kan kleiner zijn dan het winkelschap.
+  action:
+    name: Action
+    base: https://www.action.com/nl-nl
+    segment: kern
+    url_filter: "/nl-nl"
+    color_slot: 5
+    notes: Prijszetter in sokken/boxers-multipacks; zware bot-bescherming —
+      uitval mogelijk (fase-2 headless).
+  hema:
+    name: HEMA
+    base: https://www.hema.nl
+    segment: kern
+    color_slot: 6
+    notes: Sterk in ondergoed/bh's; hoger prijspunt — bovengrens van het speelveld.
+  c-and-a:
+    name: C&A
+    base: https://www.c-and-a.com/nl/nl/shop
+    segment: kern
+    url_filter: "/nl/nl/"
+    color_slot: 7
+    notes: Gezinsmode incl. breed ondergoed; bot-bescherming mogelijk.
+
+  # ---- fase 2: breder veld (aanzetten kan altijd; zie PLAN.md §3) ----
+  takko:
+    name: Takko Fashion
+    base: https://www.takko.com/nl-nl
+    segment: breed
+    enabled: false
+    url_filter: "/nl-nl"
+    notes: Duitse discounter gezinsmode.
+  kik:
+    name: KiK
+    base: https://www.kik.nl
+    segment: breed
+    enabled: false
+    notes: Laagste prijspunten van de markt.
+  scapino:
+    name: Scapino
+    base: https://www.scapino.nl
+    segment: breed
+    enabled: false
+    notes: Waardesegment schoenen + casual; sokken relevant.
+  shoeby:
+    name: Shoeby
+    base: https://www.shoeby.nl
+    segment: breed
+    enabled: false
+    notes: Middensegment gezinsmode.
+  msmode:
+    name: MS Mode
+    base: https://www.msmode.nl
+    segment: breed
+    enabled: false
+    notes: Damesmode; lingerie beperkt relevant.
+  bonprix:
+    name: Bonprix
+    base: https://www.bonprix.nl
+    segment: breed
+    enabled: false
+    notes: Online gezinsmode; grote maten sterk.

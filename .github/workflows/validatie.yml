@@ -1,0 +1,55 @@
+# Bronnen valideren zonder database: kleine proefscrape per bron met
+# een leesbaar rapport in de job-samenvatting. Draai dit na installatie,
+# na het toevoegen van een bron, of wanneer een bron rood kleurt.
+name: Validatie bronnen
+
+on:
+  workflow_dispatch:
+    inputs:
+      retailers:
+        description: "Alleen deze bronnen (gescheiden door spaties; leeg = alle, ook uitgeschakelde)"
+        required: false
+        default: ""
+      limiet:
+        description: "Maximaal aantal artikelen per bron"
+        required: false
+        default: "40"
+
+jobs:
+  valideren:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      INPUT_RETAILERS: ${{ inputs.retailers }}
+      INPUT_LIMIET: ${{ inputs.limiet }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Afhankelijkheden installeren
+        run: pip install -r requirements.txt
+
+      - name: Proefscrape per bron
+        run: |
+          EXTRA=""
+          for r in $INPUT_RETAILERS; do EXTRA="$EXTRA --retailer $r"; done
+          python -m scraper probe $EXTRA --limit "$INPUT_LIMIET"
+
+      - name: Rapport in job-samenvatting tonen
+        if: always()
+        run: |
+          if [ -f probe-rapport.md ]; then
+            cat probe-rapport.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Rapport als artifact bewaren
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validatierapport
+          path: probe-rapport.md
+          if-no-files-found: ignore
