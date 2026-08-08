@@ -96,12 +96,25 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
 
 def _absorb(seen: dict[str, Product], products: list[Product], cat_path: str) -> None:
     for p in products:
-        if not p.category_raw:
-            p.category_raw = cat_path
+        # Het crawlpad draagt de doelgroep ("dames > lingerie"), de bron-categorie
+        # vaak alleen het producttype ("Pyjama's"). Allebei bewaren, niet het een
+        # door het ander laten verdringen — anders blijft de doelgroep 'onbekend'.
+        p.category_raw = _voeg_samen(cat_path, p.category_raw)
         cur = seen.get(p.key)
         if cur is None:
             seen[p.key] = p
         elif cur.price is None and p.price is not None:
+            p.category_raw = _voeg_samen(cur.category_raw, p.category_raw)
             seen[p.key] = p
-        elif p.category_raw and not cur.category_raw:
-            cur.category_raw = p.category_raw
+        else:
+            cur.category_raw = _voeg_samen(cur.category_raw, p.category_raw)
+
+
+def _voeg_samen(*delen: str) -> str:
+    """Categoriedelen samenvoegen zonder herhaling, gecapt op de kolombreedte."""
+    uit: list[str] = []
+    for deel in delen:
+        deel = (deel or "").strip()
+        if deel and deel.lower() not in (u.lower() for u in uit):
+            uit.append(deel)
+    return " > ".join(uit)[:500]
