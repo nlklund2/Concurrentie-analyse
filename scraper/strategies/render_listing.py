@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import re
 import time
-from urllib.parse import urlsplit
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlsplit
 
 from .. import discover
 from ..config import RetailerCfg
@@ -393,6 +394,90 @@ def _load(page, url: str, consent: bool = True) -> str | None:
     if BLOCK_HINTS.search(head) and "product" not in head.lower():
         return None
     return html
+
+
+class _AnkerLezer(HTMLParser):
+    """Verzamelt per <a>: href, aria-label/title, img-alt en de tekst erbinnen.
+    De statische tegenhanger van de DOM-scan, voor HTML die al elders gerenderd
+    is (Firecrawl) en waar dus geen browser meer omheen staat."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.ankers: list[dict] = []
+        self._open: dict | None = None
+        self._diepte = 0
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == "a":
+            if self._open is not None:
+                self._diepte += 1
+                return
+            self._open = {"href": a.get("href") or "", "tekst": [],
+                          "label": a.get("aria-label") or a.get("title") or ""}
+            self._diepte = 1
+        elif self._open is not None:
+            if tag == "img" and not self._open["label"]:
+                self._open["label"] = a.get("alt") or ""
+            if a.get("aria-label") and not self._open["label"]:
+                self._open["label"] = a["aria-label"]
+
+    def handle_endtag(self, tag):
+        if tag != "a" or self._open is None:
+            return
+        self._diepte -= 1
+        if self._diepte <= 0:
+            self._open["tekst"] = re.sub(r"\s+", " ", " ".join(self._open["tekst"])).strip()
+            self.ankers.append(self._open)
+            self._open = None
+
+    def handle_data(self, data):
+        if self._open is not None and data.strip():
+            self._open["tekst"].append(data.strip())
+
+
+def lees_ankers(html: str) -> list[dict]:
+    lezer = _AnkerLezer()
+    try:
+        lezer.feed(html)
+    except Exception:
+        pass  # kapotte HTML: houden wat er tot dan toe gelezen is
+    return lezer.ankers
+
+
+def cards_from_html(html: str, base_url: str) -> list[Product]:
+    """Productkaarten uit reeds gerenderde HTML — zelfde vangnet als de
+    DOM-scan, maar zonder browser. Nodig voor Firecrawl-bronnen (HEMA) die
+    hun lijsten wél renderen maar geen JSON-LD of __NEXT_DATA__ insluiten."""
+    ankers = lees_ankers(html)
+    host = urlsplit(base_url).netloc
+    heeft_euro = "€" in html or "&euro;" in html
+    for prijs_los in (False, True):
+        if prijs_los and heeft_euro:
+            break   # losse getallen alleen als er nérgens een €-teken staat
+        producten: dict[str, Product] = {}
+        for a in ankers:
+            href = a["href"]
+            if not href or href.startswith(("javascript:", "mailto:", "tel:", "#")):
+                continue
+            vol = urljoin(base_url, href)
+            p_url = urlsplit(vol)
+            if p_url.netloc != host or discover.NOISE_WORDS.search(vol):
+                continue
+            prijzen = [p for p in _prijzen(a["tekst"], prijs_los=prijs_los) if p <= 200]
+            if not prijzen:
+                continue
+            titel = _clean_title(a["label"], a["tekst"])
+            if not titel or NAV_TITEL_RE.match(titel):
+                continue
+            key = url_key(vol)
+            if key not in producten:
+                producten[key] = Product(
+                    key=key, title=titel, url=vol, price=min(prijzen),
+                    was_price=max(prijzen) if max(prijzen) > min(prijzen) else None)
+        if producten:
+            return list(producten.values())
+    return []
 
 
 def _diagnose(page) -> str:

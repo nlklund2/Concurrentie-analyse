@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 import re
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import requests
 
@@ -27,6 +27,7 @@ from ..http import Http
 from ..jsonscan import products_from_html
 from ..models import Product, ScrapeResult
 from .listing_crawl import _voeg_samen
+from .render_listing import cards_from_html, lees_ankers
 
 FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape"
 
@@ -61,6 +62,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         urlsplit(u).path for u in cats[:10]))
     seen: dict[str, Product] = {}
     credits = res.requests_done   # navigatie-opvraag telt mee
+    uit_kaarten = 0
     for cat_url in cats:
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
         html = _firecrawl_html(session, cat_url, res)
@@ -69,13 +71,22 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             if res.error:      # sleutel ongeldig of credits op: stoppen
                 break
             continue
-        for p in products_from_html(html, cat_url):
+        found = products_from_html(html, cat_url)
+        if not found:
+            # HEMA rendert de lijst wél maar sluit geen JSON in — dan is de
+            # kaartweergave zelf de enige bron (zelfde vangnet als de DOM-scan).
+            found = cards_from_html(html, cat_url)
+            uit_kaarten += len(found)
+        for p in found:
             # crawlpad (doelgroep) én bron-categorie (producttype) allebei bewaren
             p.category_raw = _voeg_samen(cat_path, p.category_raw)
             seen.setdefault(p.key, p)
         if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
             break
     res.requests_done = credits
+    if uit_kaarten:
+        res.notes.append(f"kaart-vangnet: {uit_kaarten} artikelen uit de "
+                         "gerenderde HTML (geen ingebedde JSON)")
     res.notes.append(f"{credits} Firecrawl-credits gebruikt (± {credits} pagina's)")
     res.products = list(seen.values())[: limit or cfg.max_products]
     if not res.products and not res.error:
@@ -115,11 +126,21 @@ def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
         return []
     cats = discover.categories_from_html(html, cfg.base, cfg.url_filter,
                                          cfg.max_categories)
+    # Een 'navigatielink' mét prijs in de tekst is een productteaser, geen
+    # categorie — bij Wibra wonnen twee pyjama-teasers het zo van de echte
+    # afdelingen en crawlden we productpagina's als 'categorie'.
+    met_prijs = set()
+    for a in lees_ankers(html):
+        if a["href"] and "€" in a["tekst"]:
+            p = urlsplit(urljoin(cfg.base, a["href"]))
+            met_prijs.add(f"{p.scheme}://{p.netloc}{p.path}")
+    cats = [c for c in cats if c not in met_prijs]
     if cfg.focus_categories and cats:
+        # focus vooraan sorteren maar niets wegfilteren: bij Wibra droeg geen
+        # enkele echte afdeling een focuswoord, en een lege lijst is erger
+        # dan een paar credits aan bredere categorieën
         rx = re.compile(cfg.focus_categories, re.I)
-        focused = [u for u in cats if rx.search(u)]
-        if focused:
-            cats = focused
+        cats.sort(key=lambda u: 0 if rx.search(u) else 1)
     if cats:
         res.notes.append("categorieën via de Firecrawl-gerenderde startpagina "
                          "(sitemap onbereikbaar voor het datacenter-IP)")
@@ -131,7 +152,8 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult) -> s
         "url": url,
         "formats": ["html"],
         "onlyMainContent": False,
-        "waitFor": 2500,
+        # HEMA's raster rendert traag; bij 2500 ms was de lijst nog leeg
+        "waitFor": 5000,
         "timeout": 30000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
     }

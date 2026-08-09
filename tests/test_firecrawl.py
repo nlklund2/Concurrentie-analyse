@@ -30,6 +30,26 @@ START_HTML = """<html><body><nav>
 <a href="/klantenservice">Klantenservice</a>
 </nav></body></html>"""
 
+# Wibra-scenario: de startpagina toont productteasers mét prijs die op de
+# focusregex matchen, terwijl de echte afdelingen geen focuswoord dragen.
+START_MET_TEASERS = """<html><body>
+<nav><a href="/dames">Dames</a><a href="/heren">Heren</a></nav>
+<div class="teaser">
+  <a href="/assortiment/baby-pyjama-safari"><img alt="Baby pyjama safari">€ 6,99</a>
+  <a href="/assortiment/baby-pyjama-bloem"><img alt="Baby pyjama bloem">€ 7,99</a>
+</div></body></html>"""
+
+# HEMA-scenario: gerenderde kaarten zonder ingebedde JSON; prijs vóór én
+# achter het getal, plus een navigatietegel die geen artikel is.
+KAARTEN_HTML = """<html><body>
+<a href="/productoverzicht/dames-slips-123">
+  <img alt="dames slips katoen - 3 paar"><span>7,50 €</span></a>
+<a href="/productoverzicht/herensokken-456">
+  <img alt="herensokken naadloos - 2 paar"><span>€ 4,00</span><del>€ 6,00</del></a>
+<a href="/dames/lingerie">Bekijk alles <span>vanaf € 3,50</span></a>
+<a href="/klantenservice">Klantenservice € 0,00</a>
+</body></html>"""
+
 
 class _Resp:
     def __init__(self, status=200, html=None, body=None):
@@ -56,8 +76,10 @@ def _sessie(monkeypatch, antwoorden):
 
 
 def _cfg(**over):
-    return RetailerCfg(id="wibra", name="Wibra", base="https://www.wibra.nl",
-                       strategy="firecrawl", enrich=False, **over)
+    basis = dict(id="wibra", name="Wibra", base="https://www.wibra.nl",
+                 strategy="firecrawl", enrich=False)
+    basis.update(over)
+    return RetailerCfg(**basis)
 
 
 def test_zonder_sleutel_schone_fout(monkeypatch):
@@ -99,6 +121,37 @@ def test_ongeldige_sleutel_niet_overschreven(monkeypatch):
     monkeypatch.setattr(firecrawl_api, "_category_urls", lambda cfg, http, res: [])
     res = firecrawl_api.scrape(_cfg(), http=None)
     assert "ongeldig" in res.error
+
+
+def test_kaart_vangnet_zonder_ingebedde_json(monkeypatch):
+    """HEMA rendert de lijst maar sluit geen JSON in: kaarten zijn de bron."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(html=KAARTEN_HTML)])
+    cfg = _cfg(base="https://www.hema.nl",
+               seeds=["https://www.hema.nl/dames/lingerie"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    by_title = {p.title: p for p in res.products}
+    assert set(by_title) == {"dames slips katoen - 3 paar",
+                             "herensokken naadloos - 2 paar"}
+    assert by_title["dames slips katoen - 3 paar"].price == 7.50   # '7,50 €'
+    sokken = by_title["herensokken naadloos - 2 paar"]
+    assert (sokken.price, sokken.was_price) == (4.00, 6.00)
+    assert any("kaart-vangnet" in n for n in res.notes)
+
+
+def test_nav_teasers_zijn_geen_categorieen(monkeypatch):
+    """Wibra: productteasers mét prijs mogen de echte afdelingen niet
+    verdringen, ook al matchen alleen de teasers de focusregex."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=START_MET_TEASERS),
+                                  _Resp(html=LISTING_HTML)])
+    monkeypatch.setattr(firecrawl_api, "_category_urls", lambda cfg, http, res: [])
+    cfg = _cfg(focus_categories="ondergoed|pyjama", max_categories=2)
+    res = firecrawl_api.scrape(cfg, http=None)
+    gecrawld = set(calls[1:])
+    assert gecrawld <= {"https://www.wibra.nl/dames", "https://www.wibra.nl/heren"}
+    assert not any("assortiment" in c for c in gecrawld)
+    assert res.products
 
 
 def test_navigatie_fallback_zonder_sitemap(monkeypatch):
