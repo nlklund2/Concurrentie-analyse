@@ -51,6 +51,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     if not cats:
         res.error = "geen categorie-URLs gevonden (sitemap noch navigatie)"
         return res
+    # Welke categorieën gecrawld worden bepaalt of de doelgroep herkenbaar is;
+    # zichtbaar maken scheelt gokwerk bij het instellen van `seeds`.
+    res.notes.append("gecrawlde categorieën: " + ", ".join(
+        urlsplit(u).path for u in cats[:10]))
 
     seen: dict[str, Product] = {}
     for cat_url in cats:
