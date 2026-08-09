@@ -60,6 +60,11 @@ CONSENT_TEXTS = ("alles accepteren", "accepteer alles", "alle cookies accepteren
                  "accept all", "allow all")
 
 PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)")
+# Sommige shops zetten het €-teken via CSS (::before) neer; dan staat er in de
+# tekst alleen '3,99'. Bewust smal: twee decimalen achter een komma/punt, geen
+# maten ('35 - 46') en geen losse getallen. Alleen gebruikt als de pagina
+# nergens een €-teken toont — anders is het te grof.
+PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![\d])")
 # prijsdelen uit de kaarttekst knippen om de titel over te houden — titel en
 # prijs staan lang niet altijd op een eigen regel
 PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
@@ -76,10 +81,10 @@ NAV_TITEL_RE = re.compile(
     r"alle\s+\w+|sale|nieuw|ontdek(?:ken)?|lees\s+meer|verder\s+winkelen)$", re.I)
 
 DOM_SCAN_JS = """
-(streng) => {
+([streng, prijsLos]) => {
   const out = [];
   const seen = new Set();
-  const priceRe = /€\\s*\\d/;
+  const priceRe = prijsLos ? /(?:^|[^\\d.,])\\d{1,3}[.,]\\d{2}(?!\\d)/ : /€\\s*\\d/;
   // Productkaart = een link naar een productpagina, met ergens in de
   // omliggende kaart een prijs. Titel komt uit aria-label / img-alt /
   // heading, niet uit de ruwe kaarttekst (die is vervuild met prijs/labels).
@@ -393,33 +398,62 @@ def _clean_title(raw_title: str, card_text: str) -> str:
 def _dom_products(page, res: ScrapeResult | None = None) -> list[Product]:
     """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel).
 
-    Eerst alleen links die naar een productpagina wijzen. Levert dat niets op,
-    dan alsnog alle links met een prijs — beter een rommelige waarneming dan
-    geen, maar alleen als er echt geen productlinks zijn. Welke van de twee
-    het werd, komt in het rapport: bij C&A bleek de losse ronde nodig, en
-    juist daar sluipt navigatie binnen.
+    Vier rondes, van meest naar minst betrouwbaar; de eerste die iets oplevert
+    wint, en elke afwijking van de strengste ronde komt in het rapport.
+      1. productlink + €-prijs      — het normale geval
+      2. alle links + €-prijs       — C&A: productlinks zijn niet herkenbaar
+      3. productlink + los getal    — €-teken komt uit CSS i.p.v. uit de tekst
+      4. alle links + los getal     — laatste redmiddel
+    Rondes 3 en 4 draaien alleen als er nérgens een €-teken staat; anders is
+    'ieder getal met twee decimalen' te grof en vist het maten en gewichten op.
     """
-    streng = _dom_ronde(page, streng=True)
-    if streng:
-        return streng
-    los = _dom_ronde(page, streng=False)
-    if res is not None and los and not any("DOM-vangnet" in n for n in res.notes):
-        res.notes.append(f"DOM-vangnet: geen herkenbare productlinks, "
-                         f"teruggevallen op alle links ({len(los)} kaarten) — "
-                         "navigatietegels worden op titel geweerd")
-    return los
+    for streng in (True, False):
+        gevonden = _dom_ronde(page, streng=streng, prijs_los=False)
+        if gevonden:
+            _meld(res, streng, False, len(gevonden))
+            return gevonden
+    if _pagina_toont_euro(page):
+        return []
+    for streng in (True, False):
+        gevonden = _dom_ronde(page, streng=streng, prijs_los=True)
+        if gevonden:
+            _meld(res, streng, True, len(gevonden))
+            return gevonden
+    return []
 
 
-def _dom_ronde(page, streng: bool) -> list[Product]:
+def _pagina_toont_euro(page) -> bool:
     try:
-        raw = page.evaluate(DOM_SCAN_JS, streng)
+        return bool(page.evaluate(
+            "() => (document.body.innerText || '').includes('\\u20ac')"))
+    except Exception:
+        return True   # bij twijfel niet de losse prijsronde inzetten
+
+
+def _meld(res: ScrapeResult | None, streng: bool, prijs_los: bool, aantal: int) -> None:
+    if res is None or (streng and not prijs_los):
+        return          # de normale route hoeft niet gemeld te worden
+    waarom = []
+    if not streng:
+        waarom.append("geen herkenbare productlinks")
+    if prijs_los:
+        waarom.append("geen €-teken in de tekst")
+    boodschap = f"DOM-vangnet: {' en '.join(waarom)} — {aantal} kaarten gelezen"
+    if not any(n.startswith("DOM-vangnet") for n in res.notes):
+        res.notes.append(boodschap)
+
+
+def _dom_ronde(page, streng: bool, prijs_los: bool = False) -> list[Product]:
+    try:
+        raw = page.evaluate(DOM_SCAN_JS, [streng, prijs_los])
     except Exception:
         return []
     products: list[Product] = []
+    prijs_re = PRICE_LOOSE_RE if prijs_los else PRICE_TEXT_RE
     for item in raw:
         href = item.get("href", "")
         text = item.get("text", "")
-        prices = [p for p in (parse_price(m) for m in PRICE_TEXT_RE.findall(text)) if p]
+        prices = [p for p in (parse_price(m) for m in prijs_re.findall(text)) if p]
         # ondergoed/nachtmode/sokken: prijzen boven €200 zijn vrijwel zeker ruis
         # (artikelnummers, postcodes) uit een verkeerd kaart-element
         prices = [p for p in prices if p <= 200]

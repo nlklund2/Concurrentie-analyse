@@ -131,6 +131,26 @@ def test_titel_uit_kaarttekst_zonder_maten_en_varianten():
         browser.close()
 
 
+def test_prijzen_zonder_euroteken_in_de_tekst():
+    """Shops die het €-teken via CSS neerzetten maken een €-gebaseerde scan
+    blind. De losse prijsronde springt bij, maar alleen als er nérgens op de
+    pagina een €-teken staat — en maten ('Maten 35 - 46') blijven eraf."""
+    from playwright.sync_api import sync_playwright
+    fixture = (Path(__file__).parent / "fixtures" / "prijs-zonder-euroteken.html").resolve()
+    with sync_playwright() as pw:
+        browser = _browser(pw)
+        page = browser.new_page()
+        _load(page, fixture.as_uri(), consent=False)
+        found = {p.title: p for p in _dom_products(page)}
+
+        assert set(found) == {"Dames slip 3-pack", "Heren boxer 2-pack"}
+        assert found["Dames slip 3-pack"].price == 5.99
+        boxer = found["Heren boxer 2-pack"]
+        assert boxer.price == 7.99
+        assert boxer.was_price is None      # 35 en 46 zijn maten, geen prijzen
+        browser.close()
+
+
 def test_firecrawl_zonder_sleutel_faalt_netjes(monkeypatch):
     """Zonder FIRECRAWL_API_KEY blijft de bron rood met een duidelijke uitleg,
     zonder de weekrun te breken."""
