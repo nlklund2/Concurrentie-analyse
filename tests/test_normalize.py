@@ -24,6 +24,16 @@ def test_map_category_bronpad_wint():
     assert map_category("Huishoudtextiel", title="Handdoek 50x100") == ("huis", "huistextiel")
 
 
+def test_primark_gebruikt_vrouwen_en_mannen():
+    """Primark noemt de doelgroep 'vrouwen'/'mannen' i.p.v. dames/heren —
+    zonder deze synoniemen landde alles op 'onbekend' (week 32)."""
+    assert map_category("/nl-nl/c/vrouwen/nachtkleding-en-lingerie")[0] == "dames"
+    assert map_category("/nl-nl/c/mannen/ondergoed-en-sokken")[0] == "heren"
+    assert map_category("", title="Pyjama voor vrouwen")[0] == "dames"
+    # 'vrouwen' mag 'mannen' niet overrulen en omgekeerd
+    assert map_category("/c/mannen/pyjamas")[0] == "heren"
+
+
 def test_map_category_titel_als_vangnet():
     assert map_category("", title="Jongens boxershorts 3-pack") == ("jongens", "ondergoed")
     assert map_category("", title="Baby romper 2-pack") == ("baby", "overig")

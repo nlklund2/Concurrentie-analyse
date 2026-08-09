@@ -12,7 +12,8 @@ _HREF_RE = re.compile(r'href\s*=\s*["\']([^"\'#]+)["\']', re.I)
 
 # padwoorden die op een categorie-/overzichtspagina duiden
 CATEGORY_WORDS = re.compile(
-    r"dames|heren|jongens|meisjes|meiden|baby|kind|kids|ondergoed|lingerie|nacht|pyjama|"
+    r"dames|heren|vrouwen|mannen|jongens|meisjes|meiden|baby|kind|kids|"
+    r"ondergoed|lingerie|nacht|pyjama|"
     r"sokken|panty|schoen|sneaker|laarzen|sport|jassen|truien|broeken|jeans|shirts|"
     r"jurken|rokken|badmode|zwem|accessoires|huishoud|wonen|textiel|sale|aanbieding", re.I)
 

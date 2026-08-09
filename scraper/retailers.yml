@@ -34,7 +34,7 @@ defaults:
   # aangevuld, nieuwe artikelen eerst. Cap houdt de run kort (±2 min per bron).
   enrich: true
   enrich_limit: 150
-  focus_categories: "ondergoed|lingerie|onderkleding|underwear|nachtmode|nachthemd|pyjama|homewear|lounge|\\bsok|kousen|panty|maillot|boxer|\\bbh\\b|beha|\\bslip|hemd|singlet|shapewear|ondermode"
+  focus_categories: "ondergoed|lingerie|onderkleding|underwear|nachtmode|nachtkleding|nachthemd|pyjama|homewear|lounge|\\bsok|kousen|panty|maillot|boxer|\\bbh\\b|beha|\\bslip|hemd|singlet|shapewear|ondermode"
   focus_product_types: [ondergoed, nachtmode, "sokken & panty's"]
 
 retailers:

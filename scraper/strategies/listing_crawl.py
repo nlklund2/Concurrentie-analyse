@@ -32,6 +32,7 @@ def category_urls(cfg: RetailerCfg, http: Http, res: ScrapeResult) -> list[str]:
         urls = discover.nav_categories(http, cfg.base, cfg.url_filter, cfg.max_categories)
         if urls:
             res.notes.append("categorieën uit navigatie (geen categorie-sitemap gevonden)")
+    urls = list(dict.fromkeys(urls))   # dezelfde categorie niet twee keer crawlen
     if cfg.focus_categories and urls:
         rx = re.compile(cfg.focus_categories, re.I)
         focused = [u for u in urls if rx.search(u)]
@@ -51,6 +52,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     if not cats:
         res.error = "geen categorie-URLs gevonden (sitemap noch navigatie)"
         return res
+    # Welke categorieën gecrawld worden bepaalt of de doelgroep herkenbaar is;
+    # zichtbaar maken scheelt gokwerk bij het instellen van `seeds`.
+    res.notes.append("gecrawlde categorieën: " + ", ".join(
+        urlsplit(u).path for u in cats[:10]))
 
     seen: dict[str, Product] = {}
     for cat_url in cats:
