@@ -58,6 +58,11 @@ retailers:
       Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
       GEVALIDEERD 07-08: werkt via productpagina's; 9.672 focus-URLs → vaste
       steekproef van 2.500/week (deelwaarneming, trends vergelijkbaar).
+      GEREPAREERD 09-08: elke kleurvariant heeft een eigen pagina, maar toont
+      daarop álle varianten; de scraper koos steeds dezelfde en 60 pagina's
+      vielen samen tot 4 artikelen. Nu op naamgelijkenis met de pagina-slug,
+      en de steekproef is gelijkmatig gespreid i.p.v. de eerste N alfabetisch
+      (die waren allemaal varianten van dezelfde paar artikelen).
   wibra:
     name: Wibra
     base: https://www.wibra.nl
@@ -96,6 +101,11 @@ retailers:
       Prijszetter in sokken/boxers-multipacks.
       GEVALIDEERD 07-08: WERKT via de render-strategie nadat de cookiemuur wordt
       weggeklikt (24 artikelen, 100% prijsdekking in de proef).
+      LET OP 09-08: de categoriepaden (/c/mode/ondergoed) dragen géén doelgroep,
+      dus de mapping leunt volledig op de titel. In week 32 stonden er banners
+      als artikel in de cijfers ("Veiligheidswaarschuwing…", €1,00 van €5,00);
+      de DOM-scan eist nu een echte productlink. Haalt Action daarmee de
+      drempel van 25 niet, dan blijft de bron rood — beter leeg dan vervuild.
   hema:
     name: HEMA
     base: https://www.hema.nl
@@ -123,7 +133,10 @@ retailers:
       Gezinsmode incl. breed ondergoed.
       GEVALIDEERD 07-08: pagina's laden volledig via de render-strategie (141
       links, prijzen aanwezig); productkaart-extractie verbeterd 07-08 zodat de
-      prijs-buiten-de-link wordt opgepikt. Hervalidatie loopt.
+      prijs-buiten-de-link wordt opgepikt.
+      GEREPAREERD 09-08: navigatietegels ("Voor meisjes", "shoppen") stonden als
+      artikel in de cijfers; de DOM-scan eist nu een echte productlink. Dekking
+      over doelgroepen is goed sinds de spreiding (baby/dames/heren).
 
   # ---- fase 2: breder veld (aanzetten kan altijd; zie PLAN.md §3) ----
   takko:

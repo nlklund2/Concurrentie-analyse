@@ -68,18 +68,25 @@ BLOCK_HINTS = re.compile(r"access denied|just a moment|are you human|captcha|"
                          r"request blocked|pardon our interruption", re.I)
 
 DOM_SCAN_JS = """
-() => {
+(streng) => {
   const out = [];
   const seen = new Set();
   const priceRe = /€\\s*\\d/;
   // Productkaart = een link naar een productpagina, met ergens in de
   // omliggende kaart een prijs. Titel komt uit aria-label / img-alt /
   // heading, niet uit de ruwe kaarttekst (die is vervuild met prijs/labels).
-  const links = document.querySelectorAll(
-    'a[href*="/p/"],a[href*="/p-"],a[href*="/product"],a[href*="/artikel"],a[href]');
+  // In de strenge ronde moet de link ook echt naar een product wijzen:
+  // zonder die eis werden bij Action banners ('Veiligheidswaarschuwing…')
+  // en bij C&A navigatietegels ('Voor meisjes') als artikel opgevoerd.
+  const padRe = /\\/p\\/|\\/p-|\\/product|\\/artikel|\\/dp\\//i;
+  const links = document.querySelectorAll('a[href]');
   for (const a of links) {
     const href = a.href;
     if (!href || href.startsWith('javascript:') || seen.has(href)) continue;
+    if (streng) {
+      const laatste = (href.split(/[?#]/)[0].replace(/\\/$/, '').split('/').pop() || '');
+      if (!padRe.test(href) && !/\\d{4,}/.test(laatste)) continue;
+    }
     let card = a, hops = 0;
     while (card && hops < 5 && !priceRe.test(card.innerText || '')) {
       card = card.parentElement; hops++;
@@ -366,9 +373,19 @@ def _clean_title(raw_title: str, card_text: str) -> str:
 
 
 def _dom_products(page) -> list[Product]:
-    """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel)."""
+    """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel).
+
+    Eerst alleen links die naar een productpagina wijzen. Levert dat niets op,
+    dan alsnog alle links met een prijs — beter een rommelige waarneming dan
+    geen, maar alleen als er echt geen productlinks zijn.
+    """
+    producten = _dom_ronde(page, streng=True)
+    return producten or _dom_ronde(page, streng=False)
+
+
+def _dom_ronde(page, streng: bool) -> list[Product]:
     try:
-        raw = page.evaluate(DOM_SCAN_JS)
+        raw = page.evaluate(DOM_SCAN_JS, streng)
     except Exception:
         return []
     products: list[Product] = []

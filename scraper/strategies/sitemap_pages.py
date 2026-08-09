@@ -6,6 +6,7 @@ geweigerd zodat een run nooit uren op één bron blijft hangen.
 from __future__ import annotations
 
 import re
+from urllib.parse import urlsplit
 
 from .. import discover
 from ..config import RetailerCfg
@@ -32,15 +33,20 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         res.error = "geen product-URLs in sitemap gevonden"
         return res
 
-    # Boven de cap: vaste (gesorteerde) steekproef i.p.v. weigeren — een stabiele
-    # deelwaarneming geeft bruikbare week-op-week-trends; tellingen zijn dan wel
-    # een ondergrens, geen totaal (zichtbaar via de notitie in het rapport).
+    # Boven de cap: vaste steekproef i.p.v. weigeren — een stabiele deelwaarneming
+    # geeft bruikbare week-op-week-trends; tellingen zijn dan wel een ondergrens,
+    # geen totaal (zichtbaar via de notitie in het rapport). Gelijkmatig gespreid
+    # over de gesorteerde lijst: de eerste N alfabetisch nemen leverde bij Zeeman
+    # alleen kleurvarianten van dezelfde paar artikelen op.
     cap = limit or cfg.sitemap_page_cap
     if len(product_urls) > cap:
+        totaal = len(product_urls)
         product_urls.sort()
-        res.notes.append(f"{len(product_urls)} product-URLs binnen focus; vaste "
-                         f"steekproef van {cap} pagina's — tellingen zijn een "
-                         "deelwaarneming, trends blijven vergelijkbaar")
+        stap = totaal / cap
+        product_urls = [product_urls[int(i * stap)] for i in range(cap)]
+        res.notes.append(f"steekproef van {cap} van {totaal} product-URLs "
+                         f"(elke ~{stap:.0f}e, gelijkmatig gespreid) — tellingen "
+                         "zijn een deelwaarneming, trends blijven vergelijkbaar")
     gemist = 0
     herhaald = 0
     gezien: dict[str, str] = {}     # sleutel → titel, voor de diagnose
@@ -85,13 +91,25 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     return res
 
 
-def _eigen_product(found: list[Product], url: str) -> Product | None:
-    """Het artikel van déze pagina, niet een aanrader uit een gedeeld blok.
+_WOORD_RE = re.compile(r"[^a-z0-9]+")
 
-    Eerst op URL matchen — dat is het enige harde bewijs dat een gevonden
-    product bij deze pagina hoort. Pas als dat niets oplevert de oude
-    heuristiek (prijs + langste titel); de herhaalpoort in scrape() vangt af
-    dat die per ongeluk steeds hetzelfde artikel aanwijst.
+
+def _woorden(tekst: str) -> set[str]:
+    return {w for w in _WOORD_RE.split((tekst or "").lower()) if len(w) > 2}
+
+
+def _eigen_product(found: list[Product], url: str) -> Product | None:
+    """Het artikel van déze pagina, niet een variant of aanrader ernaast.
+
+    Drie stappen, van hard naar zacht:
+    1. URL-match — het enige harde bewijs dat een gevonden product bij deze
+       pagina hoort.
+    2. Naamgelijkenis met de slug van de pagina. Zeeman zet elke kleurvariant
+       als eigen pagina neer maar zet in álle varianten dezelfde productlijst;
+       zonder deze stap won steeds dezelfde variant en vielen 60 pagina's samen
+       tot 4 artikelen ("Amely Slip - Paars" op de pagina van elke andere kleur).
+    3. De oude heuristiek (prijs + langste titel); de herhaalpoort in scrape()
+       vangt af dat die per ongeluk steeds hetzelfde artikel aanwijst.
     """
     if not found:
         return None
@@ -99,12 +117,22 @@ def _eigen_product(found: list[Product], url: str) -> Product | None:
     for p in found:
         if p.key == doel or (p.url and url_key(p.url) == doel):
             return p
+    slug = _woorden(urlsplit(url).path.rsplit("/", 1)[-1])
+    if slug:
+        beste, score = None, 0.0
+        for p in found:
+            titel = _woorden(p.title)
+            if titel:
+                gedeeld = len(titel & slug) / len(titel)
+                if gedeeld > score:
+                    beste, score = p, gedeeld
+        if beste is not None and score >= 0.6:
+            return beste
     return max(found, key=lambda x: (x.price is not None, len(x.title or "")))
 
 
 def _pad(url: str) -> str:
     """Het URL-pad als categoriesignaal, bv. 'dames ondergoed slips'."""
-    from urllib.parse import urlsplit
     segs = [s for s in urlsplit(url).path.split("/") if s]
     return " ".join(s.replace("-", " ") for s in segs[:-1])
 

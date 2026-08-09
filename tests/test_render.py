@@ -95,6 +95,25 @@ def test_dom_kaart_met_prijs_buiten_de_link():
         browser.close()
 
 
+def test_dom_negeert_banners_en_navigatietegels():
+    """Week 32: zonder eis dat de link naar een product wijst, kwamen bij Action
+    'Veiligheidswaarschuwing: Big Jeff barbecuehandschoen' en bij C&A 'Voor
+    meisjes' als artikel in de cijfers — inclusief de prijs van de banner."""
+    from playwright.sync_api import sync_playwright
+    fixture = (Path(__file__).parent / "fixtures" / "navigatie-listing.html").resolve()
+    with sync_playwright() as pw:
+        browser = _browser(pw)
+        page = browser.new_page()
+        _load(page, fixture.as_uri(), consent=False)
+        found = {p.title: p for p in _dom_products(page)}
+
+        assert set(found) == {"Dames slips 5-pack", "Baby pyjama met sterren"}
+        assert found["Dames slips 5-pack"].price == 6.99
+        pyjama = found["Baby pyjama met sterren"]
+        assert pyjama.price == 9.99 and pyjama.was_price == 14.99
+        browser.close()
+
+
 def test_firecrawl_zonder_sleutel_faalt_netjes(monkeypatch):
     """Zonder FIRECRAWL_API_KEY blijft de bron rood met een duidelijke uitleg,
     zonder de weekrun te breken."""

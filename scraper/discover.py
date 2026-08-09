@@ -27,7 +27,9 @@ AUDIENCE_WORDS = re.compile(
 NOISE_WORDS = re.compile(
     r"klantenservice|service|contact|vacature|retour|verzend|voorwaarden|privacy|cookie|"
     r"winkels|store-?locator|blog|nieuws|account|login|wishlist|cart|winkelwagen|"
-    r"giftcard|cadeaukaart|folder|\.pdf$|\.jpg$|\.png$", re.I)
+    r"giftcard|cadeaukaart|folder|\.pdf$|\.jpg$|\.png$|"
+    # kleur-/maatfilters van een categorie die we toch al crawlen (KiK: /c_wit)
+    r"/c_[a-z]{3,}", re.I)
 
 
 def origin(url: str) -> str:

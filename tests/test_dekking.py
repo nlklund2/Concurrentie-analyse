@@ -46,3 +46,36 @@ def test_eigen_product_valt_terug_zonder_url_match():
              Product(key="b", title="Wel een prijs", price=4.99)]
     assert _eigen_product(found, pagina).key == "b"
     assert _eigen_product([], pagina) is None
+
+
+def test_eigen_product_kiest_de_juiste_kleurvariant():
+    """Zeeman zet elke kleur als eigen pagina neer maar toont in alle varianten
+    dezelfde productlijst. Zonder naamgelijkenis won steeds dezelfde variant en
+    vielen 60 pagina's samen tot 4 artikelen."""
+    varianten = [
+        Product(key="s-paars", title="Amely Slip - Paars", price=5.99),
+        Product(key="s-rood", title="Amely Slip - Rood", price=5.99),
+        Product(key="s-zwart", title="Amely Slip - Zwart", price=5.99),
+    ]
+    basis = "https://www.zeeman.com/nl-nl/dames/ondergoed/"
+    for kleur, sleutel in (("rood", "s-rood"), ("zwart", "s-zwart"), ("paars", "s-paars")):
+        gekozen = _eigen_product(varianten, f"{basis}amely-slip-{kleur}-98765")
+        assert gekozen.key == sleutel, kleur
+
+
+def test_eigen_product_negeert_zwakke_naamgelijkenis():
+    """Een aanrader die toevallig één woord deelt mag niet winnen."""
+    found = [Product(key="promo", title="Zomerdeal handdoeken set", price=9.99)]
+    gekozen = _eigen_product(found, "https://x.nl/dames/ondergoed/amely-slip-rood-123")
+    assert gekozen.key == "promo"   # valt terug op de heuristiek, niet op de slug
+
+
+def test_kleurfilterpaden_tellen_niet_als_categorie():
+    """KiK biedt elke categorie ook per kleur aan (/c_wit); die crawlen kost
+    budget en levert dezelfde artikelen op."""
+    from scraper.discover import split_product_category_urls
+    _, cats = split_product_category_urls([
+        "https://www.kik.nl/c/dames/dameskleding-ondergoed",
+        "https://www.kik.nl/c/dames/dameskleding-ondergoed/c_wit",
+    ])
+    assert cats == ["https://www.kik.nl/c/dames/dameskleding-ondergoed"]

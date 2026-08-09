@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <title>Categoriepagina met banners en navigatietegels (Action/C&amp;A-patroon)</title>
+</head>
+<body>
+  <!-- Banner met een prijs: leverde bij Action het "artikel"
+       'Veiligheidswaarschuwing: Big Jeff barbecuehandschoen €1,00 was €5,00' op -->
+  <div class="banner">
+    <a href="/nl-nl/veiligheidswaarschuwingen">
+      Veiligheidswaarschuwing: Big Jeff barbecuehandschoen
+    </a>
+    <div class="price">nu € 1,00 <s>€ 5,00</s></div>
+  </div>
+
+  <!-- Navigatietegels naar subcategorieën: leverden bij C&A de "artikelen"
+       'Voor meisjes' en 'Voor jongens' op, met de prijs van de tegel ernaast -->
+  <nav class="tiles">
+    <div class="tile">
+      <a href="/nl/nl/shop/baby-nachtkleding-meisjes">Voor meisjes</a>
+      <span class="from">vanaf € 9,00</span>
+    </div>
+    <div class="tile">
+      <a href="/nl/nl/shop/baby-nachtkleding-jongens">Voor jongens</a>
+      <span class="from">vanaf € 9,00</span>
+    </div>
+  </nav>
+
+  <!-- De echte productkaarten -->
+  <div class="grid">
+    <article class="card">
+      <a href="/nl-nl/p/dames-slip-5pack" aria-label="Dames slips 5-pack">
+        <img src="x.jpg" alt="Dames slips 5-pack">
+      </a>
+      <div class="price">€ 6,99</div>
+    </article>
+    <article class="card">
+      <a href="/nl/nl/shop/baby-pyjama-3082714_1.html" aria-label="Baby pyjama met sterren">
+        <img src="y.jpg" alt="Baby pyjama met sterren">
+      </a>
+      <div class="price"><s>€ 14,99</s> € 9,99</div>
+    </article>
+  </div>
+</body>
+</html>
