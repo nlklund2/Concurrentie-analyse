@@ -40,6 +40,12 @@ def origin(url: str) -> str:
     return f"{p.scheme}://{p.netloc}"
 
 
+def sitemap_locs(xml_text: str) -> list[str]:
+    """Alle <loc>-URLs uit sitemap-XML — ook bruikbaar voor XML die via een
+    andere route (bv. Firecrawl) is opgehaald."""
+    return _LOC_RE.findall(xml_text)
+
+
 def find_sitemaps(http: Http, base: str) -> list[str]:
     """Sitemap-URLs uit robots.txt, met gangbare fallbacks."""
     root = origin(base)

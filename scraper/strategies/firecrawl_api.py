@@ -47,8 +47,11 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
 
     cats = _category_urls(cfg, http, res)
     if not cats:
-        # De sitemap is bij deze bronnen vaak net zo geblokkeerd als de rest;
-        # haal dan de startpagina óók via Firecrawl en lees de navigatie.
+        # De sitemap is bij deze bronnen net zo geblokkeerd als de rest — maar
+        # Firecrawl kan hem wél lezen. Dat is de betrouwbaarste bron: de
+        # navigatie bleek bij Wibra alleen productteasers te bevatten.
+        cats = _sitemap_via_firecrawl(session, cfg, res)
+    if not cats:
         cats = _nav_via_firecrawl(session, cfg, res)
     if not cats:
         # een al gezette fout (401/402) is de échte oorzaak — niet overschrijven
@@ -117,6 +120,67 @@ def _category_urls(cfg: RetailerCfg, http: Http, res: ScrapeResult) -> list[str]
     return cats
 
 
+def _focus_smal(cats: list[str], cfg: RetailerCfg) -> list[str]:
+    """Versmal tot focus-categorieën, maar alleen als er dan iets overblijft."""
+    if cats and cfg.focus_categories:
+        rx = re.compile(cfg.focus_categories, re.I)
+        focused = [u for u in cats if rx.search(u)]
+        if focused:
+            return focused
+    return cats
+
+
+def _sitemap_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
+                           res: ScrapeResult) -> list[str]:
+    """Categorieën uit de sitemap, opgehaald via Firecrawl (rawHtml — geen
+    rendering nodig, dus goedkoop en betrouwbaar). Max ±5 credits."""
+    root = discover.origin(cfg.base)
+    for pad in ("/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml"):
+        xml = _firecrawl_html(session, root + pad, res, raw=True)
+        res.requests_done += 1
+        if not xml or "<loc" not in xml:
+            if res.error:
+                return []
+            continue
+        locs = discover.sitemap_locs(xml)
+        if re.search(r"<sitemap[\s>]", xml, re.I):
+            # index: alleen de meest belovende sub-sitemaps ophalen
+            subs = sorted(locs, key=lambda u: 0 if re.search(
+                r"categor|collection|listing", u, re.I) else 1)[:3]
+            locs = []
+            for sm in subs:
+                sub = _firecrawl_html(session, sm, res, raw=True)
+                res.requests_done += 1
+                if sub:
+                    locs.extend(discover.sitemap_locs(sub))
+        if cfg.url_filter:
+            locs = [u for u in locs if cfg.url_filter in u]
+        locs = _zonder_productnamespace(locs)
+        _, cats = discover.split_product_category_urls(locs)
+        cats = _focus_smal(list(dict.fromkeys(cats)), cfg)
+        if cats:
+            res.notes.append("categorieën uit de sitemap via Firecrawl")
+            return cats
+    return []
+
+
+def _zonder_productnamespace(locs: list[str]) -> list[str]:
+    """Padsegmenten waar vrijwel álle sitemap-URLs onder hangen zijn het
+    productnamespace (Wibra: duizenden /assortiment/<artikel>/). Die URLs
+    zien er voor de padheuristiek uit als categorie ('baby-pyjama-…') maar
+    zijn productpagina's; de échte lijstpagina's staan in de rest."""
+    from collections import Counter
+
+    def eerste_seg(u: str) -> str:
+        segs = [s for s in urlsplit(u).path.split("/") if s]
+        return segs[0].lower() if segs else ""
+
+    telling = Counter(eerste_seg(u) for u in locs)
+    totaal = len(locs) or 1
+    massa = {s for s, n in telling.items() if n > 100 and n / totaal > 0.5}
+    return [u for u in locs if eerste_seg(u) not in massa] if massa else locs
+
+
 def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
                        res: ScrapeResult) -> list[str]:
     """Categorieën uit de door Firecrawl gerenderde startpagina (1 credit)."""
@@ -126,12 +190,12 @@ def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
         return []
     cats = discover.categories_from_html(html, cfg.base, cfg.url_filter,
                                          cfg.max_categories)
-    # Een 'navigatielink' mét prijs in de tekst is een productteaser, geen
-    # categorie — bij Wibra wonnen twee pyjama-teasers het zo van de echte
-    # afdelingen en crawlden we productpagina's als 'categorie'.
+    # Een 'navigatielink' mét prijs in de kaart eromheen is een productteaser,
+    # geen categorie — bij Wibra wonnen pyjama-teasers het zo van de echte
+    # afdelingen (de prijs staat er búiten het anker, dus kijk naar de kaart).
     met_prijs = set()
     for a in lees_ankers(html):
-        if a["href"] and "€" in a["tekst"]:
+        if a["href"] and "€" in a["kaart"]:
             p = urlsplit(urljoin(cfg.base, a["href"]))
             met_prijs.add(f"{p.scheme}://{p.netloc}{p.path}")
     cats = [c for c in cats if c not in met_prijs]
@@ -147,13 +211,15 @@ def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
     return cats
 
 
-def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult) -> str | None:
+def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
+                    raw: bool = False) -> str | None:
+    """raw=True haalt de onbewerkte bron op (sitemap-XML) zonder rendering."""
     payload = {
         "url": url,
-        "formats": ["html"],
+        "formats": ["rawHtml"] if raw else ["html"],
         "onlyMainContent": False,
         # HEMA's raster rendert traag; bij 2500 ms was de lijst nog leeg
-        "waitFor": 5000,
+        "waitFor": 0 if raw else 5000,
         "timeout": 30000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
     }
@@ -175,4 +241,5 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult) -> s
         data = r.json()
     except ValueError:
         return None
-    return (data.get("data") or {}).get("html")
+    d = data.get("data") or {}
+    return d.get("rawHtml") or d.get("html")

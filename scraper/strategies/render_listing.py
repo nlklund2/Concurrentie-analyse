@@ -396,53 +396,87 @@ def _load(page, url: str, consent: bool = True) -> str | None:
     return html
 
 
-class _AnkerLezer(HTMLParser):
-    """Verzamelt per <a>: href, aria-label/title, img-alt en de tekst erbinnen.
-    De statische tegenhanger van de DOM-scan, voor HTML die al elders gerenderd
-    is (Firecrawl) en waar dus geen browser meer omheen staat."""
+class _KaartLezer(HTMLParser):
+    """Bouwt een minimale elementenboom: per anker de eigen tekst én de tekst
+    van omliggende voorouders. De statische tegenhanger van de DOM-scan, voor
+    HTML die al elders gerenderd is (Firecrawl) en waar geen browser meer
+    omheen staat. De vooroudertekst is essentieel: bij HEMA en C&A staat de
+    prijs búiten de link, in de omliggende productkaart."""
+
+    _TEKST_CAP = 600   # per element genoeg voor titel + prijzen, geen ballast
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.ankers: list[dict] = []
-        self._open: dict | None = None
-        self._diepte = 0
+        self._stack: list[dict] = [{"tag": "#root", "tekst": "", "ouder": None,
+                                    "n_ankers": 0}]
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        node = {"tag": tag, "tekst": "", "ouder": self._stack[-1], "n_ankers": 0}
         if tag == "a":
-            if self._open is not None:
-                self._diepte += 1
-                return
-            self._open = {"href": a.get("href") or "", "tekst": [],
-                          "label": a.get("aria-label") or a.get("title") or ""}
-            self._diepte = 1
-        elif self._open is not None:
-            if tag == "img" and not self._open["label"]:
-                self._open["label"] = a.get("alt") or ""
-            if a.get("aria-label") and not self._open["label"]:
-                self._open["label"] = a["aria-label"]
+            anker = {"href": a.get("href") or "",
+                     "label": a.get("aria-label") or a.get("title") or "",
+                     "node": node}
+            self.ankers.append(anker)
+            node["anker"] = anker
+            for open_node in self._stack:
+                open_node["n_ankers"] += 1
+        elif tag == "img":
+            alt = (a.get("alt") or "").strip()
+            if alt:
+                for n in self._reversed_stack():
+                    anker = n.get("anker")
+                    if anker is not None and not anker["label"]:
+                        anker["label"] = alt
+                        break
+            return   # img sluit zichzelf; niet op de stack
+        if tag not in ("br", "hr", "input", "meta", "link", "source", "wbr"):
+            self._stack.append(node)
+
+    def _reversed_stack(self):
+        return reversed(self._stack)
 
     def handle_endtag(self, tag):
-        if tag != "a" or self._open is None:
-            return
-        self._diepte -= 1
-        if self._diepte <= 0:
-            self._open["tekst"] = re.sub(r"\s+", " ", " ".join(self._open["tekst"])).strip()
-            self.ankers.append(self._open)
-            self._open = None
+        for i in range(len(self._stack) - 1, 0, -1):
+            if self._stack[i]["tag"] == tag:
+                del self._stack[i:]
+                return
 
     def handle_data(self, data):
-        if self._open is not None and data.strip():
-            self._open["tekst"].append(data.strip())
+        stukje = re.sub(r"\s+", " ", data).strip()
+        if not stukje:
+            return
+        for node in self._stack:
+            if len(node["tekst"]) < self._TEKST_CAP:
+                node["tekst"] = (node["tekst"] + " " + stukje).strip()
 
 
 def lees_ankers(html: str) -> list[dict]:
-    lezer = _AnkerLezer()
+    """Ankers met eigen tekst ('tekst') en kaarttekst incl. voorouders
+    ('kaart'): de prijs mag ook net buiten de link staan."""
+    lezer = _KaartLezer()
     try:
         lezer.feed(html)
     except Exception:
         pass  # kapotte HTML: houden wat er tot dan toe gelezen is
-    return lezer.ankers
+    uit = []
+    for a in lezer.ankers:
+        eigen = a["node"]["tekst"]
+        kaart, node, hops = eigen, a["node"], 0
+        # Omhoog lopen tot een voorouder met prijstekst, net als de DOM-scan —
+        # maar niet voorbij de kaart: een voorouder met veel links is een
+        # raster, navigatie of de body zelf, en diens prijzen horen niet bij
+        # dít anker (anders wordt elke nav-link een 'teaser').
+        while (node["ouder"] is not None and hops < 5
+               and not PRICE_TEXT_RE.search(kaart)
+               and node["ouder"]["n_ankers"] <= 3):
+            node = node["ouder"]
+            kaart = node["tekst"]
+            hops += 1
+        uit.append({"href": a["href"], "label": a["label"],
+                    "tekst": eigen, "kaart": kaart})
+    return uit
 
 
 def cards_from_html(html: str, base_url: str) -> list[Product]:
@@ -464,10 +498,10 @@ def cards_from_html(html: str, base_url: str) -> list[Product]:
             p_url = urlsplit(vol)
             if p_url.netloc != host or discover.NOISE_WORDS.search(vol):
                 continue
-            prijzen = [p for p in _prijzen(a["tekst"], prijs_los=prijs_los) if p <= 200]
+            prijzen = [p for p in _prijzen(a["kaart"], prijs_los=prijs_los) if p <= 200]
             if not prijzen:
                 continue
-            titel = _clean_title(a["label"], a["tekst"])
+            titel = _clean_title(a["label"], a["tekst"] or a["kaart"])
             if not titel or NAV_TITEL_RE.match(titel):
                 continue
             key = url_key(vol)

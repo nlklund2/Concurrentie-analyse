@@ -50,6 +50,28 @@ KAARTEN_HTML = """<html><body>
 <a href="/klantenservice">Klantenservice € 0,00</a>
 </body></html>"""
 
+# HEMA/C&A-vorm: de prijs staat búiten de link, in de omliggende kaart.
+KAART_PRIJS_BUITEN_LINK = """<html><body><ul>
+<li class="product-card">
+  <a href="/productoverzicht/dames-hipsters-789"><img alt="dames hipsters - 2 paar"></a>
+  <div class="prijs"><span>€ 6,50</span></div>
+</li>
+<li class="product-card">
+  <a href="/productoverzicht/heren-boxers-101"><img alt="heren boxers - 3 paar"></a>
+  <div class="prijs"><span>9,25 €</span></div>
+</li>
+</ul></body></html>"""
+
+# Wibra-scenario: sitemap met duizenden productpagina's onder /assortiment/
+# (die als categorie ogen) en een handvol echte lijstpagina's.
+SITEMAP_XML = "<urlset>" + "".join(
+    f"<url><loc>https://www.wibra.nl/assortiment/artikel-{i}-baby-pyjama/</loc></url>"
+    for i in range(150)) + """
+<url><loc>https://www.wibra.nl/thema/baby-ondergoed</loc></url>
+<url><loc>https://www.wibra.nl/thema/dames-ondergoed</loc></url>
+<url><loc>https://www.wibra.nl/klantenservice</loc></url>
+</urlset>"""
+
 
 class _Resp:
     def __init__(self, status=200, html=None, body=None):
@@ -139,32 +161,68 @@ def test_kaart_vangnet_zonder_ingebedde_json(monkeypatch):
     assert any("kaart-vangnet" in n for n in res.notes)
 
 
+def test_kaart_vangnet_prijs_buiten_de_link(monkeypatch):
+    """HEMA/C&A-vorm: de prijs hangt naast het anker in de kaart. De statische
+    lezer loopt dan omhoog, net als de DOM-scan in de browser."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(html=KAART_PRIJS_BUITEN_LINK)])
+    cfg = _cfg(base="https://www.hema.nl",
+               seeds=["https://www.hema.nl/dames/lingerie"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    by_title = {p.title: p.price for p in res.products}
+    assert by_title == {"dames hipsters - 2 paar": 6.50,
+                       "heren boxers - 3 paar": 9.25}
+
+
+def test_sitemap_via_firecrawl_weert_productnamespace(monkeypatch):
+    """Wibra: de navigatie kent geen echte afdelingen; de sitemap wel — maar
+    dan moeten de duizenden /assortiment/-productpagina's er eerst uit."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(body={"success": True,
+                                              "data": {"rawHtml": SITEMAP_XML}}),
+                                  _Resp(html=LISTING_HTML),
+                                  _Resp(html=LISTING_HTML)])
+    monkeypatch.setattr(firecrawl_api, "_category_urls", lambda cfg, http, res: [])
+    cfg = _cfg(focus_categories="ondergoed")
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert calls[0] == "https://www.wibra.nl/sitemap.xml"
+    assert set(calls[1:]) == {"https://www.wibra.nl/thema/baby-ondergoed",
+                              "https://www.wibra.nl/thema/dames-ondergoed"}
+    assert not any("/assortiment/" in c for c in calls)
+    assert any("sitemap via Firecrawl" in n for n in res.notes)
+    assert res.products
+
+
+GEEN_SITEMAP = [_Resp(html="<html>geen sitemap hier</html>")] * 3
+
+
 def test_nav_teasers_zijn_geen_categorieen(monkeypatch):
     """Wibra: productteasers mét prijs mogen de echte afdelingen niet
     verdringen, ook al matchen alleen de teasers de focusregex."""
     monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
-    calls = _sessie(monkeypatch, [_Resp(html=START_MET_TEASERS),
-                                  _Resp(html=LISTING_HTML)])
+    calls = _sessie(monkeypatch, GEEN_SITEMAP + [_Resp(html=START_MET_TEASERS),
+                                                 _Resp(html=LISTING_HTML)])
     monkeypatch.setattr(firecrawl_api, "_category_urls", lambda cfg, http, res: [])
     cfg = _cfg(focus_categories="ondergoed|pyjama", max_categories=2)
     res = firecrawl_api.scrape(cfg, http=None)
-    gecrawld = set(calls[1:])
+    gecrawld = set(calls[4:])
     assert gecrawld <= {"https://www.wibra.nl/dames", "https://www.wibra.nl/heren"}
     assert not any("assortiment" in c for c in gecrawld)
     assert res.products
 
 
 def test_navigatie_fallback_zonder_sitemap(monkeypatch):
-    """Sitemap geblokkeerd → startpagina via Firecrawl → categorieën → producten."""
+    """Sitemap geblokkeerd of leeg → startpagina via Firecrawl → categorieën."""
     monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
-    calls = _sessie(monkeypatch, [_Resp(html=START_HTML),
-                                  _Resp(html=LISTING_HTML),
-                                  _Resp(html=LISTING_HTML)])
+    calls = _sessie(monkeypatch, GEEN_SITEMAP + [_Resp(html=START_HTML),
+                                                 _Resp(html=LISTING_HTML),
+                                                 _Resp(html=LISTING_HTML)])
     monkeypatch.setattr(firecrawl_api, "_category_urls", lambda cfg, http, res: [])
     cfg = _cfg(focus_categories="ondergoed")
     res = firecrawl_api.scrape(cfg, http=None)
-    assert calls[0] == "https://www.wibra.nl"
-    assert set(calls[1:]) == {"https://www.wibra.nl/dames/ondergoed",
+    assert calls[0] == "https://www.wibra.nl/sitemap.xml"   # eerst de sitemap proberen
+    assert calls[3] == "https://www.wibra.nl"               # dan pas de startpagina
+    assert set(calls[4:]) == {"https://www.wibra.nl/dames/ondergoed",
                               "https://www.wibra.nl/heren/ondergoed"}
     assert len(res.products) == 2
     assert any("startpagina" in n for n in res.notes)
