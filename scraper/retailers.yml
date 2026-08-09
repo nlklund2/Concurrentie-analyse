@@ -228,6 +228,7 @@ retailers:
     base: https://www.kik.nl
     segment: breed
     enabled: true
+    color_slot: 8
     strategy: render
     enrich: false
     max_categories: 45
