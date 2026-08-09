@@ -94,13 +94,16 @@ def geen_wachttijd(monkeypatch):
 def _sessie(monkeypatch, antwoorden):
     """session.post vervangen: elke aanroep levert het volgende antwoord."""
     calls = []
+    payloads = []
 
     def post(self, url, json=None, timeout=None):
         calls.append(json["url"])
+        payloads.append(json)
         uit = antwoorden[min(len(calls) - 1, len(antwoorden) - 1)]
         return uit
 
     monkeypatch.setattr("requests.Session.post", post)
+    monkeypatch.setattr(firecrawl_api, "_test_payloads", payloads, raising=False)
     return calls
 
 
@@ -201,6 +204,47 @@ def test_sitemap_via_firecrawl_weert_productnamespace(monkeypatch):
     assert not any("/assortiment/" in c for c in calls)
     assert any("sitemap via Firecrawl" in n for n in res.notes)
     assert res.products
+
+
+PRODUCTPAGINA_HTML = """<html><head>
+<meta property="og:title" content="Baby pyjama safari | Wibra">
+<meta itemprop="price" content="6.99">
+<meta itemprop="listPrice" content="9.99">
+</head><body><h1>Baby pyjama safari</h1></body></html>"""
+
+
+def test_pages_modus_productpaginas_uit_sitemap(monkeypatch):
+    """Wibra-route: geen lijstpagina's → focus-gefilterde productpagina's uit
+    de sitemap, met og:meta als vangnet en het crawlpad als categoriesignaal."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(body={"success": True,
+                                              "data": {"rawHtml": SITEMAP_XML}}),
+                                  _Resp(html=PRODUCTPAGINA_HTML)])
+    cfg = _cfg(firecrawl_mode="pages", firecrawl_page_cap=50,
+               focus_categories="pyjama|ondergoed")
+    res = firecrawl_api.scrape(cfg, http=None, limit=1)
+    assert calls[0] == "https://www.wibra.nl/sitemap.xml"
+    assert "/assortiment/artikel-0-baby-pyjama/" in calls[1]   # gesorteerde steekproef
+    assert len(res.products) == 1
+    p = res.products[0]
+    assert p.title == "Baby pyjama safari"        # zonder '| Wibra'
+    assert (p.price, p.was_price) == (6.99, 9.99)
+    assert "pyjama" in p.category_raw             # URL-pad als categoriesignaal
+    assert any("steekproef" in n for n in res.notes)
+
+
+def test_scroll_acties_op_lijstpaginas_met_400_terugval(monkeypatch):
+    """HEMA's raster laadt lui: lijstfetches sturen scroll-acties mee. Keurt
+    het plan die af (HTTP 400), dan zonder acties opnieuw — geen dode bron."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(400), _Resp(html=LISTING_HTML)])
+    cfg = _cfg(seeds=["https://www.wibra.nl/dames/ondergoed"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    payloads = firecrawl_api._test_payloads
+    assert "actions" in payloads[0]               # eerste poging mét scroll
+    assert "actions" not in payloads[1]           # terugval zonder
+    assert len(res.products) == 2
+    assert any("zonder acties" in n for n in res.notes)
 
 
 def test_429_wordt_herkanst_en_dooft_niet_de_run(monkeypatch):

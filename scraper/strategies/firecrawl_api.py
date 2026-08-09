@@ -25,10 +25,11 @@ import requests
 from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
-from ..jsonscan import products_from_html
+from ..jsonscan import product_from_meta, products_from_html
 from ..models import Product, ScrapeResult
 from .listing_crawl import _voeg_samen
 from .render_listing import cards_from_html, lees_ankers
+from .sitemap_pages import _eigen_product
 
 FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape"
 
@@ -37,6 +38,17 @@ FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape"
 PAUZE_TUSSEN_CALLS = 6.5
 WACHT_BIJ_429 = (12, 30)
 _laatste_call = [0.0]
+
+# HEMA's productraster laadt lui: zonder scrollen bevat de snapshot alleen de
+# promoblokken erboven (run 19 las koffie en koekjes als 'bodywear').
+# Zelfde recept als onze eigen browser bij Action/C&A: scrollen en wachten.
+ACTIES_SCROLL = [
+    {"type": "wait", "milliseconds": 1500},
+    {"type": "scroll", "direction": "down"},
+    {"type": "wait", "milliseconds": 1200},
+    {"type": "scroll", "direction": "down"},
+    {"type": "wait", "milliseconds": 1200},
+]
 
 
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
@@ -51,6 +63,9 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json"})
+
+    if cfg.firecrawl_mode == "pages":
+        return _scrape_productpaginas(session, cfg, res, limit)
 
     cats = _category_urls(cfg, http, res)
     if not cats:
@@ -79,7 +94,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     uit_kaarten = 0
     for cat_url in cats:
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
-        html = _firecrawl_html(session, cat_url, res)
+        html = _firecrawl_html(session, cat_url, res, actions=ACTIES_SCROLL)
         credits += 1
         if html is None:
             if res.error:      # sleutel ongeldig of credits op: stoppen
@@ -141,10 +156,12 @@ def _focus_smal(cats: list[str], cfg: RetailerCfg) -> list[str]:
     return cats
 
 
-def _sitemap_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
-                           res: ScrapeResult) -> list[str]:
-    """Categorieën uit de sitemap, opgehaald via Firecrawl (rawHtml — geen
-    rendering nodig, dus goedkoop en betrouwbaar). Max ±5 credits."""
+def _sitemap_locs_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
+                                res: ScrapeResult,
+                                voorkeur_subs: str = "categor|collection|listing"
+                                ) -> list[str]:
+    """Alle sitemap-URLs, opgehaald via Firecrawl (rawHtml — geen rendering
+    nodig, dus goedkoop en betrouwbaar). Max ±5 credits."""
     root = discover.origin(cfg.base)
     for pad in ("/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml"):
         xml = _firecrawl_html(session, root + pad, res, raw=True)
@@ -157,7 +174,7 @@ def _sitemap_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
         if re.search(r"<sitemap[\s>]", xml, re.I):
             # index: alleen de meest belovende sub-sitemaps ophalen
             subs = sorted(locs, key=lambda u: 0 if re.search(
-                r"categor|collection|listing", u, re.I) else 1)[:3]
+                voorkeur_subs, u, re.I) else 1)[:3]
             locs = []
             for sm in subs:
                 sub = _firecrawl_html(session, sm, res, raw=True)
@@ -166,13 +183,86 @@ def _sitemap_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
                     locs.extend(discover.sitemap_locs(sub))
         if cfg.url_filter:
             locs = [u for u in locs if cfg.url_filter in u]
-        locs = _zonder_productnamespace(locs)
-        _, cats = discover.split_product_category_urls(locs)
-        cats = _focus_smal(list(dict.fromkeys(cats)), cfg)
-        if cats:
-            res.notes.append("categorieën uit de sitemap via Firecrawl")
-            return cats
+        if locs:
+            return list(dict.fromkeys(locs))
     return []
+
+
+def _sitemap_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
+                           res: ScrapeResult) -> list[str]:
+    """Categorie-URLs uit de via Firecrawl gelezen sitemap."""
+    locs = _sitemap_locs_via_firecrawl(session, cfg, res)
+    locs = _zonder_productnamespace(locs)
+    _, cats = discover.split_product_category_urls(locs)
+    cats = _focus_smal(list(dict.fromkeys(cats)), cfg)
+    if cats:
+        res.notes.append("categorieën uit de sitemap via Firecrawl")
+    return cats
+
+
+def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,
+                           res: ScrapeResult, limit: int | None) -> ScrapeResult:
+    """firecrawl_mode 'pages': focus-gefilterde productpagina's uit de sitemap,
+    stuk voor stuk — voor sites zonder bruikbare lijstpagina's (Wibra: de
+    sitemap kent duizenden /assortiment/<artikel>/ maar amper lijstpagina's).
+    Kost 1 credit per pagina; de cap begrenst het weekverbruik."""
+    locs = _sitemap_locs_via_firecrawl(session, cfg, res,
+                                       voorkeur_subs="product|assortiment")
+    if not locs:
+        res.error = res.error or "geen sitemap bereikbaar voor productpagina's"
+        return res
+    if cfg.focus_categories:
+        rx = re.compile(cfg.focus_categories, re.I)
+        urls = [u for u in locs if rx.search(urlsplit(u).path)]
+    else:
+        urls = list(locs)
+    if not urls:
+        res.error = "geen productpagina's binnen focus in de sitemap"
+        return res
+    # vaste (gesorteerde) steekproef: week-op-week vergelijkbaar, zoals bij Zeeman
+    urls.sort()
+    cap = min(limit or cfg.firecrawl_page_cap, cfg.firecrawl_page_cap)
+    res.notes.append(f"{len(urls)} sitemap-URLs binnen focus; vaste steekproef "
+                     f"van {min(cap, len(urls))} productpagina's (1 credit per stuk)")
+
+    credits = res.requests_done
+    gemist = herhaald = 0
+    gezien: dict[str, str] = {}
+    for url in urls[:cap]:
+        html = _firecrawl_html(session, url, res)
+        credits += 1
+        if html is None:
+            if res.error:
+                break
+            continue
+        p = _eigen_product(products_from_html(html, url), url) \
+            or product_from_meta(html, url)
+        if p is None:
+            gemist += 1
+            continue
+        if p.key in gezien:     # gedeeld blok i.p.v. eigen artikel (Zeeman-les)
+            herhaald += 1
+            continue
+        gezien[p.key] = p.title
+        # Bij Wibra draagt de artikelslug zelf de categorie ('baby-pyjama-…');
+        # het volledige pad dus meenemen, niet alleen de mapstructuur erboven.
+        segs = [s for s in urlsplit(url).path.split("/") if s]
+        p.category_raw = _voeg_samen(
+            p.category_raw, " ".join(s.replace("-", " ") for s in segs))
+        if not p.url:
+            p.url = url
+        res.products.append(p)
+        if limit and len(res.products) >= limit:
+            break
+    res.requests_done = credits
+    if gemist:
+        res.notes.append(f"{gemist} productpagina's zonder leesbare productdata")
+    if herhaald:
+        res.notes.append(f"{herhaald} pagina's leverden een al gezien artikel")
+    res.notes.append(f"{credits} Firecrawl-credits gebruikt (± {credits} pagina's)")
+    if not res.products and not res.error:
+        res.error = "Firecrawl leverde HTML maar geen producten — extractie nalopen"
+    return res
 
 
 def _zonder_productnamespace(locs: list[str]) -> list[str]:
@@ -223,17 +313,20 @@ def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
 
 
 def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
-                    raw: bool = False) -> str | None:
-    """raw=True haalt de onbewerkte bron op (sitemap-XML) zonder rendering."""
+                    raw: bool = False, actions: list | None = None) -> str | None:
+    """raw=True haalt de onbewerkte bron op (sitemap-XML) zonder rendering;
+    actions (scrollen/wachten) laten lui ladende rasters eerst renderen."""
     payload = {
         "url": url,
         "formats": ["rawHtml"] if raw else ["html"],
         "onlyMainContent": False,
         # HEMA's raster rendert traag; bij 2500 ms was de lijst nog leeg
         "waitFor": 0 if raw else 5000,
-        "timeout": 30000,
+        "timeout": 30000 if not actions else 45000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
     }
+    if actions:
+        payload["actions"] = actions
     for poging in range(len(WACHT_BIJ_429) + 1):
         wacht = PAUZE_TUSSEN_CALLS - (time.monotonic() - _laatste_call[0])
         if wacht > 0:
@@ -252,6 +345,12 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
     if r.status_code == 429:
         res.notes.append(f"Firecrawl-limiet (HTTP 429) hield aan op {url[:60]}")
         return None
+    if r.status_code == 400 and actions:
+        # acties niet beschikbaar op dit plan of afgekeurd: zonder proberen,
+        # dan komt er in elk geval een snapshot (zonder scroll) terug
+        if "acties niet geaccepteerd — zonder acties verder" not in res.notes:
+            res.notes.append("acties niet geaccepteerd — zonder acties verder")
+        return _firecrawl_html(session, url, res, raw=raw, actions=None)
     if r.status_code == 402:
         res.error = "Firecrawl-credits op (HTTP 402) — tegoed bijvullen of tier verhogen"
         return None

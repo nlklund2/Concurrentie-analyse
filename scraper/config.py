@@ -33,6 +33,12 @@ class RetailerCfg:
     respect_robots: bool = True
     enrich: bool = True            # kleur/maten aanvullen via productpagina's
     enrich_limit: int = 150        # max productpagina's per bron per week
+    # Firecrawl-varianten: 'listing' crawlt categoriepagina's; 'pages' haalt
+    # focus-gefilterde productpagina's uit de sitemap stuk voor stuk op —
+    # voor sites zonder bruikbare lijstpagina's (Wibra). Let op: 'pages'
+    # kost 1 credit per artikel per week (cap hieronder).
+    firecrawl_mode: str = "listing"
+    firecrawl_page_cap: int = 120
     focus_categories: str = ""     # regex: beperk de crawl tot deze categorieën
     focus_product_types: list[str] = field(default_factory=list)  # filter na mapping
     notes: str = ""
