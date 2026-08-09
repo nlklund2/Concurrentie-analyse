@@ -92,7 +92,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     seen: dict[str, Product] = {}
     credits = res.requests_done   # navigatie-opvraag telt mee
     uit_kaarten = 0
-    for cat_url in cats:
+    uit_json = 0
+    for n, cat_url in enumerate(cats, start=1):
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
         html = _firecrawl_html(session, cat_url, res, actions=ACTIES_SCROLL)
         credits += 1
@@ -101,6 +102,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 break
             continue
         found = products_from_html(html, cat_url)
+        uit_json += len(found)
         if not found:
             # HEMA rendert de lijst wél maar sluit geen JSON in — dan is de
             # kaartweergave zelf de enige bron (zelfde vangnet als de DOM-scan).
@@ -111,6 +113,15 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             p.category_raw = _voeg_samen(cat_path, p.category_raw)
             seen.setdefault(p.key, p)
         if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
+            break
+        # Kanarie: bij HEMA rendert het productraster niet, en dan leest het
+        # kaart-vangnet alleen de promoblokken eromheen (koffie, koekjes). Het
+        # eerlijke signaal is dus de JSON-route, niet de kaartoogst.
+        if cfg.firecrawl_canary and n >= cfg.firecrawl_canary and not uit_json:
+            res.notes.append(
+                f"kanarie: {n} categorieën zonder ingebedde productdata — "
+                f"gestopt vóór de volle {len(cats)} (bespaart credits; "
+                "levert de kanarie wél data, dan loopt de run door)")
             break
     res.requests_done = credits
     if uit_kaarten:
@@ -228,7 +239,19 @@ def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,
     credits = res.requests_done
     gemist = herhaald = 0
     gezien: dict[str, str] = {}
-    for url in urls[:cap]:
+    for n, url in enumerate(urls[:cap], start=1):
+        # Kanarie: Wibra gaf in week 32 op alle 38 productpagina's niets prijs.
+        # De bron blijft wekelijks meelopen, maar zodra de eerste handvol
+        # pagina's opnieuw leeg is heeft doorgaan geen zin — dat scheelt
+        # credits die anders binnen een maand op zijn.
+        if (cfg.firecrawl_canary and n > cfg.firecrawl_canary
+                and not res.products):
+            res.notes.append(
+                f"kanarie: eerste {cfg.firecrawl_canary} productpagina's zonder "
+                f"leesbare data — gestopt vóór de volle {min(cap, len(urls))} "
+                "(bespaart credits; levert de kanarie wél data, dan loopt de "
+                "run door tot de cap)")
+            break
         html = _firecrawl_html(session, url, res)
         credits += 1
         if html is None:

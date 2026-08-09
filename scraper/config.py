@@ -39,6 +39,11 @@ class RetailerCfg:
     # kost 1 credit per artikel per week (cap hieronder).
     firecrawl_mode: str = "listing"
     firecrawl_page_cap: int = 120
+    # Kanarie: een bron die aantoonbaar geen data prijsgeeft mag wél elke week
+    # opnieuw geprobeerd worden, maar niet tegen de volle prijs. Na dit aantal
+    # opvragingen zonder leesbaar artikel stopt de run; levert de kanarie wél
+    # iets op, dan loopt hij door tot de gewone cap. 0 = uit (volle run).
+    firecrawl_canary: int = 0
     focus_categories: str = ""     # regex: beperk de crawl tot deze categorieën
     focus_product_types: list[str] = field(default_factory=list)  # filter na mapping
     notes: str = ""

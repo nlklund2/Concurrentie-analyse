@@ -295,3 +295,52 @@ def test_navigatie_fallback_zonder_sitemap(monkeypatch):
     assert any("startpagina" in n for n in res.notes)
     # klantenservice-link is ruis en mag geen credit kosten
     assert not any("klantenservice" in c for c in calls)
+
+
+# Wibra-scenario week 32: de productpagina laadt wél, maar draagt geen enkele
+# machineleesbare productdata — geen JSON-LD, geen __NEXT_DATA__, geen prijsmeta.
+LEGE_PRODUCTPAGINA = """<html><head><title>Wibra</title></head>
+<body><div id="app"></div></body></html>"""
+
+
+def test_kanarie_stopt_pages_modus_na_lege_pagina_s(monkeypatch):
+    """Wibra loopt bewust elke week mee als hertest, maar mag daar geen veertig
+    credits aan opmaken: na de kanarie zonder leesbaar artikel stopt de run."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(body={"success": True,
+                                              "data": {"rawHtml": SITEMAP_XML}}),
+                                  _Resp(html=LEGE_PRODUCTPAGINA)])
+    cfg = _cfg(firecrawl_mode="pages", firecrawl_page_cap=50,
+               firecrawl_canary=3, focus_categories="pyjama|ondergoed")
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(calls) == 1 + 3          # sitemap + precies de kanarie
+    assert res.products == []
+    assert any("kanarie" in n for n in res.notes)
+
+
+def test_kanarie_laat_werkende_bron_doorlopen(monkeypatch):
+    """Geeft de site wél data prijs, dan mag de kanarie niet in de weg zitten —
+    dan loopt dezelfde run door tot de gewone cap."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(body={"success": True,
+                                              "data": {"rawHtml": SITEMAP_XML}}),
+                                  _Resp(html=PRODUCTPAGINA_HTML)])
+    cfg = _cfg(firecrawl_mode="pages", firecrawl_page_cap=10,
+               firecrawl_canary=3, focus_categories="pyjama|ondergoed")
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(calls) == 1 + 10         # doorgelopen tot de cap, niet tot de kanarie
+    assert not any("kanarie" in n for n in res.notes)
+
+
+def test_kanarie_kijkt_naar_json_niet_naar_de_kaartoogst(monkeypatch):
+    """HEMA-scenario: het raster rendert niet, dus leest het kaart-vangnet de
+    promoblokken eromheen. Die oogst mag de kanarie niet groen praten."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=KAARTEN_HTML)])
+    cfg = _cfg(id="hema", name="HEMA", base="https://www.hema.nl",
+               firecrawl_canary=2,
+               seeds=[f"https://www.hema.nl/c/{i}/ondergoed" for i in range(6)])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(calls) == 2              # gestopt op de kanarie, niet alle zes
+    assert res.products                 # de kaartoogst blijft wél in de opbrengst
+    assert any("kanarie" in n for n in res.notes)
