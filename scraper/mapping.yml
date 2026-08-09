@@ -9,8 +9,9 @@ audience:
   - {label: meisjes,  match: "meisje|meiden|\\bgirls?\\b"}
   - {label: jongens,  match: "jongen|\\bboys?\\b"}
   - {label: kinderen, match: "\\bkind(?:er)?|\\bkids\\b|junior"}
-  - {label: dames,    match: "dames|\\bdame\\b|women|ladies|femme"}
-  - {label: heren,    match: "heren|\\bheer\\b|\\bmen\\b|\\bmannen\\b|homme"}
+  # 'vrouwen'/'mannen': Primark hanteert die woorden i.p.v. dames/heren
+  - {label: dames,    match: "dames|\\bdame\\b|vrouw(?:en)?|women|ladies|femme"}
+  - {label: heren,    match: "heren|\\bheer\\b|\\bmannen?\\b|\\bmen\\b|homme"}
   - {label: huis,     match: "huishoud|badtextiel|bedtextiel|beddengoed|keuken|wonen|\\bhome\\b|handdoek|dekbed|hoeslaken|badkamer|interieur"}
 
 product_type:

@@ -32,6 +32,7 @@ def category_urls(cfg: RetailerCfg, http: Http, res: ScrapeResult) -> list[str]:
         urls = discover.nav_categories(http, cfg.base, cfg.url_filter, cfg.max_categories)
         if urls:
             res.notes.append("categorieën uit navigatie (geen categorie-sitemap gevonden)")
+    urls = list(dict.fromkeys(urls))   # dezelfde categorie niet twee keer crawlen
     if cfg.focus_categories and urls:
         rx = re.compile(cfg.focus_categories, re.I)
         focused = [u for u in urls if rx.search(u)]
