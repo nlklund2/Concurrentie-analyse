@@ -173,7 +173,7 @@
 /* Vaste kleur per bron (slot in het gevalideerde palet). Kleur volgt de bron,
    nooit de selectie. Max 8 bronnen tegelijk in de grafieken. Houd dit in lijn
    met color_slot in scraper/retailers.yml. */
-const SLOTS = { terstal:1, zeeman:2, wibra:3, primark:4, action:5, hema:6, "c-and-a":7 };
+const SLOTS = { terstal:1, zeeman:2, wibra:3, primark:4, action:5, hema:6, "c-and-a":7, kik:8 };
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const slotColor = rid => SLOTS[rid] ? cssVar(`--s${SLOTS[rid]}`) : cssVar("--muted");
 
@@ -304,9 +304,12 @@ const weeksInRange = () => state.weeks.slice(0, state.range).reverse();
 
 function seriesFromStats(field) {
   const weeks = weeksInRange();
+  // In de eerste weken is een lijn zonder punten onzichtbaar (1 week = 0 lijnstukken);
+  // toon dan stippen. Vanaf 3 weken nemen de lijnen het over en gaan de stippen uit.
+  const stipRadius = weeks.length <= 2 ? 4 : 0;
   return state.selected.map(rid => ({
     label: naam(rid), borderColor: slotColor(rid), backgroundColor: slotColor(rid),
-    borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 14,
+    borderWidth: 2, pointRadius: stipRadius, pointHoverRadius: 5, pointHitRadius: 14,
     tension: 0.2, spanGaps: true,
     data: weeks.map(w => {
       const rows = state.stats.filter(s => s.retailer_id === rid && s.week === w
