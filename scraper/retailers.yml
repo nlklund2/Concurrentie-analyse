@@ -54,10 +54,29 @@ retailers:
     segment: kern
     url_filter: "/nl"
     color_slot: 2
+    strategy: render
+    enrich: false
+    max_categories: 30
+    max_pages_per_category: 10
     notes: >-
       Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
-      GEVALIDEERD 07-08: werkt via productpagina's; 9.672 focus-URLs → vaste
-      steekproef van 2.500/week (deelwaarneming, trends vergelijkbaar).
+      OMGEZET 09-08 naar de render-strategie. Zeeman is een client-side app:
+      de lijstpagina's leverden via HTTP nul producten, en op de productpagina's
+      staat in de HTML alleen een aanraderblok — 60 verschillende pagina's,
+      gelijkmatig over 9.672 URL's bemonsterd, leverden 6 artikelen op (dezelfde
+      zes). De prijzen en doelgroepen daarvan klopten, dus de bron zelf is prima;
+      alleen komt de data pas na het renderen beschikbaar. Caps krap gehouden
+      (30 categorieën x 10 pagina's) zodat de weekrun onder ±25 min blijft.
+      NOG NIET OPGELOST 09-08: ook de browser vindt nul artikelen, en het ligt
+      niet aan de categoriekeuze. Drie échte lijstpagina's gemeten, alle drie
+      met NUL euro-tekens in de tekst: /dames/ondergoed (120 links, 9.860
+      tekens), /heren/sokken (120 links) en /collecties/sokken (116 links).
+      Terwijl de titel van die tweede letterlijk 'Vanaf EUR 1,99' zegt — de
+      prijzen bestaan dus, maar komen pas na een stap die wij niet zetten.
+      Meest waarschijnlijk een cookie- of regiokeuze die het productraster
+      vrijgeeft en die de consent-routine niet herkent. Zie PLAN.md par. 8.
+      Zeeman blijft ROOD tot dat gericht is uitgezocht: zes aanraderartikelen
+      als 'het assortiment' presenteren is schadelijker dan een lege regel.
   wibra:
     name: Wibra
     base: https://www.wibra.nl
@@ -92,10 +111,20 @@ retailers:
     enrich: false
     max_categories: 20
     max_pages_per_category: 15
+    # Gekalibreerd 09-08: Action heeft online ~24 bodywear-artikelen in de zes
+    # relevante categorieën; met de standaarddrempel van 25 zou een correcte
+    # meting elke week rood staan. De echte breukdetectie is de <50%-van-vorige-
+    # week-regel; deze drempel vangt alleen een totale instorting.
+    min_products_expected: 15
     notes: >-
       Prijszetter in sokken/boxers-multipacks.
       GEVALIDEERD 07-08: WERKT via de render-strategie nadat de cookiemuur wordt
       weggeklikt (24 artikelen, 100% prijsdekking in de proef).
+      LET OP 09-08: de categoriepaden (/c/mode/ondergoed) dragen géén doelgroep,
+      dus de mapping leunt volledig op de titel. In week 32 stonden er banners
+      als artikel in de cijfers ("Veiligheidswaarschuwing…", €1,00 van €5,00);
+      de DOM-scan eist nu een echte productlink. Haalt Action daarmee de
+      drempel van 25 niet, dan blijft de bron rood — beter leeg dan vervuild.
   hema:
     name: HEMA
     base: https://www.hema.nl
@@ -119,11 +148,18 @@ retailers:
     enrich: false
     max_categories: 40
     max_pages_per_category: 15
+    # Gekalibreerd 09-08: zie Action. C&A's productraster is maar deels leesbaar
+    # (165 links en 38 prijzen op de pagina, waarvan we er ~5 als kaart
+    # herkennen) — 16 artikelen is voorlopig de eerlijke opbrengst.
+    min_products_expected: 12
     notes: >-
       Gezinsmode incl. breed ondergoed.
       GEVALIDEERD 07-08: pagina's laden volledig via de render-strategie (141
       links, prijzen aanwezig); productkaart-extractie verbeterd 07-08 zodat de
-      prijs-buiten-de-link wordt opgepikt. Hervalidatie loopt.
+      prijs-buiten-de-link wordt opgepikt.
+      GEREPAREERD 09-08: navigatietegels ("Voor meisjes", "shoppen") stonden als
+      artikel in de cijfers; de DOM-scan eist nu een echte productlink. Dekking
+      over doelgroepen is goed sinds de spreiding (baby/dames/heren).
 
   # ---- fase 2: breder veld (aanzetten kan altijd; zie PLAN.md §3) ----
   takko:
@@ -143,7 +179,7 @@ retailers:
     enabled: true
     strategy: render
     enrich: false
-    max_categories: 20
+    max_categories: 45
     max_pages_per_category: 15
     notes: >-
       Laagste prijspunten van de markt.
@@ -151,6 +187,10 @@ retailers:
       artikelen); titel-/prijsextractie verbeterd 07-08 (losse getallen als
       '599' worden niet meer als prijs of titel gelezen). Aangezet als
       werkende discounter naast Zeeman/Wibra.
+      BIJGESTELD 09-08: 500 categorieën binnen focus, waarvan er 20 werden
+      gecrawld — alfabetisch allemaal 'dames', waardoor KiK in week 32 als
+      damesspeciaalzaak in de cijfers stond. Nu 45 categorieën én spreiding
+      over doelgroepen bij het afkappen.
   scapino:
     name: Scapino
     base: https://www.scapino.nl

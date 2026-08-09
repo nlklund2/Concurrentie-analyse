@@ -57,8 +57,8 @@ def build(week: date) -> str:
 
     # ---- 1. Grondgezondheid ----
     md.append("## 1. Gezondheid van de bronnen\n")
-    md.append("| Bron | Strategie | Artikelen | t.o.v. vorige week | Status |")
-    md.append("|---|---|---:|---:|---|")
+    md.append("| Bron | Strategie | Deze run | In database | t.o.v. vorige week | Status |")
+    md.append("|---|---|---:|---:|---:|---|")
     latest_run: dict[str, dict] = {}
     for r in runs:
         latest_run.setdefault(r["retailer_id"], r)  # runs staan al nieuwste-eerst
@@ -74,9 +74,15 @@ def build(week: date) -> str:
         status = run.get("status", "geen run")
         icon = {"ok": "🟢", "afwijkend": "🟠", "fout": "🔴"}.get(status, "⚪")
         note = f" — {run['note']}" if run.get("note") else ""
-        md.append(f"| {name(rid)} | {run.get('strategy', '–')} | {cur_n if cur_n is not None else '–'} "
+        run_n = run.get("products_found")
+        md.append(f"| {name(rid)} | {run.get('strategy', '–')} "
+                  f"| {run_n if run_n is not None else '–'} "
+                  f"| {cur_n if cur_n is not None else '–'} "
                   f"| {delta} | {icon} {status}{note} |")
-    md.append("\n> 🟠/🔴: cijfers van die bron deze week niet gebruiken voor besluiten.\n")
+    md.append("\n> 🟠/🔴: cijfers van die bron deze week niet gebruiken voor besluiten.\n"
+              "> *Deze run* is wat de scraper deze week ophaalde, *in database* de laatst "
+              "verwerkte stand. Lopen die uiteen, dan heeft de kwaliteitspoort deze week "
+              "tegengehouden en staat er nog oudere data.\n")
 
     # ---- 2. Signalen ----
     md.append("## 2. Signalen van de week\n")

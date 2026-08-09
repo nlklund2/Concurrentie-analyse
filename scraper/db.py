@@ -1,6 +1,7 @@
 """Supabase-koppeling via de PostgREST REST-API (bewust zonder zware SDK)."""
 from __future__ import annotations
 
+import time
 from datetime import date
 
 import requests
@@ -13,7 +14,9 @@ class DbError(RuntimeError):
 
 
 class Db:
-    PAGE = 1000  # Supabase geeft max 1000 rijen per request
+    PAGE = 1000       # Supabase geeft max 1000 rijen per request
+    POGINGEN = 3      # herkansingen bij netwerkhapering of 5xx/429
+    WACHT = (2, 6)    # seconden tussen de pogingen
 
     def __init__(self):
         url = env("SUPABASE_URL", required=True).rstrip("/")
@@ -31,14 +34,36 @@ class Db:
             raise DbError(f"Supabase {resp.status_code}: {resp.text[:500]}")
         return resp
 
+    def _req(self, method: str, path: str, *, pogingen: int = POGINGEN,
+             **kw) -> requests.Response:
+        """Eén REST-aanroep, met herkansing bij een hapering.
+
+        Een netwerkstoring van een paar seconden mag een bron geen hele week
+        kosten: in week 32 verloor C&A 28 al gescrapete artikelen aan één
+        read-timeout van 60 s. Alleen 5xx/429 en verbindingsfouten worden
+        herkanst — een 4xx is een echte fout en komt meteen naar boven.
+        """
+        laatste = ""
+        for poging in range(pogingen):
+            try:
+                resp = self.session.request(method, f"{self.rest}/{path}", **kw)
+            except (requests.Timeout, requests.ConnectionError) as e:
+                laatste = f"{type(e).__name__}: {str(e)[:200]}"
+            else:
+                if resp.status_code < 500 and resp.status_code != 429:
+                    return self._check(resp)
+                laatste = f"Supabase {resp.status_code}: {resp.text[:300]}"
+            if poging < pogingen - 1:
+                time.sleep(self.WACHT[min(poging, len(self.WACHT) - 1)])
+        raise DbError(f"{laatste} (na {pogingen} pogingen)")
+
     def get_all(self, path: str, params: dict) -> list[dict]:
         """Alle rijen ophalen, gepagineerd voorbij de 1000-rijenlimiet."""
         rows: list[dict] = []
         offset = 0
         while True:
             headers = {"Range-Unit": "items", "Range": f"{offset}-{offset + self.PAGE - 1}"}
-            resp = self._check(self.session.get(f"{self.rest}/{path}", params=params,
-                                                headers=headers, timeout=60))
+            resp = self._req("GET", path, params=params, headers=headers, timeout=60)
             batch = resp.json()
             rows.extend(batch)
             if len(batch) < self.PAGE:
@@ -49,42 +74,52 @@ class Db:
     def ensure_retailers(self, cfgs) -> None:
         payload = [{"id": c.id, "name": c.name, "website": c.base,
                     "segment": c.segment, "enabled": c.enabled} for c in cfgs]
-        self._check(self.session.post(
-            f"{self.rest}/retailers", json=payload, timeout=60,
-            params={"on_conflict": "id"},
-            headers={"Prefer": "resolution=merge-duplicates,return=minimal"}))
+        self._req("POST", "retailers", json=payload, timeout=60,
+                  params={"on_conflict": "id"},
+                  headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
 
     def replace_staging(self, retailer_id: str, rows: list[dict]) -> None:
-        self._check(self.session.delete(
-            f"{self.rest}/staging_products",
-            params={"retailer_id": f"eq.{retailer_id}"}, timeout=60))
-        for i in range(0, len(rows), 500):
-            self._check(self.session.post(
-                f"{self.rest}/staging_products", json=rows[i:i + 500], timeout=120,
-                headers={"Prefer": "return=minimal"}))
+        """Leegmaken en vullen als één geheel.
+
+        De herkansing begint weer bij de delete: een half geslaagde insert zou
+        anders dubbele sleutels in staging achterlaten, en daar loopt de
+        upsert in process_staging op vast.
+        """
+        for poging in range(self.POGINGEN):
+            try:
+                self._req("DELETE", "staging_products", pogingen=1, timeout=60,
+                          params={"retailer_id": f"eq.{retailer_id}"})
+                for i in range(0, len(rows), 500):
+                    self._req("POST", "staging_products", pogingen=1,
+                              json=rows[i:i + 500], timeout=120,
+                              headers={"Prefer": "return=minimal"})
+                return
+            except DbError:
+                if poging == self.POGINGEN - 1:
+                    raise
+                time.sleep(self.WACHT[min(poging, len(self.WACHT) - 1)])
 
     def process_week(self, retailer_id: str, week: date) -> dict:
-        resp = self._check(self.session.post(
-            f"{self.rest}/rpc/process_staging", timeout=300,
-            json={"p_retailer": retailer_id, "p_week": week.isoformat()}))
+        # process_staging is idempotent per (bron, week) — herkansen is veilig
+        resp = self._req("POST", "rpc/process_staging", timeout=300,
+                         json={"p_retailer": retailer_id, "p_week": week.isoformat()})
         return resp.json()
 
     def log_run(self, retailer_id: str, week: date, strategy: str,
                 products_found: int, status: str, note: str = "") -> None:
-        self._check(self.session.post(
-            f"{self.rest}/scrape_runs", timeout=60,
-            json={"retailer_id": retailer_id, "week": week.isoformat(),
-                  "strategy": strategy, "products_found": products_found,
-                  "status": status, "note": note[:800]},
-            headers={"Prefer": "return=minimal"}))
+        self._req("POST", "scrape_runs", timeout=60,
+                  json={"retailer_id": retailer_id, "week": week.isoformat(),
+                        "strategy": strategy, "products_found": products_found,
+                        "status": status, "note": note[:800]},
+                  headers={"Prefer": "return=minimal"})
 
     # -- lezen (rapport & drempelbewaking) -----------------------------
     def active_count(self, retailer_id: str) -> int:
-        resp = self._check(self.session.get(
-            f"{self.rest}/products", timeout=60,
+        resp = self._req(
+            "GET", "products", timeout=60,
             params={"retailer_id": f"eq.{retailer_id}", "status": "eq.active",
                     "select": "product_key", "limit": "1"},
-            headers={"Prefer": "count=exact", "Range": "0-0", "Range-Unit": "items"}))
+            headers={"Prefer": "count=exact", "Range": "0-0", "Range-Unit": "items"})
         content_range = resp.headers.get("Content-Range", "/0")
         total = content_range.rsplit("/", 1)[-1]
         return int(total) if total.isdigit() else 0

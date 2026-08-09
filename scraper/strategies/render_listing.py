@@ -67,19 +67,34 @@ PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
 BLOCK_HINTS = re.compile(r"access denied|just a moment|are you human|captcha|"
                          r"request blocked|pardon our interruption", re.I)
 
+# Navigatietegels dragen vaak óók een prijs ("vanaf € 9,00") en komen in het
+# losse DOM-vangnet als artikel binnen. Bij C&A stonden zo 'shoppen', 'Voor
+# meisjes' en 'Voor jongens' in de weekcijfers.
+NAV_TITEL_RE = re.compile(
+    r"^(?:shop(?:pen)?|bekijk(?:\s+alles)?|alles?\s+bekijken|meer\s+\w+|"
+    r"voor\s+(?:haar|hem|meisjes|jongens|kinderen|baby'?s?|dames|heren)|"
+    r"alle\s+\w+|sale|nieuw|ontdek(?:ken)?|lees\s+meer|verder\s+winkelen)$", re.I)
+
 DOM_SCAN_JS = """
-() => {
+(streng) => {
   const out = [];
   const seen = new Set();
   const priceRe = /€\\s*\\d/;
   // Productkaart = een link naar een productpagina, met ergens in de
   // omliggende kaart een prijs. Titel komt uit aria-label / img-alt /
   // heading, niet uit de ruwe kaarttekst (die is vervuild met prijs/labels).
-  const links = document.querySelectorAll(
-    'a[href*="/p/"],a[href*="/p-"],a[href*="/product"],a[href*="/artikel"],a[href]');
+  // In de strenge ronde moet de link ook echt naar een product wijzen:
+  // zonder die eis werden bij Action banners ('Veiligheidswaarschuwing…')
+  // en bij C&A navigatietegels ('Voor meisjes') als artikel opgevoerd.
+  const padRe = /\\/p\\/|\\/p-|\\/product|\\/artikel|\\/dp\\//i;
+  const links = document.querySelectorAll('a[href]');
   for (const a of links) {
     const href = a.href;
     if (!href || href.startsWith('javascript:') || seen.has(href)) continue;
+    if (streng) {
+      const laatste = (href.split(/[?#]/)[0].replace(/\\/$/, '').split('/').pop() || '');
+      if (!padRe.test(href) && !/\\d{4,}/.test(laatste)) continue;
+    }
     let card = a, hops = 0;
     while (card && hops < 5 && !priceRe.test(card.innerText || '')) {
       card = card.parentElement; hops++;
@@ -170,14 +185,19 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 cats = _nav_categories_via_browser(page, cfg)
                 if cats:
                     res.notes.append("categorieën via gerenderde navigatie")
-            cats = cats[: cfg.max_categories]
+            cats = discover.spread_by_audience(cats, cfg.max_categories)
             res.categories_found = len(cats)
             if not cats:
                 res.error = "geen categorie-URLs gevonden (ook niet via de browser)"
                 return res
+            # Welke categorieën gecrawld worden bepaalt of de doelgroep herkenbaar
+            # is; zichtbaar maken scheelt gokwerk bij het instellen van `seeds`.
+            # (Zo kwam bij Primark aan het licht dat 'vrouwen'/'mannen' ontbraken.)
+            res.notes.append("gecrawlde categorieën: " + ", ".join(
+                urlsplit(u).path for u in cats[:10]))
 
             blocked_pages = 0
-            diagnose_gedaan = False
+            diagnoses = 0
             for cat_url in cats:
                 cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
                 for n in range(1, cfg.max_pages_per_category + 1):
@@ -194,12 +214,15 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     api_hits += len(from_api)
                     found = from_api + products_from_html(html, url)
                     if not found:
-                        found = _dom_products(page)
+                        found = _dom_products(page, res)
                     new = _absorb(seen, found, cat_path)
                     if not new:
-                        if not diagnose_gedaan and not seen:
-                            res.notes.append(f"diagnose {cat_path[:40]}: {_diagnose(page)}")
-                            diagnose_gedaan = True
+                        # Meerdere diagnoses: één pagina zegt te weinig. Bij Zeeman
+                        # bleek de eerste categorie een redactionele pagina te zijn
+                        # (0 €-tekens) — dat zei niets over de échte lijstpagina's.
+                        if not seen and diagnoses < 3:
+                            res.notes.append(f"diagnose {cat_path[:60]}: {_diagnose(page)}")
+                            diagnoses += 1
                         break
                     if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
                         break
@@ -353,6 +376,13 @@ def _clean_title(raw_title: str, card_text: str) -> str:
         for line in (bron or "").splitlines():
             kandidaat = PRICE_STRIP_RE.sub(" ", line)
             kandidaat = re.sub(r"\(\s*/?\s*stuk\s*\)|/\s*stuk|per stuk", " ", kandidaat, flags=re.I)
+            # Action plakt de maatvermelding en varianten aan de titel vast:
+            # "CompressiesokkenMaten 35 - 46 | 2 paar | diverse kleuren".
+            # Alles vanaf de eerste scheiding of maatvermelding valt weg.
+            kandidaat = kandidaat.split("|")[0]
+            # alleen een vastgeplakte maatvermelding ("...sokkenMaten 35 - 46");
+            # een losse "Maat 40" met spatie ervoor hoort wél bij de naam
+            kandidaat = re.sub(r"(?<=[a-z])Ma(?:at|ten)\b.*", "", kandidaat)
             kandidaat = re.sub(r"\s{2,}", " ", kandidaat).strip(" -–|,.\t")
             # een echte titel bevat een letter en is geen los getal/label
             if len(kandidaat) >= 3 and re.search(r"[a-zA-Z]", kandidaat):
@@ -360,10 +390,29 @@ def _clean_title(raw_title: str, card_text: str) -> str:
     return ""
 
 
-def _dom_products(page) -> list[Product]:
-    """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel)."""
+def _dom_products(page, res: ScrapeResult | None = None) -> list[Product]:
+    """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel).
+
+    Eerst alleen links die naar een productpagina wijzen. Levert dat niets op,
+    dan alsnog alle links met een prijs — beter een rommelige waarneming dan
+    geen, maar alleen als er echt geen productlinks zijn. Welke van de twee
+    het werd, komt in het rapport: bij C&A bleek de losse ronde nodig, en
+    juist daar sluipt navigatie binnen.
+    """
+    streng = _dom_ronde(page, streng=True)
+    if streng:
+        return streng
+    los = _dom_ronde(page, streng=False)
+    if res is not None and los and not any("DOM-vangnet" in n for n in res.notes):
+        res.notes.append(f"DOM-vangnet: geen herkenbare productlinks, "
+                         f"teruggevallen op alle links ({len(los)} kaarten) — "
+                         "navigatietegels worden op titel geweerd")
+    return los
+
+
+def _dom_ronde(page, streng: bool) -> list[Product]:
     try:
-        raw = page.evaluate(DOM_SCAN_JS)
+        raw = page.evaluate(DOM_SCAN_JS, streng)
     except Exception:
         return []
     products: list[Product] = []
@@ -380,7 +429,7 @@ def _dom_products(page) -> list[Product]:
         if len(prices) > 1 and max(prices) > min(prices):
             was = max(prices)
         title = _clean_title(item.get("title", ""), text)
-        if not title:
+        if not title or NAV_TITEL_RE.match(title):
             continue
         products.append(Product(key=url_key(href), title=title, url=href,
                                 price=price, was_price=was))

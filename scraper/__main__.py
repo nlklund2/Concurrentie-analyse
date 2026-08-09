@@ -48,6 +48,13 @@ def cmd_scrape(args) -> int:
             enrich_products(cfg, res, known_keys=known, only_keys=focus_keys)
 
         all_rows = to_staging_rows(cfg.id, res.products)
+        # Kanarie: veel gevonden producten die tot weinig sleutels samenvallen
+        # betekent dat we steeds hetzelfde blok lezen. Zeeman week 32: 2.478
+        # producten → 15 sleutels, en dat bleef een week lang onopgemerkt.
+        if len(res.products) >= 50 and len(all_rows) < 0.6 * len(res.products):
+            print(f"  ! {len(res.products)} gevonden producten vallen samen tot "
+                  f"{len(all_rows)} unieke sleutels — vermoedelijk wordt een gedeeld "
+                  "blok gelezen i.p.v. het artikel van de pagina")
         _dump_raw(week, cfg.id, all_rows)  # ruwe dump vóór het focusfilter
         rows = apply_focus(all_rows, cfg.focus_product_types)
         if len(rows) != len(all_rows):
