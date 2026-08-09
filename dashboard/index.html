@@ -161,6 +161,17 @@
   </div>
 
   <div class="card">
+    <h2>Artikel-explorer</h2>
+    <p class="sub" id="explSub">Elk artikel van de gekozen week — klik de artikelnaam om hem op de site
+      van de concurrent te openen. De bron-, doelgroep- en producttypefilters bovenaan werken hier ook.</p>
+    <div class="filters" style="margin-bottom:10px">
+      <input type="search" id="explZoek" placeholder="Zoek op artikelnaam…" style="min-width:240px">
+      <span class="hint" id="explTelling"></span>
+    </div>
+    <div class="plot-wrap" id="explorer"></div>
+  </div>
+
+  <div class="card">
     <h2>Gezondheid van de bronnen</h2>
     <p class="sub">Bij status 🟠 afwijkend of 🔴 fout is de week voor die bron niet verwerkt — cijfers dan niet gebruiken voor besluiten.</p>
     <div class="plot-wrap" id="health"></div>
@@ -355,8 +366,15 @@ function tableFrom(labels, datasets, fmt) {
 
 function render() {
   renderTiles(); renderOmvang(); renderMediaan(); renderPunten();
-  renderMovers(); renderHealth();
+  renderMovers(); renderExplorer(); renderHealth();
 }
+
+// zoeken in de artikel-explorer: kort wachten tot de gebruiker uitgetypt is
+let explTimer;
+document.getElementById("explZoek").addEventListener("input", () => {
+  clearTimeout(explTimer);
+  explTimer = setTimeout(renderExplorer, 300);
+});
 
 function renderTiles() {
   const cur = Object.fromEntries(state.totals.filter(t => t.week === state.week)
@@ -439,6 +457,50 @@ async function renderPunten() {
     tableFrom(labels, ds, v => (+v).toLocaleString("nl-NL"));
 }
 
+// Titels en URL's komen van gescrapete concurrentpagina's — altijd escapen
+// voordat ze de pagina in gaan, en alleen http(s)-links klikbaar maken.
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const veiligeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
+
+async function renderExplorer() {
+  const box = document.getElementById("explorer");
+  const telling = document.getElementById("explTelling");
+  const q = document.getElementById("explZoek").value.trim();
+  if (!state.selected.length) { box.innerHTML = `<div class="hint">Selecteer bronnen in de filterbalk.</div>`; return; }
+  let b = sb.from("weekly_articles")
+    .select("retailer_id,product_key,title,audience,product_type,color,sizes,price,was_price,url",
+            { count: "exact" })
+    .eq("week", state.week).in("retailer_id", state.selected);
+  if (state.aud)  b = b.eq("audience", state.aud);
+  if (state.type) b = b.eq("product_type", state.type);
+  if (q) b = b.ilike("title", `%${q}%`);
+  const { data, error, count } = await b.order("retailer_id").order("title").limit(300);
+  if (error) { box.innerHTML = `<div class="hint">Laden mislukt: ${esc(error.message)}</div>`; return; }
+  if (!data || !data.length) {
+    telling.textContent = "";
+    box.innerHTML = `<div class="hint">Geen artikelen binnen deze filters.</div>`;
+    return;
+  }
+  telling.textContent = `${count.toLocaleString("nl-NL")} artikelen` +
+    (count > 300 ? " — eerste 300 getoond; verfijn met zoeken of filters" : "");
+  box.innerHTML = `<table><tr><th>Bron</th><th>Artikel</th><th>Groep</th><th>Kleur</th>
+    <th>Maten</th><th class="num">Van</th><th class="num">Voor</th></tr>` +
+    data.map(a => {
+      const url = veiligeUrl(a.url);
+      const titel = url
+        ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(a.title)}</a>`
+        : esc(a.title);
+      return `<tr>
+        <td><span class="dot" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${slotColor(a.retailer_id)};margin-right:6px"></span>${esc(naam(a.retailer_id))}</td>
+        <td>${titel}</td>
+        <td>${esc(a.audience)} / ${esc(a.product_type)}</td>
+        <td>${esc(a.color)}</td><td>${esc(a.sizes)}</td>
+        <td class="num">${a.was_price ? eur(a.was_price) : "–"}</td>
+        <td class="num">${a.price != null ? eur(a.price) : "–"}</td></tr>`;
+    }).join("") + `</table>`;
+}
+
 async function renderMovers() {
   const box = document.getElementById("movers");
   box.innerHTML = `<div class="hint">Laden…</div>`;
@@ -464,10 +526,11 @@ async function renderMovers() {
     <th class="num">Van</th><th class="num">Naar</th><th class="num">Verschil</th></tr>` +
     evs.map(e => {
       const p = titles[e.retailer_id + "|" + e.product_key] || {};
-      const titel = p.url ? `<a href="${p.url}" target="_blank" rel="noreferrer">${p.title || e.product_key}</a>`
-                          : (p.title || e.product_key);
-      return `<tr><td>${naam(e.retailer_id)}</td><td>${titel}</td>
-        <td>${p.audience || ""} / ${p.product_type || ""}</td>
+      const url = veiligeUrl(p.url);
+      const titel = url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(p.title || e.product_key)}</a>`
+                        : esc(p.title || e.product_key);
+      return `<tr><td>${esc(naam(e.retailer_id))}</td><td>${titel}</td>
+        <td>${esc(p.audience || "")} / ${esc(p.product_type || "")}</td>
         <td class="num">${eur(e.prev_price)}</td><td class="num">${eur(e.price)}</td>
         <td class="num">${(e.d * 100).toFixed(0)}%</td></tr>`;
     }).join("") + `</table>`;
