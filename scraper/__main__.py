@@ -30,6 +30,7 @@ def cmd_scrape(args) -> int:
         db.ensure_retailers(load_retailers(include_disabled=True))
 
     summary: list[tuple[str, str, int, str]] = []
+    credits: dict[str, int] = {}
     for cfg in cfgs:
         print(f"→ {cfg.name} ({cfg.strategy}) …", flush=True)
         res = strategies.run(cfg, limit=args.limit)
@@ -80,6 +81,11 @@ def cmd_scrape(args) -> int:
         except Exception as e:  # databaseprobleem bij één bron ≠ einde weekrun
             status, note = "fout", f"verwerking mislukt: {e}"
             print(f"  ✗ {note}")
+        # Firecrawl is de enige betaalde stap; het tegoed is eindig en raakt
+        # anders ongemerkt op. Verbruik dus mee het weekrapport in.
+        if res.strategy == "firecrawl":
+            credits[cfg.id] = res.requests_done
+            note = f"{note} · {res.requests_done} Firecrawl-credits"
         try:
             db.log_run(cfg.id, week, res.strategy or cfg.strategy, len(rows), status, note)
         except Exception as e:
@@ -89,6 +95,10 @@ def cmd_scrape(args) -> int:
     print("\n=== Samenvatting ===")
     for rid, strat, n, status in summary:
         print(f"{rid:12s} {strat or '-':14s} {n:6d} artikelen  {status}")
+    if credits:
+        detail = ", ".join(f"{rid} {n}" for rid, n in sorted(credits.items()))
+        print(f"Firecrawl: {sum(credits.values())} credits deze run ({detail}). "
+              "Tegoed op? Dan melden beide bronnen 'HTTP 402'.")
     ok = [s for s in summary if s[3] == "ok"]
     if not ok:
         print("Geen enkele bron leverde bruikbare data op.", file=sys.stderr)

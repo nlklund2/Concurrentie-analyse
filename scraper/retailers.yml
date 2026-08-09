@@ -100,6 +100,11 @@ retailers:
     strategy: firecrawl
     firecrawl_mode: pages
     firecrawl_page_cap: 110
+    # Besluit 09-08 (eigenaar): bron blijft wekelijks meelopen als hertest.
+    # De kanarie houdt die hertest goedkoop: acht pagina's zonder leesbare
+    # data en de run stopt (±8 i.p.v. ±40 credits). Geeft de site wél iets
+    # prijs, dan loopt hij dezelfde run door tot de cap van 110.
+    firecrawl_canary: 8
     enrich: false
     max_categories: 20
     notes: >-
@@ -113,9 +118,9 @@ retailers:
       alleen productteasers. Ronde 6 (firecrawl_mode 'pages') haalde alle
       38 bodywear-productpagina's uit de sitemap op: ALLE 38 zonder
       leesbare productdata — geen JSON-LD, geen __NEXT_DATA__, geen
-      og:prijs-metatags. EINDOORDEEL: technisch uitgeput; bron blijft rood
-      (kost ±42 credits/week aan vergeefse pogingen — uitzetten met
-      enabled: false als dat zonde is). Enige resterende route: iemand
+      og:prijs-metatags. EINDOORDEEL: technisch uitgeput; bron blijft rood.
+      BESLUIT 09-08: blijft aan als wekelijkse hertest, maar met kanarie —
+      ±8 i.p.v. ±42 credits per week. Enige resterende route: iemand
       opent wibra.nl in een gewone browser, navigeert naar het
       ondergoed-overzicht en levert die URL aan als seed — dán kan de
       lijstroute met het kaart-vangnet het opnieuw proberen.
@@ -161,6 +166,12 @@ retailers:
     strategy: firecrawl
     enrich: false
     max_categories: 20
+    # Besluit 09-08 (eigenaar): bron blijft wekelijks meelopen als hertest.
+    # De kanarie kijkt naar de JSON-route, niet naar de kaartoogst — die
+    # levert bij een niet-renderend raster alleen promoblokken op. Vijf
+    # categorieën zonder ingebedde productdata en de run stopt (±6 i.p.v.
+    # ±24 credits); rendert het raster wél, dan gaat hij door tot 20.
+    firecrawl_canary: 5
     # Poort omhoog: de promo-oogst (26 'artikelen': koffie, koekjes, ga-naar-
     # home-tegels) zou de standaarddrempel van 25 nét passeren en week 33
     # vervuilen. Een écht productraster levert honderden artikelen; pas dan
@@ -181,10 +192,10 @@ retailers:
       (geaccepteerd, geen 400) — oogst exact gelijk aan zonder acties:
       zelfde 26 promo-artikelen. Het raster verschijnt niet in de
       Firecrawl-snapshot, ook niet na scrollen. EINDOORDEEL: technisch
-      uitgeput; bron blijft rood, de drempel van 60 bewaakt de data
-      (kost ±24 credits/week aan vergeefse pogingen — uitzetten met
-      enabled: false als dat zonde is). Later herproberen kan; HEMA's
-      folder/winkel blijft het alternatief voor prijspeiling.
+      uitgeput; bron blijft rood, de drempel van 60 bewaakt de data.
+      BESLUIT 09-08: blijft aan als wekelijkse hertest, maar met kanarie —
+      ±6 i.p.v. ±24 credits per week. HEMA's folder/winkel blijft het
+      alternatief voor prijspeiling zolang het raster niet rendert.
   c-and-a:
     name: C&A
     base: https://www.c-and-a.com/nl/nl/shop

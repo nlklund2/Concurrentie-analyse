@@ -173,6 +173,10 @@ Sommige retailers blokkeren niet de scraper-*techniek* maar het *IP-adres*: verk
 - **Waarde:** Wibra is een directe kernconcurrent (zelfde klant, zelfde straat); die missen doet pijn. HEMA markeert de bovenkant. Voor die twee kan ±€16/mnd verdedigbaar zijn — maar het is een **business**beslissing, geen technische.
 - **Alternatief zonder kosten:** Wibra/HEMA afdekken via de weekfolder-check en het gerichte winkelbezoek (§7), en leunen op de wél-werkende bronnen die hetzelfde prijssegment beslaan (KiK, Action, C&A).
 
+**Stand 09-08 na zes validatierondes:** de IP-blokkade ís doorbroken — Firecrawl komt bij beide sites binnen. Maar daarachter geven ze hun assortiment niet prijs: Wibra's productpagina's dragen geen enkele machineleesbare productdata (0 van 38), HEMA's productraster rendert niet binnen de snapshot, ook niet na scroll-acties. Betalen voor de hobby-tier lost dat dus **niet** op; het probleem is niet meer het IP.
+
+**Besluit van de eigenaar (09-08): beide bronnen blijven wekelijks meelopen als hertest.** Sites veranderen, en de dag dat het raster wél rendert wil je het diezelfde maandag zien. Om te voorkomen dat die hertest het gratis tegoed opmaakt, kent de firecrawl-strategie een **kanarie** (`firecrawl_canary` in `retailers.yml`): levert de eerste handvol opvragingen niets leesbaars op, dan stopt de run daar. Dat drukt het weekverbruik van ±66 naar ±14 credits — genoeg voor maanden hertesten in plaats van vier weken. Geeft de kanarie wél data, dan loopt dezelfde run gewoon door tot de volle cap; er gaat dus geen week verloren. Bij HEMA kijkt de kanarie bewust naar de JSON-route en niet naar de kaartoogst: die leest bij een niet-renderend raster alleen de promoblokken (koffie, koekjes) en zou de bron ten onrechte groen praten.
+
 ### Zeeman: laadt wel, toont geen prijzen (stand 09-08)
 Zeeman is een ander geval dan Wibra/HEMA — er is géén blokkade. De pagina's laden
 volledig, ook zonder browser, maar bevatten geen prijzen. Drie gemeten voorbeelden:
