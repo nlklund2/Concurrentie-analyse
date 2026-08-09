@@ -104,7 +104,7 @@ Max ~1 request/seconde, robots.txt wordt gerespecteerd, één run per week, alle
 ## 5. Architectuur & kosten
 
 ```
-GitHub Actions (cron, ma 06:30)          Supabase (Postgres, gratis tier)
+GitHub Actions (cron, ma 06:00)          Supabase (Postgres, gratis tier)
 ┌─────────────────────────────┐          ┌──────────────────────────────┐
 │ 1. scrape alle bronnen      │─ upsert ►│ products   (actueel + histor.)│
 │ 2. verwerk in database ─────┼─ RPC ───►│ price_events (alleen mutaties)│
