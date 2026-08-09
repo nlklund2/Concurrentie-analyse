@@ -108,13 +108,17 @@ retailers:
       laden — het datacenter-IP van GitHub Actions wordt geweerd. Enige route
       is een residentiële proxy: strategy 'firecrawl' (betaald, activeer met
       FIRECRAWL_API_KEY). Zonder sleutel blijft de bron rood in de tabel.
-      FIRECRAWL GETEST 09-08 (5 rondes): blokkade doorbroken, maar de site
+      FIRECRAWL GETEST 09-08 (6 rondes): blokkade doorbroken, maar de site
       geeft zijn LIJSTEN niet prijs — sitemap kent 1 lijstpagina, navigatie
-      alleen productteasers. DAAROM 09-08 OMGEZET naar firecrawl_mode
-      'pages': focus-gefilterde PRODUCTpagina's uit de sitemap, stuk voor
-      stuk (zoals terStal/Zeeman, maar via Firecrawl). Kost 1 credit per
-      artikel per week; cap 110 begrenst het verbruik. Tellingen zijn een
-      deelwaarneming als het bodywear-assortiment boven de cap uitkomt.
+      alleen productteasers. Ronde 6 (firecrawl_mode 'pages') haalde alle
+      38 bodywear-productpagina's uit de sitemap op: ALLE 38 zonder
+      leesbare productdata — geen JSON-LD, geen __NEXT_DATA__, geen
+      og:prijs-metatags. EINDOORDEEL: technisch uitgeput; bron blijft rood
+      (kost ±42 credits/week aan vergeefse pogingen — uitzetten met
+      enabled: false als dat zonde is). Enige resterende route: iemand
+      opent wibra.nl in een gewone browser, navigeert naar het
+      ondergoed-overzicht en levert die URL aan als seed — dán kan de
+      lijstroute met het kaart-vangnet het opnieuw proberen.
   primark:
     name: Primark
     base: https://www.primark.com/nl-nl
@@ -173,10 +177,14 @@ retailers:
       het kaart-vangnet las alleen de promoblokken eromheen (koffie en
       koekjes die via het crawlpad als bodywear zouden meetellen). Daarom
       drempel op 60: promo-rommel komt daar nooit overheen, een echt raster
-      (honderden artikelen) wel. VERVOLG 09-08: scroll-acties toegevoegd
-      aan de Firecrawl-aanroep (zelfde recept als de eigen browser bij
-      Action/C&A) zodat het raster eerst laadt — validatie moet dit
-      bevestigen; tot die tijd bewaakt de drempel de data.
+      (honderden artikelen) wel. RONDE 6 (09-08): scroll-acties meegegeven
+      (geaccepteerd, geen 400) — oogst exact gelijk aan zonder acties:
+      zelfde 26 promo-artikelen. Het raster verschijnt niet in de
+      Firecrawl-snapshot, ook niet na scrollen. EINDOORDEEL: technisch
+      uitgeput; bron blijft rood, de drempel van 60 bewaakt de data
+      (kost ±24 credits/week aan vergeefse pogingen — uitzetten met
+      enabled: false als dat zonde is). Later herproberen kan; HEMA's
+      folder/winkel blijft het alternatief voor prijspeiling.
   c-and-a:
     name: C&A
     base: https://www.c-and-a.com/nl/nl/shop
