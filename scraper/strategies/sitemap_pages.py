@@ -116,7 +116,7 @@ def _eigen_product(found: list[Product], url: str) -> Product | None:
     doel = url_key(url)
     for p in found:
         if p.key == doel or (p.url and url_key(p.url) == doel):
-            return p
+            return _met_prijs(p, found)
     slug = _woorden(urlsplit(url).path.rsplit("/", 1)[-1])
     if slug:
         beste, score = None, 0.0
@@ -127,8 +127,30 @@ def _eigen_product(found: list[Product], url: str) -> Product | None:
                 if gedeeld > score:
                     beste, score = p, gedeeld
         if beste is not None and score >= 0.6:
-            return beste
+            return _met_prijs(beste, found)
     return max(found, key=lambda x: (x.price is not None, len(x.title or "")))
+
+
+def _met_prijs(p: Product, found: list[Product]) -> Product:
+    """Prijs aanvullen uit een ander blok over hetzelfde artikel.
+
+    Shops splitsen de productpagina vaak op: JSON-LD met naam en URL, de prijs
+    in een apart script. Identiteit gaat vóór gemak — we houden het artikel van
+    de pagina vast — maar de prijs mag uit een blok komen dat aantoonbaar over
+    hetzelfde artikel gaat (zelfde sleutel of zelfde titel), nooit uit een
+    willekeurig ander product op de pagina.
+    """
+    if p.price is not None:
+        return p
+    for ander in found:
+        if ander is p or ander.price is None:
+            continue
+        if ander.key == p.key or (ander.title and ander.title == p.title):
+            p.price = ander.price
+            if p.was_price is None and ander.was_price:
+                p.was_price = ander.was_price
+            break
+    return p
 
 
 def _pad(url: str) -> str:

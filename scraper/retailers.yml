@@ -54,15 +54,19 @@ retailers:
     segment: kern
     url_filter: "/nl"
     color_slot: 2
+    strategy: render
+    enrich: false
+    max_categories: 30
+    max_pages_per_category: 10
     notes: >-
       Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
-      GEVALIDEERD 07-08: werkt via productpagina's; 9.672 focus-URLs → vaste
-      steekproef van 2.500/week (deelwaarneming, trends vergelijkbaar).
-      GEREPAREERD 09-08: elke kleurvariant heeft een eigen pagina, maar toont
-      daarop álle varianten; de scraper koos steeds dezelfde en 60 pagina's
-      vielen samen tot 4 artikelen. Nu op naamgelijkenis met de pagina-slug,
-      en de steekproef is gelijkmatig gespreid i.p.v. de eerste N alfabetisch
-      (die waren allemaal varianten van dezelfde paar artikelen).
+      OMGEZET 09-08 naar de render-strategie. Zeeman is een client-side app:
+      de lijstpagina's leverden via HTTP nul producten, en op de productpagina's
+      staat in de HTML alleen een aanraderblok — 60 verschillende pagina's,
+      gelijkmatig over 9.672 URL's bemonsterd, leverden 6 artikelen op (dezelfde
+      zes). De prijzen en doelgroepen daarvan klopten, dus de bron zelf is prima;
+      alleen komt de data pas na het renderen beschikbaar. Caps krap gehouden
+      (30 categorieën x 10 pagina's) zodat de weekrun onder ±25 min blijft.
   wibra:
     name: Wibra
     base: https://www.wibra.nl

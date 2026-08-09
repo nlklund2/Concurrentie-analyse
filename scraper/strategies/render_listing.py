@@ -67,6 +67,14 @@ PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
 BLOCK_HINTS = re.compile(r"access denied|just a moment|are you human|captcha|"
                          r"request blocked|pardon our interruption", re.I)
 
+# Navigatietegels dragen vaak óók een prijs ("vanaf € 9,00") en komen in het
+# losse DOM-vangnet als artikel binnen. Bij C&A stonden zo 'shoppen', 'Voor
+# meisjes' en 'Voor jongens' in de weekcijfers.
+NAV_TITEL_RE = re.compile(
+    r"^(?:shop(?:pen)?|bekijk(?:\s+alles)?|alles?\s+bekijken|meer\s+\w+|"
+    r"voor\s+(?:haar|hem|meisjes|jongens|kinderen|baby'?s?|dames|heren)|"
+    r"alle\s+\w+|sale|nieuw|ontdek(?:ken)?|lees\s+meer|verder\s+winkelen)$", re.I)
+
 DOM_SCAN_JS = """
 (streng) => {
   const out = [];
@@ -206,7 +214,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     api_hits += len(from_api)
                     found = from_api + products_from_html(html, url)
                     if not found:
-                        found = _dom_products(page)
+                        found = _dom_products(page, res)
                     new = _absorb(seen, found, cat_path)
                     if not new:
                         if not diagnose_gedaan and not seen:
@@ -365,6 +373,13 @@ def _clean_title(raw_title: str, card_text: str) -> str:
         for line in (bron or "").splitlines():
             kandidaat = PRICE_STRIP_RE.sub(" ", line)
             kandidaat = re.sub(r"\(\s*/?\s*stuk\s*\)|/\s*stuk|per stuk", " ", kandidaat, flags=re.I)
+            # Action plakt de maatvermelding en varianten aan de titel vast:
+            # "CompressiesokkenMaten 35 - 46 | 2 paar | diverse kleuren".
+            # Alles vanaf de eerste scheiding of maatvermelding valt weg.
+            kandidaat = kandidaat.split("|")[0]
+            # alleen een vastgeplakte maatvermelding ("...sokkenMaten 35 - 46");
+            # een losse "Maat 40" met spatie ervoor hoort wél bij de naam
+            kandidaat = re.sub(r"(?<=[a-z])Ma(?:at|ten)\b.*", "", kandidaat)
             kandidaat = re.sub(r"\s{2,}", " ", kandidaat).strip(" -–|,.\t")
             # een echte titel bevat een letter en is geen los getal/label
             if len(kandidaat) >= 3 and re.search(r"[a-zA-Z]", kandidaat):
@@ -372,15 +387,24 @@ def _clean_title(raw_title: str, card_text: str) -> str:
     return ""
 
 
-def _dom_products(page) -> list[Product]:
+def _dom_products(page, res: ScrapeResult | None = None) -> list[Product]:
     """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel).
 
     Eerst alleen links die naar een productpagina wijzen. Levert dat niets op,
     dan alsnog alle links met een prijs — beter een rommelige waarneming dan
-    geen, maar alleen als er echt geen productlinks zijn.
+    geen, maar alleen als er echt geen productlinks zijn. Welke van de twee
+    het werd, komt in het rapport: bij C&A bleek de losse ronde nodig, en
+    juist daar sluipt navigatie binnen.
     """
-    producten = _dom_ronde(page, streng=True)
-    return producten or _dom_ronde(page, streng=False)
+    streng = _dom_ronde(page, streng=True)
+    if streng:
+        return streng
+    los = _dom_ronde(page, streng=False)
+    if res is not None and los and not any("DOM-vangnet" in n for n in res.notes):
+        res.notes.append(f"DOM-vangnet: geen herkenbare productlinks, "
+                         f"teruggevallen op alle links ({len(los)} kaarten) — "
+                         "navigatietegels worden op titel geweerd")
+    return los
 
 
 def _dom_ronde(page, streng: bool) -> list[Product]:
@@ -402,7 +426,7 @@ def _dom_ronde(page, streng: bool) -> list[Product]:
         if len(prices) > 1 and max(prices) > min(prices):
             was = max(prices)
         title = _clean_title(item.get("title", ""), text)
-        if not title:
+        if not title or NAV_TITEL_RE.match(title):
             continue
         products.append(Product(key=url_key(href), title=title, url=href,
                                 price=price, was_price=was))
