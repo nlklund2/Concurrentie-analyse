@@ -388,10 +388,11 @@ def _dom_products(page) -> list[Product]:
 
 
 def _absorb(seen: dict[str, Product], found: list[Product], cat_path: str) -> int:
+    from .listing_crawl import _voeg_samen
     new = 0
     for p in found:
-        if not p.category_raw:
-            p.category_raw = cat_path
+        # crawlpad (doelgroep) én bron-categorie (producttype) allebei bewaren
+        p.category_raw = _voeg_samen(cat_path, p.category_raw)
         cur = seen.get(p.key)
         if cur is None:
             seen[p.key] = p

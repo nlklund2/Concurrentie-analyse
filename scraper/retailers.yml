@@ -117,7 +117,7 @@ retailers:
     color_slot: 7
     strategy: render
     enrich: false
-    max_categories: 20
+    max_categories: 40
     max_pages_per_category: 15
     notes: >-
       Gezinsmode incl. breed ondergoed.

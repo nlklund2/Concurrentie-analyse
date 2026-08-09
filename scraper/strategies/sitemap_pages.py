@@ -10,7 +10,7 @@ import re
 from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
-from ..jsonscan import extract_jsonld, products_from_jsonld
+from ..jsonscan import extract_jsonld, products_from_html, products_from_jsonld
 from ..models import Product, ScrapeResult
 
 
@@ -41,20 +41,38 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         res.notes.append(f"{len(product_urls)} product-URLs binnen focus; vaste "
                          f"steekproef van {cap} pagina's — tellingen zijn een "
                          "deelwaarneming, trends blijven vergelijkbaar")
+    gemist = 0
     for url in product_urls[:cap]:
         resp = http.get(url)
         if resp is None:
             continue
         objs = extract_jsonld(resp.text)
         found = products_from_jsonld(objs, url)
-        if found:
-            p = found[0]
-            if not p.category_raw:
-                p.category_raw = _breadcrumb(objs)
-            if not p.url:
-                p.url = url
-            res.products.append(p)
+        if not found:
+            # Lang niet elke shop zet JSON-LD op de productpagina (Zeeman bv. niet);
+            # val terug op de volledige scan: __NEXT_DATA__ en andere ingebedde JSON.
+            found = products_from_html(resp.text, url)
+        if not found:
+            gemist += 1
+            continue
+        p = max(found, key=lambda x: (x.price is not None, len(x.title or "")))
+        # Het URL-pad draagt bij vrijwel elke shop de doelgroep ("/dames/ondergoed/");
+        # samen met de breadcrumb geeft dat de mapping het sterkste signaal.
+        p.category_raw = " ".join(x for x in (
+            _breadcrumb(objs), p.category_raw, _pad(url)) if x)[:500]
+        if not p.url:
+            p.url = url
+        res.products.append(p)
+    if gemist:
+        res.notes.append(f"{gemist} productpagina's zonder leesbare productdata")
     return res
+
+
+def _pad(url: str) -> str:
+    """Het URL-pad als categoriesignaal, bv. 'dames ondergoed slips'."""
+    from urllib.parse import urlsplit
+    segs = [s for s in urlsplit(url).path.split("/") if s]
+    return " ".join(s.replace("-", " ") for s in segs[:-1])
 
 
 def _breadcrumb(objs: list) -> str:
