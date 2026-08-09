@@ -19,6 +19,7 @@ def probe_one(cfg: RetailerCfg, limit: int = 40) -> dict:
     n = len(all_rows) or 1
     return {
         "cfg": cfg,
+        "limit": limit,
         "result": res,
         "all_rows": all_rows,
         "rows": rows,
@@ -38,6 +39,12 @@ def advies(p: dict) -> str:
     if p["all_rows"] and not p["rows"]:
         return ("artikelen gevonden maar geen enkele binnen de focus — mappingregels "
                 "of focus_product_types nalopen")
+    if len(p["rows"]) < cfg.min_products_expected <= p.get("limit", 0):
+        # Zonder deze regel adviseerde de probe 'klaar voor de wekelijkse run' bij
+        # 6 artikelen (Zeeman) — terwijl de weekrun zo'n oogst per definitie afkeurt.
+        return (f"slechts {len(p['rows'])} artikelen binnen focus — onder de "
+                f"weekdrempel van {cfg.min_products_expected}, dus de weekrun keurt "
+                "dit af; controleer de notities en voorbeeldtitels hierboven")
     if p["price_coverage"] < 0.6:
         return "prijsextractie mager — bron-JSON bekijken en veldnamen aan jsonscan toevoegen"
     if p["mapping"] < 0.6:

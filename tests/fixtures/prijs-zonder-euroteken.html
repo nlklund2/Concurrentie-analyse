@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <title>Prijzen met het euroteken uit CSS</title>
+  <style>
+    /* Het valutateken staat in de stylesheet, niet in de tekst — een veel
+       voorkomend patroon dat een €-gebaseerde scan volledig blind maakt. */
+    .prijs::before { content: "\20AC "; }
+  </style>
+</head>
+<body>
+  <h1>Dames ondergoed</h1>
+  <div class="grid">
+    <article class="card">
+      <a href="/nl-nl/p/dames-slip-3pack-441122" aria-label="Dames slip 3-pack">
+        <img src="a.jpg" alt="Dames slip 3-pack">
+      </a>
+      <div class="prijs">5,99</div>
+    </article>
+    <article class="card">
+      <a href="/nl-nl/p/heren-boxer-2pack-551133" aria-label="Heren boxer 2-pack">
+        <img src="b.jpg" alt="Heren boxer 2-pack">
+      </a>
+      <div class="prijs">7,99</div>
+      <div class="maat">Maten 35 - 46</div>
+    </article>
+  </div>
+</body>
+</html>

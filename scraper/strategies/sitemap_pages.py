@@ -11,7 +11,8 @@ from urllib.parse import urlsplit
 from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
-from ..jsonscan import extract_jsonld, products_from_html, products_from_jsonld, url_key
+from ..jsonscan import (extract_jsonld, price_from_microdata, products_from_html,
+                        products_from_jsonld, url_key)
 from ..models import Product, ScrapeResult
 
 
@@ -65,6 +66,14 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         if p is None:
             gemist += 1
             continue
+        if p.price is None:
+            # Laatste kans op de prijs: microdata en og:-metatags van déze
+            # pagina. Die horen per definitie bij dit artikel, dus veilig.
+            micro, micro_was = price_from_microdata(resp.text)
+            if micro is not None:
+                p.price = micro
+                if p.was_price is None:
+                    p.was_price = micro_was
         if p.key in gezien:
             # Elke productpagina hoort een eigen artikel te leveren. Dezelfde
             # sleutel op tientallen pagina's betekent dat we een gedeeld blok

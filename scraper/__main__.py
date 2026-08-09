@@ -3,6 +3,7 @@
   python -m scraper scrape [--retailer id ...] [--dry-run] [--limit N]
   python -m scraper probe  [--retailer id ...] [--limit N] [--out bestand.md]
   python -m scraper report [--week JJJJ-MM-DD] [--no-email]
+  python -m scraper diagnose --url <url> [--url <url> ...] [--no-render]
 """
 from __future__ import annotations
 
@@ -134,6 +135,15 @@ def cmd_probe(args) -> int:
     return 0
 
 
+def cmd_diagnose(args) -> int:
+    from .diagnose import diagnose_rapport
+    md = diagnose_rapport(args.url, render=not args.no_render)
+    Path(args.out).write_text(md, encoding="utf-8")
+    print(md)
+    print(f"\nDiagnoserapport: {args.out}")
+    return 0
+
+
 def cmd_report(args) -> int:
     from .report import write_report
     week = date.fromisoformat(args.week) if args.week else week_monday()
@@ -156,6 +166,12 @@ def main() -> int:
     p.add_argument("--limit", type=int, default=40)
     p.add_argument("--out", default="probe-rapport.md")
     p.set_defaults(fn=cmd_probe)
+
+    d = sub.add_parser("diagnose", help="waarom levert deze pagina niets op?")
+    d.add_argument("--url", action="append", required=True, help="te onderzoeken pagina")
+    d.add_argument("--no-render", action="store_true", help="alleen de HTTP-kant")
+    d.add_argument("--out", default="diagnose-rapport.md")
+    d.set_defaults(fn=cmd_diagnose)
 
     r = sub.add_parser("report", help="weekrapport genereren uit de database")
     r.add_argument("--week", help="maandag van de week (JJJJ-MM-DD), standaard deze week")

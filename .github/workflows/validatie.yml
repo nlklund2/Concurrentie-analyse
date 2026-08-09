@@ -1,6 +1,12 @@
 # Bronnen valideren zonder database: kleine proefscrape per bron met
 # een leesbaar rapport in de job-samenvatting. Draai dit na installatie,
 # na het toevoegen van een bron, of wanneer een bron rood kleurt.
+#
+# Blijft een bron leeg en snap je niet waarom? Vul dan `diagnose_urls` met een
+# of meer pagina's van die bron. Dat rapport toont álle signalen waar de
+# extractie op kan aanhaken — €-tekens versus kale prijsgetallen, microdata,
+# prijs-attributen, JSON-scripts en de JSON-API's die de pagina zelf aanroept —
+# en noemt de vervolgstap. Scheelt een dag gokken (zie PLAN.md §8, Zeeman).
 name: Validatie bronnen
 
 on:
@@ -14,6 +20,10 @@ on:
         description: "Maximaal aantal artikelen per bron"
         required: false
         default: "40"
+      diagnose_urls:
+        description: "Losse pagina's diepgaand onderzoeken (spaties ertussen; leeg = overslaan)"
+        required: false
+        default: ""
 
 jobs:
   valideren:
@@ -22,6 +32,10 @@ jobs:
     env:
       INPUT_RETAILERS: ${{ inputs.retailers }}
       INPUT_LIMIET: ${{ inputs.limiet }}
+      INPUT_DIAGNOSE: ${{ inputs.diagnose_urls }}
+      # Zonder deze regel test een validatierun Firecrawl nooit — de sleutel
+      # bestaat dan wel als secret maar bereikt het proces niet.
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,22 +53,33 @@ jobs:
           playwright install --with-deps chromium
 
       - name: Proefscrape per bron
+        if: inputs.diagnose_urls == ''
         run: |
           EXTRA=""
           for r in $INPUT_RETAILERS; do EXTRA="$EXTRA --retailer $r"; done
           python -m scraper probe $EXTRA --limit "$INPUT_LIMIET"
 
+      - name: Pagina's diepgaand onderzoeken
+        if: inputs.diagnose_urls != ''
+        run: |
+          ARGS=""
+          for u in $INPUT_DIAGNOSE; do ARGS="$ARGS --url $u"; done
+          python -m scraper diagnose $ARGS
+
       - name: Rapport in job-samenvatting tonen
         if: always()
         run: |
-          if [ -f probe-rapport.md ]; then
-            cat probe-rapport.md >> "$GITHUB_STEP_SUMMARY"
-          fi
+          for f in probe-rapport.md diagnose-rapport.md; do
+            [ -f "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY"
+          done
+          true
 
       - name: Rapport als artifact bewaren
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: validatierapport
-          path: probe-rapport.md
+          path: |
+            probe-rapport.md
+            diagnose-rapport.md
           if-no-files-found: ignore

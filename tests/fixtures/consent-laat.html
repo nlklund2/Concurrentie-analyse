@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <title>Cookiemuur die pas na het laden verschijnt (Zeeman-patroon)</title>
+</head>
+<body>
+  <h1>Dames ondergoed</h1>
+  <div class="grid">
+    <article class="card">
+      <a href="/p/dames-slip-5pack-12345" aria-label="Dames slips 5-pack">
+        <img src="x.jpg" alt="Dames slips 5-pack">
+      </a>
+      <div class="price">€ 6,99</div>
+    </article>
+  </div>
+  <script>
+    // Cookiebot-gedrag: de muur rendert asynchroon, ná domcontentloaded en
+    // dus ná de eerste klikpoging van de scraper. Knoptekst is de Nederlandse
+    // Cookiebot-standaard 'Alles toestaan'.
+    window.__consent = false;
+    setTimeout(() => {
+      const d = document.createElement('div');
+      d.id = 'laatdialoog';
+      d.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99;padding:40px';
+      d.innerHTML = '<p>Wij gebruiken cookies.</p>';
+      const b = document.createElement('button');
+      b.textContent = 'Alles toestaan';
+      b.addEventListener('click', () => { window.__consent = true; d.remove(); });
+      d.appendChild(b);
+      document.body.appendChild(d);
+    }, 400);
+  </script>
+</body>
+</html>

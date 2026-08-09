@@ -246,6 +246,61 @@ def deep_find_products(obj, base_url: str = "", _depth: int = 0) -> list[Product
     return found
 
 
+# Microdata (schema.org in HTML-attributen). Veel shops zetten geen JSON-LD
+# neer maar wél <meta itemprop="price" content="7.99">. Zonder deze route
+# missen we op zulke productpagina's de prijs — bij terStal bleef daardoor 57%
+# van de artikelen prijsloos.
+_MICRO_PRICE_RE = re.compile(
+    r'itemprop\s*=\s*["\'](?:price|lowPrice)["\'][^>]*?content\s*=\s*["\']([^"\']+)["\']'
+    r'|content\s*=\s*["\']([^"\']+)["\'][^>]*?itemprop\s*=\s*["\'](?:price|lowPrice)["\']',
+    re.I)
+# Bewust géén 'highPrice': dat is in schema.org de bovenkant van een prijsréeks
+# over varianten, niet de doorgestreepte oude prijs. Als was-prijs opvoeren zou
+# korting verzinnen en de sale-druk in het weekrapport opblazen.
+_MICRO_WAS_RE = re.compile(
+    r'itemprop\s*=\s*["\']listPrice["\'][^>]*?content\s*=\s*["\']([^"\']+)["\']', re.I)
+_META_PROP_RE = re.compile(
+    r'<meta[^>]+(?:property|name)\s*=\s*["\'](?:product:price:amount|og:price:amount|'
+    r'twitter:data1)["\'][^>]+content\s*=\s*["\']([^"\']+)["\']', re.I)
+
+
+def price_from_microdata(html: str) -> tuple[float | None, float | None]:
+    """(prijs, was-prijs) uit microdata en og:-metatags van een productpagina."""
+    prijs = was = None
+    for m in _MICRO_PRICE_RE.finditer(html):
+        prijs = parse_price(m.group(1) or m.group(2))
+        if prijs is not None:
+            break
+    if prijs is None:
+        for m in _META_PROP_RE.finditer(html):
+            prijs = parse_price(m.group(1))
+            if prijs is not None:
+                break
+    m = _MICRO_WAS_RE.search(html)
+    if m:
+        was = parse_price(m.group(1))
+    return prijs, (was if (was and prijs and was > prijs) else None)
+
+
+_OG_TITLE_RE = re.compile(
+    r'<meta[^>]+(?:property|name)\s*=\s*["\']og:title["\'][^>]+content\s*=\s*["\']([^"\']+)["\']'
+    r'|<meta[^>]+content\s*=\s*["\']([^"\']+)["\'][^>]+(?:property|name)\s*=\s*["\']og:title["\']',
+    re.I)
+
+
+def product_from_meta(html: str, url: str) -> Product | None:
+    """Vangnet voor productpagina's zonder ingebedde JSON: og:title plus de
+    micro-/metaprijs. Vrijwel elke webshop zet deze tags voor social shares."""
+    m = _OG_TITLE_RE.search(html)
+    titel = (m.group(1) or m.group(2)).strip() if m else ""
+    titel = titel.split(" | ")[0].strip()   # "…naam | Winkelnaam" → naam
+    prijs, was = price_from_microdata(html)
+    if not titel or prijs is None:
+        return None
+    return Product(key=url_key(url), title=titel[:200], url=url,
+                   price=prijs, was_price=was)
+
+
 def products_from_html(html: str, base_url: str = "") -> list[Product]:
     """Alle beschikbare extractiemethoden op één pagina, ontdubbeld op sleutel."""
     products: list[Product] = []

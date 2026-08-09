@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import re
 import time
-from urllib.parse import urlsplit
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlsplit
 
 from .. import discover
 from ..config import RetailerCfg
@@ -48,6 +49,7 @@ CONSENT_SELECTORS = (
     "#onetrust-accept-btn-handler",
     "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
     "#CybotCookiebotDialogBodyButtonAccept",
+    "#CybotCookiebotDialogBodyButtonAcceptAll",
     "#usercentrics-root >>> button[data-testid='uc-accept-all-button']",
     "button[data-testid='uc-accept-all-button']",
     "button[id*='accept-all' i]",
@@ -55,11 +57,31 @@ CONSENT_SELECTORS = (
     "[data-cy='cookie-accept-all']",
     "[data-test-id='cookie-accept-all']",
 )
-CONSENT_TEXTS = ("alles accepteren", "accepteer alles", "alle cookies accepteren",
+# 'alles toestaan' is de Nederlandse Cookiebot-standaard (Zeeman) — zonder die
+# tekst bleef de muur daar staan en laadde het Algolia-productraster nooit
+CONSENT_TEXTS = ("alles toestaan", "sta alle cookies toe", "alles accepteren",
+                 "accepteer alles", "alle cookies accepteren",
                  "cookies accepteren", "accepteren", "akkoord", "ik ga akkoord",
                  "accept all", "allow all")
 
-PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)")
+# Beide schrijfwijzen: '€ 24,99' én '24,99 €' — C&A zet het teken achter het
+# getal, waardoor een €-eerst-regex maar een fractie van de kaarten las.
+PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)"
+                           r"|(\d+(?:[.,]\d{2})?)\s*€")
+# Sommige shops zetten het €-teken via CSS (::before) neer; dan staat er in de
+# tekst alleen '3,99'. Bewust smal: twee decimalen achter een komma/punt, geen
+# maten ('35 - 46'), geen losse getallen en geen versienummers ('5.51.0' —
+# de diagnose telde die op Zeeman als prijs). Alleen gebruikt als de pagina
+# nergens een €-teken toont — anders is het te grof.
+PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![.,]?\d)")
+
+
+def _prijzen(text: str, prijs_los: bool = False) -> list[float]:
+    if prijs_los:
+        ruw = PRICE_LOOSE_RE.findall(text)
+    else:
+        ruw = [m.group(1) or m.group(2) for m in PRICE_TEXT_RE.finditer(text)]
+    return [p for p in (parse_price(r) for r in ruw) if p]
 # prijsdelen uit de kaarttekst knippen om de titel over te houden — titel en
 # prijs staan lang niet altijd op een eigen regel
 PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
@@ -76,10 +98,12 @@ NAV_TITEL_RE = re.compile(
     r"alle\s+\w+|sale|nieuw|ontdek(?:ken)?|lees\s+meer|verder\s+winkelen)$", re.I)
 
 DOM_SCAN_JS = """
-(streng) => {
+([streng, prijsLos]) => {
   const out = [];
   const seen = new Set();
-  const priceRe = /€\\s*\\d/;
+  // '€ 24,99' én '24,99 €' (C&A); losse ronde weert versienummers als 5.51.0
+  const priceRe = prijsLos ? /(?:^|[^\\d.,])\\d{1,3}[.,]\\d{2}(?![.,]?\\d)/
+                           : /€\\s*\\d|\\d[\\d.,]*\\s*€/;
   // Productkaart = een link naar een productpagina, met ergens in de
   // omliggende kaart een prijs. Titel komt uit aria-label / img-alt /
   // heading, niet uit de ruwe kaarttekst (die is vervuild met prijs/labels).
@@ -331,9 +355,10 @@ def _load(page, url: str, consent: bool = True) -> str | None:
         return None
     if resp is not None and resp.status in (403, 429, 503):
         return None
+    geklikt = not consent
     if consent:
         try:
-            accept_consent(page)
+            geklikt = accept_consent(page)
         except Exception:
             pass
     try:
@@ -345,6 +370,23 @@ def _load(page, url: str, consent: bool = True) -> str | None:
         page.wait_for_timeout(700)
         page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
         page.wait_for_timeout(900)
+    except Exception:
+        return None
+    if not geklikt:
+        # Cookiemuren (Cookiebot e.d.) laden asynchroon en staan er vaak pas ná
+        # de eerste klikpoging — bij Zeeman bleef de muur zo onopgemerkt staan
+        # en laadde het productraster nooit. Na een late klik even wachten
+        # zodat het raster (en zijn API-calls) alsnog kan opkomen.
+        try:
+            if accept_consent(page):
+                try:
+                    page.wait_for_load_state("networkidle", timeout=8000)
+                except Exception:
+                    pass
+                page.wait_for_timeout(800)
+        except Exception:
+            pass
+    try:
         html = page.content()
     except Exception:
         return None
@@ -352,6 +394,124 @@ def _load(page, url: str, consent: bool = True) -> str | None:
     if BLOCK_HINTS.search(head) and "product" not in head.lower():
         return None
     return html
+
+
+class _KaartLezer(HTMLParser):
+    """Bouwt een minimale elementenboom: per anker de eigen tekst én de tekst
+    van omliggende voorouders. De statische tegenhanger van de DOM-scan, voor
+    HTML die al elders gerenderd is (Firecrawl) en waar geen browser meer
+    omheen staat. De vooroudertekst is essentieel: bij HEMA en C&A staat de
+    prijs búiten de link, in de omliggende productkaart."""
+
+    _TEKST_CAP = 600   # per element genoeg voor titel + prijzen, geen ballast
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.ankers: list[dict] = []
+        self._stack: list[dict] = [{"tag": "#root", "tekst": "", "ouder": None,
+                                    "n_ankers": 0}]
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        node = {"tag": tag, "tekst": "", "ouder": self._stack[-1], "n_ankers": 0}
+        if tag == "a":
+            anker = {"href": a.get("href") or "",
+                     "label": a.get("aria-label") or a.get("title") or "",
+                     "node": node}
+            self.ankers.append(anker)
+            node["anker"] = anker
+            for open_node in self._stack:
+                open_node["n_ankers"] += 1
+        elif tag == "img":
+            alt = (a.get("alt") or "").strip()
+            if alt:
+                for n in self._reversed_stack():
+                    anker = n.get("anker")
+                    if anker is not None and not anker["label"]:
+                        anker["label"] = alt
+                        break
+            return   # img sluit zichzelf; niet op de stack
+        if tag not in ("br", "hr", "input", "meta", "link", "source", "wbr"):
+            self._stack.append(node)
+
+    def _reversed_stack(self):
+        return reversed(self._stack)
+
+    def handle_endtag(self, tag):
+        for i in range(len(self._stack) - 1, 0, -1):
+            if self._stack[i]["tag"] == tag:
+                del self._stack[i:]
+                return
+
+    def handle_data(self, data):
+        stukje = re.sub(r"\s+", " ", data).strip()
+        if not stukje:
+            return
+        for node in self._stack:
+            if len(node["tekst"]) < self._TEKST_CAP:
+                node["tekst"] = (node["tekst"] + " " + stukje).strip()
+
+
+def lees_ankers(html: str) -> list[dict]:
+    """Ankers met eigen tekst ('tekst') en kaarttekst incl. voorouders
+    ('kaart'): de prijs mag ook net buiten de link staan."""
+    lezer = _KaartLezer()
+    try:
+        lezer.feed(html)
+    except Exception:
+        pass  # kapotte HTML: houden wat er tot dan toe gelezen is
+    uit = []
+    for a in lezer.ankers:
+        eigen = a["node"]["tekst"]
+        kaart, node, hops = eigen, a["node"], 0
+        # Omhoog lopen tot een voorouder met prijstekst, net als de DOM-scan —
+        # maar niet voorbij de kaart: een voorouder met veel links is een
+        # raster, navigatie of de body zelf, en diens prijzen horen niet bij
+        # dít anker (anders wordt elke nav-link een 'teaser').
+        while (node["ouder"] is not None and hops < 5
+               and not PRICE_TEXT_RE.search(kaart)
+               and node["ouder"]["n_ankers"] <= 3):
+            node = node["ouder"]
+            kaart = node["tekst"]
+            hops += 1
+        uit.append({"href": a["href"], "label": a["label"],
+                    "tekst": eigen, "kaart": kaart})
+    return uit
+
+
+def cards_from_html(html: str, base_url: str) -> list[Product]:
+    """Productkaarten uit reeds gerenderde HTML — zelfde vangnet als de
+    DOM-scan, maar zonder browser. Nodig voor Firecrawl-bronnen (HEMA) die
+    hun lijsten wél renderen maar geen JSON-LD of __NEXT_DATA__ insluiten."""
+    ankers = lees_ankers(html)
+    host = urlsplit(base_url).netloc
+    heeft_euro = "€" in html or "&euro;" in html
+    for prijs_los in (False, True):
+        if prijs_los and heeft_euro:
+            break   # losse getallen alleen als er nérgens een €-teken staat
+        producten: dict[str, Product] = {}
+        for a in ankers:
+            href = a["href"]
+            if not href or href.startswith(("javascript:", "mailto:", "tel:", "#")):
+                continue
+            vol = urljoin(base_url, href)
+            p_url = urlsplit(vol)
+            if p_url.netloc != host or discover.NOISE_WORDS.search(vol):
+                continue
+            prijzen = [p for p in _prijzen(a["kaart"], prijs_los=prijs_los) if p <= 200]
+            if not prijzen:
+                continue
+            titel = _clean_title(a["label"], a["tekst"] or a["kaart"])
+            if not titel or NAV_TITEL_RE.match(titel):
+                continue
+            key = url_key(vol)
+            if key not in producten:
+                producten[key] = Product(
+                    key=key, title=titel, url=vol, price=min(prijzen),
+                    was_price=max(prijzen) if max(prijzen) > min(prijzen) else None)
+        if producten:
+            return list(producten.values())
+    return []
 
 
 def _diagnose(page) -> str:
@@ -393,33 +553,61 @@ def _clean_title(raw_title: str, card_text: str) -> str:
 def _dom_products(page, res: ScrapeResult | None = None) -> list[Product]:
     """Vangnet: productkaarten uit de gerenderde DOM (link + prijs + titel).
 
-    Eerst alleen links die naar een productpagina wijzen. Levert dat niets op,
-    dan alsnog alle links met een prijs — beter een rommelige waarneming dan
-    geen, maar alleen als er echt geen productlinks zijn. Welke van de twee
-    het werd, komt in het rapport: bij C&A bleek de losse ronde nodig, en
-    juist daar sluipt navigatie binnen.
+    Vier rondes, van meest naar minst betrouwbaar; de eerste die iets oplevert
+    wint, en elke afwijking van de strengste ronde komt in het rapport.
+      1. productlink + €-prijs      — het normale geval
+      2. alle links + €-prijs       — C&A: productlinks zijn niet herkenbaar
+      3. productlink + los getal    — €-teken komt uit CSS i.p.v. uit de tekst
+      4. alle links + los getal     — laatste redmiddel
+    Rondes 3 en 4 draaien alleen als er nérgens een €-teken staat; anders is
+    'ieder getal met twee decimalen' te grof en vist het maten en gewichten op.
     """
-    streng = _dom_ronde(page, streng=True)
-    if streng:
-        return streng
-    los = _dom_ronde(page, streng=False)
-    if res is not None and los and not any("DOM-vangnet" in n for n in res.notes):
-        res.notes.append(f"DOM-vangnet: geen herkenbare productlinks, "
-                         f"teruggevallen op alle links ({len(los)} kaarten) — "
-                         "navigatietegels worden op titel geweerd")
-    return los
+    for streng in (True, False):
+        gevonden = _dom_ronde(page, streng=streng, prijs_los=False)
+        if gevonden:
+            _meld(res, streng, False, len(gevonden))
+            return gevonden
+    if _pagina_toont_euro(page):
+        return []
+    for streng in (True, False):
+        gevonden = _dom_ronde(page, streng=streng, prijs_los=True)
+        if gevonden:
+            _meld(res, streng, True, len(gevonden))
+            return gevonden
+    return []
 
 
-def _dom_ronde(page, streng: bool) -> list[Product]:
+def _pagina_toont_euro(page) -> bool:
     try:
-        raw = page.evaluate(DOM_SCAN_JS, streng)
+        return bool(page.evaluate(
+            "() => (document.body.innerText || '').includes('\\u20ac')"))
+    except Exception:
+        return True   # bij twijfel niet de losse prijsronde inzetten
+
+
+def _meld(res: ScrapeResult | None, streng: bool, prijs_los: bool, aantal: int) -> None:
+    if res is None or (streng and not prijs_los):
+        return          # de normale route hoeft niet gemeld te worden
+    waarom = []
+    if not streng:
+        waarom.append("geen herkenbare productlinks")
+    if prijs_los:
+        waarom.append("geen €-teken in de tekst")
+    boodschap = f"DOM-vangnet: {' en '.join(waarom)} — {aantal} kaarten gelezen"
+    if not any(n.startswith("DOM-vangnet") for n in res.notes):
+        res.notes.append(boodschap)
+
+
+def _dom_ronde(page, streng: bool, prijs_los: bool = False) -> list[Product]:
+    try:
+        raw = page.evaluate(DOM_SCAN_JS, [streng, prijs_los])
     except Exception:
         return []
     products: list[Product] = []
     for item in raw:
         href = item.get("href", "")
         text = item.get("text", "")
-        prices = [p for p in (parse_price(m) for m in PRICE_TEXT_RE.findall(text)) if p]
+        prices = _prijzen(text, prijs_los)
         # ondergoed/nachtmode/sokken: prijzen boven €200 zijn vrijwel zeker ruis
         # (artikelnummers, postcodes) uit een verkeerd kaart-element
         prices = [p for p in prices if p <= 200]
