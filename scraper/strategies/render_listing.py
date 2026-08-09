@@ -175,6 +175,11 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             if not cats:
                 res.error = "geen categorie-URLs gevonden (ook niet via de browser)"
                 return res
+            # Welke categorieën gecrawld worden bepaalt of de doelgroep herkenbaar
+            # is; zichtbaar maken scheelt gokwerk bij het instellen van `seeds`.
+            # (Zo kwam bij Primark aan het licht dat 'vrouwen'/'mannen' ontbraken.)
+            res.notes.append("gecrawlde categorieën: " + ", ".join(
+                urlsplit(u).path for u in cats[:10]))
 
             blocked_pages = 0
             diagnose_gedaan = False
