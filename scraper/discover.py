@@ -134,9 +134,17 @@ def nav_categories(http: Http, base: str, url_filter: str = "", cap: int = 40) -
     resp = http.get(base)
     if resp is None:
         return []
+    return categories_from_html(resp.text, base, url_filter, cap)
+
+
+def categories_from_html(html: str, base: str, url_filter: str = "",
+                         cap: int = 40) -> list[str]:
+    """Categorie-URLs uit reeds opgehaalde HTML — dezelfde selectie als
+    nav_categories, maar bruikbaar wanneer de pagina via een andere route
+    binnenkwam (headless browser, Firecrawl)."""
     host = urlsplit(base).netloc
     seen: dict[str, None] = {}
-    for href in _HREF_RE.findall(resp.text):
+    for href in _HREF_RE.findall(html):
         full = urljoin(base, href)
         p = urlsplit(full)
         if p.netloc != host or NOISE_WORDS.search(full):

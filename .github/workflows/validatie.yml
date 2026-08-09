@@ -33,6 +33,9 @@ jobs:
       INPUT_RETAILERS: ${{ inputs.retailers }}
       INPUT_LIMIET: ${{ inputs.limiet }}
       INPUT_DIAGNOSE: ${{ inputs.diagnose_urls }}
+      # Zonder deze regel test een validatierun Firecrawl nooit — de sleutel
+      # bestaat dan wel als secret maar bereikt het proces niet.
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 

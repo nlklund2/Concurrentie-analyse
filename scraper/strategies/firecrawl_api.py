@@ -16,6 +16,7 @@ geen automatische stap in de waterval.
 from __future__ import annotations
 
 import os
+import re
 from urllib.parse import urlsplit
 
 import requests
@@ -25,6 +26,7 @@ from ..config import RetailerCfg
 from ..http import Http
 from ..jsonscan import products_from_html
 from ..models import Product, ScrapeResult
+from .listing_crawl import _voeg_samen
 
 FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape"
 
@@ -38,27 +40,38 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                      "(betaalde dienst, zie PLAN.md §8).")
         return res
 
-    cats = _category_urls(cfg, http, res)
-    if not cats:
-        res.error = "geen categorie-URLs gevonden om via Firecrawl op te halen"
-        return res
-    cats = cats[: cfg.max_categories]
-    res.categories_found = len(cats)
-
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json"})
+
+    cats = _category_urls(cfg, http, res)
+    if not cats:
+        # De sitemap is bij deze bronnen vaak net zo geblokkeerd als de rest;
+        # haal dan de startpagina óók via Firecrawl en lees de navigatie.
+        cats = _nav_via_firecrawl(session, cfg, res)
+    if not cats:
+        # een al gezette fout (401/402) is de échte oorzaak — niet overschrijven
+        res.error = res.error or (
+            "geen categorie-URLs gevonden (sitemap én startpagina) — "
+            "voeg `seeds` toe in retailers.yml om Firecrawl te sturen")
+        return res
+    cats = discover.spread_by_audience(cats, cfg.max_categories)
+    res.categories_found = len(cats)
+    res.notes.append("gecrawlde categorieën: " + ", ".join(
+        urlsplit(u).path for u in cats[:10]))
     seen: dict[str, Product] = {}
-    credits = 0
+    credits = res.requests_done   # navigatie-opvraag telt mee
     for cat_url in cats:
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
         html = _firecrawl_html(session, cat_url, res)
         credits += 1
         if html is None:
+            if res.error:      # sleutel ongeldig of credits op: stoppen
+                break
             continue
         for p in products_from_html(html, cat_url):
-            if not p.category_raw:
-                p.category_raw = cat_path
+            # crawlpad (doelgroep) én bron-categorie (producttype) allebei bewaren
+            p.category_raw = _voeg_samen(cat_path, p.category_raw)
             seen.setdefault(p.key, p)
         if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
             break
@@ -86,14 +99,30 @@ def _category_urls(cfg: RetailerCfg, http: Http, res: ScrapeResult) -> list[str]
     except Exception:
         pass
     if cats and cfg.focus_categories:
-        import re
         rx = re.compile(cfg.focus_categories, re.I)
         focused = [u for u in cats if rx.search(u)]
         if focused:
             cats = focused
-    if not cats:
-        res.notes.append("geen categorie-sitemap bereikbaar — voeg `seeds` toe in "
-                         "retailers.yml (categorie-URLs) om Firecrawl te sturen")
+    return cats
+
+
+def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
+                       res: ScrapeResult) -> list[str]:
+    """Categorieën uit de door Firecrawl gerenderde startpagina (1 credit)."""
+    html = _firecrawl_html(session, cfg.base, res)
+    res.requests_done += 1
+    if not html:
+        return []
+    cats = discover.categories_from_html(html, cfg.base, cfg.url_filter,
+                                         cfg.max_categories)
+    if cfg.focus_categories and cats:
+        rx = re.compile(cfg.focus_categories, re.I)
+        focused = [u for u in cats if rx.search(u)]
+        if focused:
+            cats = focused
+    if cats:
+        res.notes.append("categorieën via de Firecrawl-gerenderde startpagina "
+                         "(sitemap onbereikbaar voor het datacenter-IP)")
     return cats
 
 
