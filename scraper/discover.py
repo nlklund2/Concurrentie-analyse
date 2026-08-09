@@ -17,6 +17,12 @@ CATEGORY_WORDS = re.compile(
     r"sokken|panty|schoen|sneaker|laarzen|sport|jassen|truien|broeken|jeans|shirts|"
     r"jurken|rokken|badmode|zwem|accessoires|huishoud|wonen|textiel|sale|aanbieding", re.I)
 
+# doelgroepwoorden in een categoriepad — nodig om bij het afkappen niet één
+# doelgroep te bevoordelen
+AUDIENCE_WORDS = re.compile(
+    r"dames|vrouwen|women|ladies|heren|mannen|\bmen\b|jongens|\bboys?\b|"
+    r"meisjes|meiden|\bgirls?\b|baby|kinder|\bkids\b|junior", re.I)
+
 # padwoorden die juist géén categorie zijn
 NOISE_WORDS = re.compile(
     r"klantenservice|service|contact|vacature|retour|verzend|voorwaarden|privacy|cookie|"
@@ -87,6 +93,35 @@ def split_product_category_urls(urls: list[str]) -> tuple[list[str], list[str]]:
         elif CATEGORY_WORDS.search(path) and len(segs) <= 4:
             categories.append(u)
     return products, categories
+
+
+def spread_by_audience(urls: list[str], cap: int) -> list[str]:
+    """Categorielijst afkappen zonder één doelgroep te bevoordelen.
+
+    Een op diepte en lengte gesorteerde lijst is alfabetisch geclusterd. Bij
+    KiK leverden de eerste 20 van 500 categorieën daardoor uitsluitend 'dames'
+    op, waarna de bron in week 32 als damesspeciaalzaak in de cijfers stond —
+    203 artikelen, nul heren. Ronde voor ronde één categorie per doelgroep
+    houdt de volgorde bínnen een doelgroep intact en de dekking evenwichtig.
+    """
+    if cap <= 0:
+        return []
+    if len(urls) <= cap:
+        return urls
+    groepen: dict[str, list[str]] = {}
+    for u in urls:
+        m = AUDIENCE_WORDS.search(urlsplit(u).path)
+        groepen.setdefault(m.group(0).lower() if m else "", []).append(u)
+    uit: list[str] = []
+    while len(uit) < cap:
+        ronde = [g for g in groepen.values() if g]
+        if not ronde:
+            break
+        for groep in ronde:
+            uit.append(groep.pop(0))
+            if len(uit) >= cap:
+                break
+    return uit
 
 
 def nav_categories(http: Http, base: str, url_filter: str = "", cap: int = 40) -> list[str]:

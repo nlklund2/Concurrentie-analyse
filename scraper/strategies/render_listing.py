@@ -170,7 +170,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 cats = _nav_categories_via_browser(page, cfg)
                 if cats:
                     res.notes.append("categorieën via gerenderde navigatie")
-            cats = cats[: cfg.max_categories]
+            cats = discover.spread_by_audience(cats, cfg.max_categories)
             res.categories_found = len(cats)
             if not cats:
                 res.error = "geen categorie-URLs gevonden (ook niet via de browser)"

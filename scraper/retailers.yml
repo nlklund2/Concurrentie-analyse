@@ -143,7 +143,7 @@ retailers:
     enabled: true
     strategy: render
     enrich: false
-    max_categories: 20
+    max_categories: 45
     max_pages_per_category: 15
     notes: >-
       Laagste prijspunten van de markt.
@@ -151,6 +151,10 @@ retailers:
       artikelen); titel-/prijsextractie verbeterd 07-08 (losse getallen als
       '599' worden niet meer als prijs of titel gelezen). Aangezet als
       werkende discounter naast Zeeman/Wibra.
+      BIJGESTELD 09-08: 500 categorieën binnen focus, waarvan er 20 werden
+      gecrawld — alfabetisch allemaal 'dames', waardoor KiK in week 32 als
+      damesspeciaalzaak in de cijfers stond. Nu 45 categorieën én spreiding
+      over doelgroepen bij het afkappen.
   scapino:
     name: Scapino
     base: https://www.scapino.nl

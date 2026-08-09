@@ -42,7 +42,7 @@ def category_urls(cfg: RetailerCfg, http: Http, res: ScrapeResult) -> list[str]:
         else:
             res.notes.append("focusfilter matchte geen categorie — alle categorieën "
                              "gecrawld; producten worden na de mapping gefilterd")
-    return urls[: cfg.max_categories]
+    return discover.spread_by_audience(urls, cfg.max_categories)
 
 
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
