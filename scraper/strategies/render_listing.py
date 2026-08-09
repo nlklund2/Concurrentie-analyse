@@ -197,7 +197,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 urlsplit(u).path for u in cats[:10]))
 
             blocked_pages = 0
-            diagnose_gedaan = False
+            diagnoses = 0
             for cat_url in cats:
                 cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
                 for n in range(1, cfg.max_pages_per_category + 1):
@@ -217,9 +217,12 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                         found = _dom_products(page, res)
                     new = _absorb(seen, found, cat_path)
                     if not new:
-                        if not diagnose_gedaan and not seen:
-                            res.notes.append(f"diagnose {cat_path[:40]}: {_diagnose(page)}")
-                            diagnose_gedaan = True
+                        # Meerdere diagnoses: één pagina zegt te weinig. Bij Zeeman
+                        # bleek de eerste categorie een redactionele pagina te zijn
+                        # (0 €-tekens) — dat zei niets over de échte lijstpagina's.
+                        if not seen and diagnoses < 3:
+                            res.notes.append(f"diagnose {cat_path[:60]}: {_diagnose(page)}")
+                            diagnoses += 1
                         break
                     if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
                         break

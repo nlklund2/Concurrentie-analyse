@@ -29,7 +29,10 @@ NOISE_WORDS = re.compile(
     r"winkels|store-?locator|blog|nieuws|account|login|wishlist|cart|winkelwagen|"
     r"giftcard|cadeaukaart|folder|\.pdf$|\.jpg$|\.png$|"
     # kleur-/maatfilters van een categorie die we toch al crawlen (KiK: /c_wit)
-    r"/c_[a-z]{3,}", re.I)
+    r"/c_[a-z]{3,}|"
+    # redactionele pagina's die assortimentswoorden bevatten maar geen artikelen
+    # tonen (Zeeman: /inspiratie/ons-damesondergoed, /over-zeeman/onze-producten)
+    r"/inspiratie/|/over-[a-z]+/|/magazine|/lookbook|/verhalen|/advies", re.I)
 
 
 def origin(url: str) -> str:

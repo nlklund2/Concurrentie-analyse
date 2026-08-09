@@ -67,6 +67,12 @@ retailers:
       zes). De prijzen en doelgroepen daarvan klopten, dus de bron zelf is prima;
       alleen komt de data pas na het renderen beschikbaar. Caps krap gehouden
       (30 categorieën x 10 pagina's) zodat de weekrun onder ±25 min blijft.
+      NOG NIET OPGELOST 09-08: ook de browser vond nul artikelen. De diagnose
+      wees uit dat de eerste categorie een redactionele pagina was (0 prijzen
+      op de hele pagina); die worden nu bij de ontdekking uitgesloten en de
+      diagnose kijkt naar drie categorieën in plaats van één. Blijft Zeeman
+      leeg, dan is de bron rood tot er seeds of een andere route zijn — beter
+      leeg dan de zes aanraderartikelen als 'het assortiment' presenteren.
   wibra:
     name: Wibra
     base: https://www.wibra.nl
@@ -101,6 +107,11 @@ retailers:
     enrich: false
     max_categories: 20
     max_pages_per_category: 15
+    # Gekalibreerd 09-08: Action heeft online ~24 bodywear-artikelen in de zes
+    # relevante categorieën; met de standaarddrempel van 25 zou een correcte
+    # meting elke week rood staan. De echte breukdetectie is de <50%-van-vorige-
+    # week-regel; deze drempel vangt alleen een totale instorting.
+    min_products_expected: 15
     notes: >-
       Prijszetter in sokken/boxers-multipacks.
       GEVALIDEERD 07-08: WERKT via de render-strategie nadat de cookiemuur wordt
@@ -133,6 +144,10 @@ retailers:
     enrich: false
     max_categories: 40
     max_pages_per_category: 15
+    # Gekalibreerd 09-08: zie Action. C&A's productraster is maar deels leesbaar
+    # (165 links en 38 prijzen op de pagina, waarvan we er ~5 als kaart
+    # herkennen) — 16 artikelen is voorlopig de eerlijke opbrengst.
+    min_products_expected: 12
     notes: >-
       Gezinsmode incl. breed ondergoed.
       GEVALIDEERD 07-08: pagina's laden volledig via de render-strategie (141

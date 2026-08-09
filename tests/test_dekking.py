@@ -70,6 +70,18 @@ def test_eigen_product_negeert_zwakke_naamgelijkenis():
     assert gekozen.key == "promo"   # valt terug op de heuristiek, niet op de slug
 
 
+def test_redactionele_paden_tellen_niet_als_categorie():
+    """Zeeman: /inspiratie/ons-damesondergoed bevat assortimentswoorden maar
+    toont geen artikelen — de browserdiagnose vond er nul prijzen op."""
+    from scraper.discover import split_product_category_urls
+    _, cats = split_product_category_urls([
+        "https://www.zeeman.com/nl-nl/dames/ondergoed/",
+        "https://www.zeeman.com/nl-nl/inspiratie/ons-damesondergoed",
+        "https://www.zeeman.com/nl-nl/over-zeeman/onze-producten/kinderpyjama",
+    ])
+    assert cats == ["https://www.zeeman.com/nl-nl/dames/ondergoed/"]
+
+
 def test_kleurfilterpaden_tellen_niet_als_categorie():
     """KiK biedt elke categorie ook per kleur aan (/c_wit); die crawlen kost
     budget en levert dezelfde artikelen op."""

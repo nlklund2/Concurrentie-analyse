@@ -50,6 +50,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     gemist = 0
     herhaald = 0
     gezien: dict[str, str] = {}     # sleutel → titel, voor de diagnose
+    zonder_prijs: list[str] = []
     for url in product_urls[:cap]:
         resp = http.get(url)
         if resp is None:
@@ -73,6 +74,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             herhaald += 1
             continue
         gezien[p.key] = p.title
+        if p.price is None and len(zonder_prijs) < 3:
+            zonder_prijs.append(url)
         # Het URL-pad draagt bij vrijwel elke shop de doelgroep ("/dames/ondergoed/");
         # samen met de breadcrumb geeft dat de mapping het sterkste signaal.
         p.category_raw = " ".join(x for x in (
@@ -82,6 +85,12 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         res.products.append(p)
     if gemist:
         res.notes.append(f"{gemist} productpagina's zonder leesbare productdata")
+    if zonder_prijs:
+        # Zonder prijs is een artikel wel te tellen maar niet te indexeren.
+        # De voorbeeld-URL's maken het naspeurbaar: open er één, zoek waar de
+        # prijs staat en voeg dat veld toe aan jsonscan (PLAN.md §6.7).
+        res.notes.append("artikelen zonder prijs op de productpagina, bv.: "
+                         + ", ".join(zonder_prijs))
     if herhaald:
         voorbeeld = ", ".join(list(gezien.values())[:5]) or "geen"
         res.notes.append(
