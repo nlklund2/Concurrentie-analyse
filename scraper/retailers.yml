@@ -84,7 +84,14 @@ retailers:
       cookiedialoog). Fix: consent-herkansing ná networkidle + 'Alles
       toestaan' in de tekstenlijst. Algolia-calls worden al onderschept door
       de API-sink, dus na de klik kan de data via die route binnenkomen.
-      Hervalidatie moet dit bevestigen; tot die tijd blijft de bron rood.
+      HERVALIDATIE 09-08 (run 14): NIET opgelost — 6 'artikelen', en de titels
+      ontmaskeren ze: 'Cookiebot Usercentrics' en 4x 'Trusted Shops' met prijs
+      €4.44 / was €5.00 — dat is de shopwaardering 4,44 van 5, gelezen als
+      afprijzing. De muur of het raster blokkeert dus nog steeds, en de
+      getal-eerst-prijsscan maakt van badges nepproducten. BRON BLIJFT ROOD;
+      de weekpoort (minimaal 25) houdt deze rommel uit de database. Geen
+      derde poging zonder nieuwe diagnose-informatie; alternatief is Firecrawl
+      (zelfde route als Wibra/HEMA) of accepteren dat Zeeman ontbreekt.
   wibra:
     name: Wibra
     base: https://www.wibra.nl
