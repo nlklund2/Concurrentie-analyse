@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from urllib.parse import urljoin, urlsplit
 
 import requests
@@ -30,6 +31,12 @@ from .listing_crawl import _voeg_samen
 from .render_listing import cards_from_html, lees_ankers
 
 FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape"
+
+# Het gratis tier staat ±10 scrapes per minuut toe. Zonder tempo eronder
+# kaatste elke categoriefetch op HTTP 429 (validatierun 18: 19 van de 20).
+PAUZE_TUSSEN_CALLS = 6.5
+WACHT_BIJ_429 = (12, 30)
+_laatste_call = [0.0]
 
 
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
@@ -51,8 +58,12 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         # Firecrawl kan hem wél lezen. Dat is de betrouwbaarste bron: de
         # navigatie bleek bij Wibra alleen productteasers te bevatten.
         cats = _sitemap_via_firecrawl(session, cfg, res)
-    if not cats:
-        cats = _nav_via_firecrawl(session, cfg, res)
+    if not cfg.seeds and len(cats) < 5 and not res.error:
+        # Wibra's sitemap kent nauwelijks lijstpagina's (1 landingspagina);
+        # de navigatie vult dan aan met de thema-/afdelingspagina's.
+        # Expliciete seeds zijn een bewuste keuze en worden nooit aangevuld.
+        extra = [c for c in _nav_via_firecrawl(session, cfg, res) if c not in cats]
+        cats = cats + extra
     if not cats:
         # een al gezette fout (401/402) is de échte oorzaak — niet overschrijven
         res.error = res.error or (
@@ -223,10 +234,23 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
         "timeout": 30000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
     }
-    try:
-        r = session.post(FIRECRAWL_ENDPOINT, json=payload, timeout=60)
-    except requests.RequestException as e:
-        res.notes.append(f"Firecrawl-netwerkfout: {str(e)[:120]}")
+    for poging in range(len(WACHT_BIJ_429) + 1):
+        wacht = PAUZE_TUSSEN_CALLS - (time.monotonic() - _laatste_call[0])
+        if wacht > 0:
+            time.sleep(wacht)
+        try:
+            r = session.post(FIRECRAWL_ENDPOINT, json=payload, timeout=60)
+        except requests.RequestException as e:
+            _laatste_call[0] = time.monotonic()
+            res.notes.append(f"Firecrawl-netwerkfout: {str(e)[:120]}")
+            return None
+        _laatste_call[0] = time.monotonic()
+        if r.status_code != 429:
+            break
+        if poging < len(WACHT_BIJ_429):
+            time.sleep(WACHT_BIJ_429[poging])
+    if r.status_code == 429:
+        res.notes.append(f"Firecrawl-limiet (HTTP 429) hield aan op {url[:60]}")
         return None
     if r.status_code == 402:
         res.error = "Firecrawl-credits op (HTTP 402) — tegoed bijvullen of tier verhogen"

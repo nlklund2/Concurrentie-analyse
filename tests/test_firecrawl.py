@@ -84,6 +84,13 @@ class _Resp:
         return self._payload
 
 
+@pytest.fixture(autouse=True)
+def geen_wachttijd(monkeypatch):
+    """Tests wachten niet: tempo-pauzes en 429-backoff uitschakelen."""
+    monkeypatch.setattr(firecrawl_api, "PAUZE_TUSSEN_CALLS", 0)
+    monkeypatch.setattr(firecrawl_api.time, "sleep", lambda _s: None)
+
+
 def _sessie(monkeypatch, antwoorden):
     """session.post vervangen: elke aanroep levert het volgende antwoord."""
     calls = []
@@ -176,21 +183,37 @@ def test_kaart_vangnet_prijs_buiten_de_link(monkeypatch):
 
 def test_sitemap_via_firecrawl_weert_productnamespace(monkeypatch):
     """Wibra: de navigatie kent geen echte afdelingen; de sitemap wel — maar
-    dan moeten de duizenden /assortiment/-productpagina's er eerst uit."""
+    dan moeten de duizenden /assortiment/-productpagina's er eerst uit. Een
+    magere sitemap-oogst (<5) wordt aangevuld vanuit de navigatie."""
     monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
     calls = _sessie(monkeypatch, [_Resp(body={"success": True,
                                               "data": {"rawHtml": SITEMAP_XML}}),
+                                  _Resp(html="<html>lege nav</html>"),
                                   _Resp(html=LISTING_HTML),
                                   _Resp(html=LISTING_HTML)])
     monkeypatch.setattr(firecrawl_api, "_category_urls", lambda cfg, http, res: [])
     cfg = _cfg(focus_categories="ondergoed")
     res = firecrawl_api.scrape(cfg, http=None)
     assert calls[0] == "https://www.wibra.nl/sitemap.xml"
-    assert set(calls[1:]) == {"https://www.wibra.nl/thema/baby-ondergoed",
+    assert calls[1] == "https://www.wibra.nl"          # nav-aanvulling bij <5
+    assert set(calls[2:]) == {"https://www.wibra.nl/thema/baby-ondergoed",
                               "https://www.wibra.nl/thema/dames-ondergoed"}
     assert not any("/assortiment/" in c for c in calls)
     assert any("sitemap via Firecrawl" in n for n in res.notes)
     assert res.products
+
+
+def test_429_wordt_herkanst_en_dooft_niet_de_run(monkeypatch):
+    """Rate-limiet van het gratis tier (10/min): herkansen met wachttijd, en
+    een aanhoudende 429 is een notitie, geen fatale fout voor de hele bron."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(429), _Resp(html=LISTING_HTML)])
+    cfg = _cfg(seeds=["https://www.wibra.nl/dames/ondergoed"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(calls) == 2          # zelfde URL opnieuw geprobeerd
+    assert calls[0] == calls[1]
+    assert res.error == ""
+    assert len(res.products) == 2
 
 
 GEEN_SITEMAP = [_Resp(html="<html>geen sitemap hier</html>")] * 3
