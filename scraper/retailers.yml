@@ -106,6 +106,13 @@ retailers:
       laden — het datacenter-IP van GitHub Actions wordt geweerd. Enige route
       is een residentiële proxy: strategy 'firecrawl' (betaald, activeer met
       FIRECRAWL_API_KEY). Zonder sleutel blijft de bron rood in de tabel.
+      FIRECRAWL GETEST 09-08 (5 rondes): de blokkade is doorbroken en het
+      kaart-vangnet leest 78 kaarten — maar de site geeft zijn LIJSTEN niet
+      prijs. De sitemap kent 1 lijstpagina (/herenkleding-bij-wibra/), de
+      navigatie alleen productteasers en themapagina's; oogst: 1 artikel
+      binnen focus. De weekpoort (min 25) houdt dit netjes tegen — bron
+      blijft rood. Opties: echte categorie-URLs als `seeds` aanleveren
+      (handmatig uit de site plukken), of de bron laten vallen.
   primark:
     name: Primark
     base: https://www.primark.com/nl-nl
@@ -148,11 +155,24 @@ retailers:
     strategy: firecrawl
     enrich: false
     max_categories: 20
+    # Poort omhoog: de promo-oogst (26 'artikelen': koffie, koekjes, ga-naar-
+    # home-tegels) zou de standaarddrempel van 25 nét passeren en week 33
+    # vervuilen. Een écht productraster levert honderden artikelen; pas dan
+    # mag HEMA de database in.
+    min_products_expected: 60
     notes: >-
       Sterk in ondergoed/bh's; hoger prijspunt — bovengrens van het speelveld.
       GEVALIDEERD 07-08: weert ook een echte headless browser al bij het laden
       (datacenter-IP geblokkeerd). Route: strategy 'firecrawl' (betaald,
       FIRECRAWL_API_KEY). Zonder sleutel blijft de bron rood.
+      FIRECRAWL GETEST 09-08 (5 rondes): blokkade doorbroken, sitemap levert
+      perfecte bodywear-categorieën (/kind/ondergoed/…, /dames/lingerie) —
+      maar het productraster zelf rendert niet binnen de Firecrawl-snapshot;
+      het kaart-vangnet leest alleen de promoblokken eromheen ("2 voor"-
+      artikelen als koffie en koekjes, plus ga-naar-tegels), die via het
+      crawlpad ten onrechte als bodywear zouden meetellen. Daarom drempel
+      op 60. Vervolgroutes: Firecrawl met langere wachttijd/scroll-acties
+      proberen, of de bron laten vallen.
   c-and-a:
     name: C&A
     base: https://www.c-and-a.com/nl/nl/shop
