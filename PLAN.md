@@ -171,7 +171,30 @@ Sommige retailers blokkeren niet de scraper-*techniek* maar het *IP-adres*: verk
 - **Kosten:** gratis start (~500 pagina's eenmalig), daarna ±€16/mnd (hobby-tier). Dit is de eerste post die de €0-opzet doorbreekt.
 - **Privacy/juridisch:** de te scrapen product-URL's gaan naar een derde partij; de proxy-aanpak omzeilt bewust een IP-blokkade, wat het "publiek toegankelijk"-argument iets minder sterk maakt. Neem dit mee in de juridische toetsing hierboven.
 - **Waarde:** Wibra is een directe kernconcurrent (zelfde klant, zelfde straat); die missen doet pijn. HEMA markeert de bovenkant. Voor die twee kan ±€16/mnd verdedigbaar zijn — maar het is een **business**beslissing, geen technische.
-- **Alternatief zonder kosten:** Wibra/HEMA afdekken via de weekfolder-check en het gerichte winkelbezoek (§7), en leunen op de wél-werkende bronnen die hetzelfde prijssegment beslaan (Zeeman, KiK, Action, C&A).
+- **Alternatief zonder kosten:** Wibra/HEMA afdekken via de weekfolder-check en het gerichte winkelbezoek (§7), en leunen op de wél-werkende bronnen die hetzelfde prijssegment beslaan (KiK, Action, C&A).
+
+### Zeeman: laadt wel, toont geen prijzen (stand 09-08)
+Zeeman is een ander geval dan Wibra/HEMA — er is géén blokkade. De pagina's laden
+volledig, ook zonder browser, maar bevatten geen prijzen. Drie gemeten voorbeelden:
+
+| Pagina | Links | €-tekens in de tekst |
+|---|---:|---:|
+| `/nl-nl/dames/ondergoed` | 120 | **0** |
+| `/nl-nl/heren/sokken` | 120 | **0** |
+| `/nl-nl/collecties/sokken` | 116 | **0** |
+
+De paginatitel van de tweede luidt letterlijk *"Herensokken, enkelsokken, en meer.
+Vanaf €1,99 | Zeeman"* — de prijzen bestáán dus, maar komen pas in beeld na een
+stap die de scraper niet zet. Meest waarschijnlijke oorzaak: een cookie- of
+regiokeuze die het productraster vrijgeeft en die de consent-routine niet herkent.
+Via de productpagina's lukt het evenmin: die dragen in de HTML alleen een
+aanraderblok, waardoor 60 verschillende pagina's steeds dezelfde zes artikelen
+opleverden.
+
+**Besluit: Zeeman blijft rood tot dit gericht is uitgezocht.** Zes aanrader-
+artikelen als "het Zeeman-assortiment" presenteren is schadelijker dan een lege
+regel — juist omdat Zeeman de maatstaf van het waardesegment is. Dit is de
+belangrijkste openstaande technische taak; begin bij de consent-/regiostap.
 
 ## 9. Beperkingen & risico's — eerlijk benoemd
 
@@ -180,6 +203,7 @@ Sommige retailers blokkeren niet de scraper-*techniek* maar het *IP-adres*: verk
 | Bot-bescherming (m.n. Action, Wibra, HEMA) | Bron valt uit | Waterval-strategie; bron-gezondheid in rapport; render-strategie (headless browser) actief voor de geblokkeerde bronnen — zware challenge-muren kunnen ook die tegenhouden, dan folder-/winkelflankering |
 | Site-redesign bij concurrent | Bron valt uit of telt raar | Autodetectie + harde afwijkingsdrempel: bij <50% van vorige week wordt de week **niet** verwerkt (geen vervuilde trends) en kleurt de bron rood |
 | Mapping-ruis | Verkeerde groepstoedeling | "Onbekend"-bak zichtbaar; maandelijks 15 min onderhoud; mappingregels in één YAML-bestand |
+| Prijs ontbreekt op de productpagina (terStal: 43% dekking) | Mediaan en prijsindex berusten op een deel van het assortiment | Rapport noemt voorbeeld-URL's van artikelen zonder prijs, zodat het ontbrekende veld op te zoeken en toe te voegen is; liever een smallere basis dan een prijs van een ánder artikel |
 | Online ≠ winkel | Verkeerde absolute conclusies | Alleen trends communiceren; folder- en winkelflankering |
 | Stille dood (niemand kijkt) | Tool wordt speeltje | Maandagritueel met eigenaar en actieteller (§1, §6.9) |
 | Gratis tiers wijzigen | Kosten ontstaan | Alles is standaard Postgres/statische site — verhuisbaar in een dag |

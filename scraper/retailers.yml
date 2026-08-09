@@ -67,12 +67,16 @@ retailers:
       zes). De prijzen en doelgroepen daarvan klopten, dus de bron zelf is prima;
       alleen komt de data pas na het renderen beschikbaar. Caps krap gehouden
       (30 categorieën x 10 pagina's) zodat de weekrun onder ±25 min blijft.
-      NOG NIET OPGELOST 09-08: ook de browser vond nul artikelen. De diagnose
-      wees uit dat de eerste categorie een redactionele pagina was (0 prijzen
-      op de hele pagina); die worden nu bij de ontdekking uitgesloten en de
-      diagnose kijkt naar drie categorieën in plaats van één. Blijft Zeeman
-      leeg, dan is de bron rood tot er seeds of een andere route zijn — beter
-      leeg dan de zes aanraderartikelen als 'het assortiment' presenteren.
+      NOG NIET OPGELOST 09-08: ook de browser vindt nul artikelen, en het ligt
+      niet aan de categoriekeuze. Drie échte lijstpagina's gemeten, alle drie
+      met NUL euro-tekens in de tekst: /dames/ondergoed (120 links, 9.860
+      tekens), /heren/sokken (120 links) en /collecties/sokken (116 links).
+      Terwijl de titel van die tweede letterlijk 'Vanaf EUR 1,99' zegt — de
+      prijzen bestaan dus, maar komen pas na een stap die wij niet zetten.
+      Meest waarschijnlijk een cookie- of regiokeuze die het productraster
+      vrijgeeft en die de consent-routine niet herkent. Zie PLAN.md par. 8.
+      Zeeman blijft ROOD tot dat gericht is uitgezocht: zes aanraderartikelen
+      als 'het assortiment' presenteren is schadelijker dan een lege regel.
   wibra:
     name: Wibra
     base: https://www.wibra.nl
