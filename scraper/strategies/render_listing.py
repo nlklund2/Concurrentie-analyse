@@ -48,6 +48,7 @@ CONSENT_SELECTORS = (
     "#onetrust-accept-btn-handler",
     "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
     "#CybotCookiebotDialogBodyButtonAccept",
+    "#CybotCookiebotDialogBodyButtonAcceptAll",
     "#usercentrics-root >>> button[data-testid='uc-accept-all-button']",
     "button[data-testid='uc-accept-all-button']",
     "button[id*='accept-all' i]",
@@ -55,16 +56,31 @@ CONSENT_SELECTORS = (
     "[data-cy='cookie-accept-all']",
     "[data-test-id='cookie-accept-all']",
 )
-CONSENT_TEXTS = ("alles accepteren", "accepteer alles", "alle cookies accepteren",
+# 'alles toestaan' is de Nederlandse Cookiebot-standaard (Zeeman) — zonder die
+# tekst bleef de muur daar staan en laadde het Algolia-productraster nooit
+CONSENT_TEXTS = ("alles toestaan", "sta alle cookies toe", "alles accepteren",
+                 "accepteer alles", "alle cookies accepteren",
                  "cookies accepteren", "accepteren", "akkoord", "ik ga akkoord",
                  "accept all", "allow all")
 
-PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)")
+# Beide schrijfwijzen: '€ 24,99' én '24,99 €' — C&A zet het teken achter het
+# getal, waardoor een €-eerst-regex maar een fractie van de kaarten las.
+PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)"
+                           r"|(\d+(?:[.,]\d{2})?)\s*€")
 # Sommige shops zetten het €-teken via CSS (::before) neer; dan staat er in de
 # tekst alleen '3,99'. Bewust smal: twee decimalen achter een komma/punt, geen
-# maten ('35 - 46') en geen losse getallen. Alleen gebruikt als de pagina
+# maten ('35 - 46'), geen losse getallen en geen versienummers ('5.51.0' —
+# de diagnose telde die op Zeeman als prijs). Alleen gebruikt als de pagina
 # nergens een €-teken toont — anders is het te grof.
-PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![\d])")
+PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![.,]?\d)")
+
+
+def _prijzen(text: str, prijs_los: bool = False) -> list[float]:
+    if prijs_los:
+        ruw = PRICE_LOOSE_RE.findall(text)
+    else:
+        ruw = [m.group(1) or m.group(2) for m in PRICE_TEXT_RE.finditer(text)]
+    return [p for p in (parse_price(r) for r in ruw) if p]
 # prijsdelen uit de kaarttekst knippen om de titel over te houden — titel en
 # prijs staan lang niet altijd op een eigen regel
 PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
@@ -84,7 +100,9 @@ DOM_SCAN_JS = """
 ([streng, prijsLos]) => {
   const out = [];
   const seen = new Set();
-  const priceRe = prijsLos ? /(?:^|[^\\d.,])\\d{1,3}[.,]\\d{2}(?!\\d)/ : /€\\s*\\d/;
+  // '€ 24,99' én '24,99 €' (C&A); losse ronde weert versienummers als 5.51.0
+  const priceRe = prijsLos ? /(?:^|[^\\d.,])\\d{1,3}[.,]\\d{2}(?![.,]?\\d)/
+                           : /€\\s*\\d|\\d[\\d.,]*\\s*€/;
   // Productkaart = een link naar een productpagina, met ergens in de
   // omliggende kaart een prijs. Titel komt uit aria-label / img-alt /
   // heading, niet uit de ruwe kaarttekst (die is vervuild met prijs/labels).
@@ -336,9 +354,10 @@ def _load(page, url: str, consent: bool = True) -> str | None:
         return None
     if resp is not None and resp.status in (403, 429, 503):
         return None
+    geklikt = not consent
     if consent:
         try:
-            accept_consent(page)
+            geklikt = accept_consent(page)
         except Exception:
             pass
     try:
@@ -350,6 +369,23 @@ def _load(page, url: str, consent: bool = True) -> str | None:
         page.wait_for_timeout(700)
         page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
         page.wait_for_timeout(900)
+    except Exception:
+        return None
+    if not geklikt:
+        # Cookiemuren (Cookiebot e.d.) laden asynchroon en staan er vaak pas ná
+        # de eerste klikpoging — bij Zeeman bleef de muur zo onopgemerkt staan
+        # en laadde het productraster nooit. Na een late klik even wachten
+        # zodat het raster (en zijn API-calls) alsnog kan opkomen.
+        try:
+            if accept_consent(page):
+                try:
+                    page.wait_for_load_state("networkidle", timeout=8000)
+                except Exception:
+                    pass
+                page.wait_for_timeout(800)
+        except Exception:
+            pass
+    try:
         html = page.content()
     except Exception:
         return None
@@ -449,11 +485,10 @@ def _dom_ronde(page, streng: bool, prijs_los: bool = False) -> list[Product]:
     except Exception:
         return []
     products: list[Product] = []
-    prijs_re = PRICE_LOOSE_RE if prijs_los else PRICE_TEXT_RE
     for item in raw:
         href = item.get("href", "")
         text = item.get("text", "")
-        prices = [p for p in (parse_price(m) for m in prijs_re.findall(text)) if p]
+        prices = _prijzen(text, prijs_los)
         # ondergoed/nachtmode/sokken: prijzen boven €200 zijn vrijwel zeker ruis
         # (artikelnummers, postcodes) uit een verkeerd kaart-element
         prices = [p for p in prices if p <= 200]

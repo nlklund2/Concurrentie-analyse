@@ -23,9 +23,10 @@ import re
 from .http import Http
 from .jsonscan import deep_find_products, products_from_html
 
-# Prijsachtig zonder valutateken: 3,99 of 3.99, niet 35 - 46 (maten) en niet
-# jaartallen. Bewust smal — dit is een signaal, geen extractieregel.
-PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![\d])")
+# Prijsachtig zonder valutateken: 3,99 of 3.99, niet 35 - 46 (maten), geen
+# jaartallen en geen versienummers (5.51.0 — telde op Zeeman als prijs terwijl
+# het een scriptnaam in de cookiedialoog was). Signaal, geen extractieregel.
+PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)")
 
 PAGINA_JS = r"""
 () => {
@@ -54,7 +55,7 @@ PAGINA_JS = r"""
     const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let n;
     while ((n = w.nextNode())) {
-      if (/(?:^|[^\d.,])\d{1,4}[.,]\d{2}(?!\d)/.test(n.nodeValue || '')) {
+      if (/(?:^|[^\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)/.test(n.nodeValue || '')) {
         const delen = [];
         let el = n.parentElement;
         while (el && delen.length < 5) {
@@ -63,7 +64,15 @@ PAGINA_JS = r"""
           delen.unshift(el.tagName.toLowerCase() + cls);
           el = el.parentElement;
         }
-        pad = delen.join(' > ') + '  «' + (n.nodeValue || '').trim().slice(0, 40) + '»';
+        // de omsluitende link (of het ontbreken ervan) beslist of de
+        // DOM-kaartscan dit prijsgetal ooit aan een product kan koppelen
+        const link = n.parentElement && n.parentElement.closest
+          ? n.parentElement.closest('a') : null;
+        const linkinfo = link
+          ? ' | link: ' + (link.getAttribute('href') || 'zonder href').slice(0, 70)
+          : ' | geen omsluitende link';
+        pad = delen.join(' > ') + linkinfo
+          + '  «' + (n.nodeValue || '').trim().slice(0, 40) + '»';
         break;
       }
     }
@@ -74,7 +83,7 @@ PAGINA_JS = r"""
     links: document.querySelectorAll('a[href]').length,
     euro: (tekst.match(/€/g) || []).length,
     eur: (tekst.match(/\bEUR\b/g) || []).length,
-    prijsachtig: (tekst.match(/(?:^|[^\d.,])\d{1,4}[.,]\d{2}(?!\d)/g) || []).length,
+    prijsachtig: (tekst.match(/(?:^|[^\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)/g) || []).length,
     attr, micro, scripts, pad,
   };
 }
@@ -152,6 +161,12 @@ def _render_diagnose(url: str) -> list[str]:
                 page.wait_for_load_state("networkidle", timeout=12000)
             except Exception:
                 pass
+            if not geklikt:
+                # Cookiemuren laden asynchroon; bij Zeeman stond de muur er pas
+                # ná de eerste klikpoging en bleef het raster daardoor leeg.
+                geklikt = accept_consent(page)
+                if geklikt:
+                    page.wait_for_timeout(1000)
             # Trager en verder scrollen dan de scraper: zo blijkt of het raster
             # alleen maar méér geduld nodig had.
             for deel in (0.3, 0.6, 1.0):
@@ -164,7 +179,8 @@ def _render_diagnose(url: str) -> list[str]:
             return [f"- **browserfout:** {type(e).__name__}: {str(e)[:200]}"]
 
         regels += [
-            f"- browser: HTTP {status}, cookiemuur {'weggeklikt' if geklikt else 'niet gevonden'}",
+            f"- browser: HTTP {status}, cookiemuur "
+            f"{'weggeklikt' if geklikt else 'niet gevonden (ook niet bij de tweede poging)'}",
             f"- titel: {info['titel']!r}",
             f"- {info['tekst']} tekens tekst, {info['links']} links",
             f"- prijssignalen: {info['euro']}× €, {info['eur']}× 'EUR', "
