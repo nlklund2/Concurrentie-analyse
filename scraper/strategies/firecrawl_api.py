@@ -15,6 +15,8 @@ geen automatische stap in de waterval.
 """
 from __future__ import annotations
 
+import html as html_lib
+import json
 import os
 import re
 import time
@@ -25,7 +27,7 @@ import requests
 from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
-from ..jsonscan import product_from_meta, products_from_html
+from ..jsonscan import product_from_meta, products_from_html, url_key
 from ..models import Product, ScrapeResult
 from .listing_crawl import _voeg_samen
 from .render_listing import cards_from_html, lees_ankers
@@ -90,6 +92,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     session.headers.update({"Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json"})
 
+    if cfg.firecrawl_mode == "wp_store":
+        return _scrape_wp_store(session, cfg, res, limit)
     if cfg.firecrawl_mode == "pages":
         return _scrape_productpaginas(session, cfg, res, limit)
 
@@ -244,6 +248,81 @@ def _sitemap_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
     if cats:
         res.notes.append("categorieën uit de sitemap via Firecrawl")
     return cats
+
+
+def _wp_store_product(item: dict) -> Product | None:
+    """Eén artikel uit de WooCommerce Store-API. Prijzen staan er in
+    minor units ('599' met currency_minor_unit 2 = € 5,99)."""
+    naam = html_lib.unescape(item.get("name") or "").strip()
+    url = item.get("permalink") or ""
+    prijzen = item.get("prices") or {}
+    try:
+        deler = 10 ** int(prijzen.get("currency_minor_unit", 2))
+        prijs = int(prijzen.get("price")) / deler
+    except (TypeError, ValueError):
+        return None
+    if not naam or not url:
+        return None
+    was = None
+    try:
+        regulier = int(prijzen.get("regular_price")) / deler
+        if regulier > prijs:
+            was = regulier
+    except (TypeError, ValueError):
+        pass
+    cats = " > ".join(c.get("name", "") for c in item.get("categories") or [])
+    kleur, maten = "", ""
+    for attr in item.get("attributes") or []:
+        attr_naam = (attr.get("name") or "").lower()
+        termen = ", ".join(t.get("name", "") for t in attr.get("terms") or [])
+        if not termen:
+            continue
+        if "maat" in attr_naam or "size" in attr_naam:
+            maten = termen[:200]
+        elif "kleur" in attr_naam or "colour" in attr_naam or "color" in attr_naam:
+            kleur = termen[:200]
+    return Product(key=url_key(url), title=naam[:200], url=url,
+                   price=prijs, was_price=was,
+                   category_raw=html_lib.unescape(cats), color=kleur, sizes=maten)
+
+
+def _scrape_wp_store(session: requests.Session, cfg: RetailerCfg,
+                     res: ScrapeResult, limit: int | None) -> ScrapeResult:
+    """firecrawl_mode 'wp_store': de publieke WooCommerce Store-API, per 100
+    artikelen per opvraging — gemeten 10-08 bij Wibra (762 producten ≈ 8
+    credits voor de complete catalogus, mét maten en kleuren). De productpagina-
+    route bleef daar leeg: de pagina's dragen geen machineleesbare data, de
+    API wél."""
+    basis = cfg.base.rstrip("/")
+    per = 100
+    gezien: dict[str, Product] = {}
+    for pagina in range(1, 13):     # 12 × 100 — ruim boven Wibra's 762
+        url = f"{basis}/wp-json/wc/store/v1/products?per_page={per}&page={pagina}"
+        tekst = _firecrawl_html(session, url, res, raw=True)
+        res.requests_done += 1
+        if tekst is None:
+            break                   # fout staat al in res.error/notes
+        try:
+            start = tekst.find("[")
+            data = json.loads(tekst[start:]) if start >= 0 else None
+        except ValueError:
+            data = None
+        if not isinstance(data, list):
+            res.error = res.error or ("Store-API gaf geen JSON-lijst terug — "
+                                      "endpoint dicht of vorm gewijzigd")
+            break
+        for item in data:
+            p = _wp_store_product(item) if isinstance(item, dict) else None
+            if p is not None:
+                gezien.setdefault(p.key, p)
+        if len(data) < per or (limit and len(gezien) >= limit):
+            break
+    res.products = list(gezien.values())[: limit or cfg.max_products]
+    res.notes.append(f"Store-API: {len(res.products)} artikelen in "
+                     f"{res.requests_done} opvragingen")
+    if not res.products and not res.error:
+        res.error = "Store-API bereikbaar maar zonder artikelen — vorm nalopen"
+    return res
 
 
 def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,

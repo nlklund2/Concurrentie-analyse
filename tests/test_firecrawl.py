@@ -422,3 +422,49 @@ def test_kanarie_laat_een_kaartraster_door(monkeypatch):
     assert len(calls) == 6               # niet gestopt: alle categorieën bezocht
     assert len(res.products) >= 20
     assert not any("kanarie" in n for n in res.notes)
+
+
+# Wibra-doorbraak 10-08: de publieke WooCommerce Store-API. Prijzen in minor
+# units ('599' = € 5,99), naam met HTML-entities, maten/kleuren als attributen.
+def _wp_item(i, prijs="599", regulier=None, naam=None):
+    return {"id": 4227000 + i,
+            "name": naam or f"Baby boxpakje rib auto&#8217;s maat {i}",
+            "permalink": f"https://www.wibra.nl/assortiment/boxpakje-{i}/",
+            "prices": {"price": prijs, "regular_price": regulier or prijs,
+                       "currency_minor_unit": 2},
+            "categories": [{"name": "Baby"}, {"name": "Nachtkleding"}],
+            "attributes": [{"name": "Maat", "terms": [{"name": "50/56"},
+                                                      {"name": "62/68"}]},
+                           {"name": "Kleur", "terms": [{"name": "blauw"}]}]}
+
+
+def test_wp_store_volledige_catalogus(monkeypatch):
+    import json as _json
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    pagina1 = [_wp_item(i) for i in range(100)]
+    pagina2 = [_wp_item(100 + i, prijs="250", regulier="499") for i in range(30)]
+    calls = _sessie(monkeypatch, [
+        _Resp(body={"success": True, "data": {"rawHtml": _json.dumps(pagina1)}}),
+        _Resp(body={"success": True, "data": {"rawHtml": _json.dumps(pagina2)}}),
+    ])
+    cfg = _cfg(firecrawl_mode="wp_store")
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert res.error == ""
+    assert len(calls) == 2                      # 130 artikelen < 2×100 → klaar
+    assert "per_page=100&page=1" in calls[0] and "page=2" in calls[1]
+    assert len(res.products) == 130
+    p = res.products[0]
+    assert p.title.startswith("Baby boxpakje rib auto’s")   # entity ontcijferd
+    assert p.price == 5.99                                   # minor units
+    assert p.sizes == "50/56, 62/68" and p.color == "blauw"
+    assert p.category_raw == "Baby > Nachtkleding"
+    afgeprijsd = res.products[-1]
+    assert (afgeprijsd.price, afgeprijsd.was_price) == (2.50, 4.99)
+
+
+def test_wp_store_dichte_api_geeft_schone_fout(monkeypatch):
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(html="<html>404 Not Found</html>")])
+    res = firecrawl_api.scrape(_cfg(firecrawl_mode="wp_store"), http=None)
+    assert res.products == []
+    assert "Store-API" in res.error

@@ -413,19 +413,23 @@ class _KaartLezer(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.ankers: list[dict] = []
         self._stack: list[dict] = [{"tag": "#root", "tekst": "", "ouder": None,
-                                    "n_ankers": 0}]
+                                    "hrefs": set()}]
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
-        node = {"tag": tag, "tekst": "", "ouder": self._stack[-1], "n_ankers": 0}
+        node = {"tag": tag, "tekst": "", "ouder": self._stack[-1], "hrefs": set()}
         if tag == "a":
             anker = {"href": a.get("href") or "",
                      "label": a.get("aria-label") or a.get("title") or "",
                      "node": node}
             self.ankers.append(anker)
             node["anker"] = anker
+            # Unieke bestemmingen tellen, geen ankers: een HEMA-tegel bevat
+            # zeven links (afbeelding, titel, kleurdots, verlanglijstje) naar
+            # amper twee bestemmingen — dat is één kaart, geen raster.
+            schoon = (anker["href"] or "").split("?")[0].split("#")[0]
             for open_node in self._stack:
-                open_node["n_ankers"] += 1
+                open_node["hrefs"].add(schoon)
         elif tag == "img":
             alt = (a.get("alt") or "").strip()
             if alt:
@@ -456,25 +460,31 @@ class _KaartLezer(HTMLParser):
                 node["tekst"] = (node["tekst"] + " " + stukje).strip()
 
 
-def lees_ankers(html: str) -> list[dict]:
+def lees_ankers(html: str, heeft_euro: bool = True,
+                max_bestemmingen: int = 3) -> list[dict]:
     """Ankers met eigen tekst ('tekst') en kaarttekst incl. voorouders
-    ('kaart'): de prijs mag ook net buiten de link staan."""
+    ('kaart'): de prijs mag ook net buiten de link staan. Op pagina's zonder
+    €-teken (HEMA) telt een kaal prijsgetal als klimstop.
+
+    max_bestemmingen begrenst de klim: een voorouder met meer unieke
+    linkbestemmingen is een raster of navigatie, geen kaart. De navigatieroute
+    houdt de strikte 3 (anders absorbeert een afdelingslink de teaserprijs
+    van zijn buurman); de kaartlezer klimt ruimer, want een HEMA-tegel telt
+    door kleurvarianten en verlanglijstje zomaar zes bestemmingen."""
     lezer = _KaartLezer()
     try:
         lezer.feed(html)
     except Exception:
         pass  # kapotte HTML: houden wat er tot dan toe gelezen is
+    stop_re = PRICE_TEXT_RE if heeft_euro else PRICE_LOOSE_RE
     uit = []
     for a in lezer.ankers:
         eigen = a["node"]["tekst"]
         kaart, node, hops = eigen, a["node"], 0
-        # Omhoog lopen tot een voorouder met prijstekst, net als de DOM-scan —
-        # maar niet voorbij de kaart: een voorouder met veel links is een
-        # raster, navigatie of de body zelf, en diens prijzen horen niet bij
-        # dít anker (anders wordt elke nav-link een 'teaser').
         while (node["ouder"] is not None and hops < 5
-               and not PRICE_TEXT_RE.search(kaart)
-               and node["ouder"]["n_ankers"] <= 3):
+               and not stop_re.search(kaart)
+               and len(node["ouder"]["hrefs"]) <= max_bestemmingen
+               and len(PRICE_LOOSE_RE.findall(node["ouder"]["tekst"])) <= 4):
             node = node["ouder"]
             kaart = node["tekst"]
             hops += 1
@@ -487,9 +497,9 @@ def cards_from_html(html: str, base_url: str) -> list[Product]:
     """Productkaarten uit reeds gerenderde HTML — zelfde vangnet als de
     DOM-scan, maar zonder browser. Nodig voor Firecrawl-bronnen (HEMA) die
     hun lijsten wél renderen maar geen JSON-LD of __NEXT_DATA__ insluiten."""
-    ankers = lees_ankers(html)
     host = urlsplit(base_url).netloc
     heeft_euro = "€" in html or "&euro;" in html
+    ankers = lees_ankers(html, heeft_euro=heeft_euro, max_bestemmingen=12)
     beste: list[Product] = []
     for prijs_los in (False, True):
         # HEMA-meting 10-08: het raster draagt géén €-tekens, maar één

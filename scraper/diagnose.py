@@ -29,6 +29,20 @@ from .jsonscan import deep_find_products, products_from_html
 PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)")
 
 
+def _sitemap_regels(xml: str) -> list[str]:
+    """Sitemap samenvatten: omvang, padsegmenten en voorbeeld-URL's — de
+    grondstof om een productpagina voor een vervolgdiagnose te kiezen."""
+    locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml)
+    per_seg: dict[str, int] = {}
+    for u in locs:
+        seg = (re.sub(r"^https?://[^/]+", "", u).strip("/").split("/") or [""])[0]
+        per_seg[seg] = per_seg.get(seg, 0) + 1
+    top = sorted(per_seg.items(), key=lambda kv: -kv[1])[:5]
+    return [f"- sitemap: {len(locs)} URL's",
+            f"- grootste padsegmenten: {top}",
+            "- voorbeelden: " + ", ".join(locs[:6])]
+
+
 def _json_of_none(text: str):
     """JSON parsen uit een Firecrawl-rawHtml-antwoord; endpoints geven soms
     HTML-omlijsting mee, dus ook het eerste {...}/[...]-blok proberen."""
@@ -151,16 +165,7 @@ def _firecrawl_diagnose(url: str) -> str:
         return "\n".join(regels)
 
     if raw:
-        locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", html)
-        regels.append(f"- sitemap: {len(locs)} URL's")
-        per_seg: dict[str, int] = {}
-        for u in locs:
-            seg = (re.sub(r"^https?://[^/]+", "", u).strip("/").split("/") or [""])[0]
-            per_seg[seg] = per_seg.get(seg, 0) + 1
-        top = sorted(per_seg.items(), key=lambda kv: -kv[1])[:5]
-        regels.append(f"- grootste padsegmenten: {top}")
-        regels.append("- voorbeelden: " + ", ".join(locs[:6]))
-        return "\n".join(regels)
+        return "\n".join(regels + _sitemap_regels(html))
 
     from .strategies.render_listing import cards_from_html
 
@@ -194,6 +199,9 @@ def diagnose(url: str, render: bool = True) -> str:
     resp = http.get(url)
     if resp is None:
         regels.append("- **HTTP: geen antwoord** — geblokkeerd, robots.txt of netwerkfout.")
+    elif url.lower().endswith(".xml"):
+        return "\n".join(regels + [f"- HTTP {resp.status_code}"]
+                         + _sitemap_regels(resp.text))
     else:
         html = resp.text
         prods = products_from_html(html, url)

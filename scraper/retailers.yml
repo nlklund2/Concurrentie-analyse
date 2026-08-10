@@ -98,13 +98,12 @@ retailers:
     segment: kern
     color_slot: 3
     strategy: firecrawl
-    firecrawl_mode: pages
-    firecrawl_page_cap: 110
-    # Besluit 09-08 (eigenaar): bron blijft wekelijks meelopen als hertest.
-    # De kanarie houdt die hertest goedkoop: acht pagina's zonder leesbare
-    # data en de run stopt (±8 i.p.v. ±40 credits). Geeft de site wél iets
-    # prijs, dan loopt hij dezelfde run door tot de cap van 110.
-    firecrawl_canary: 8
+    # DOORBRAAK 10-08 (meetronde 2): wibra.nl draait op WordPress/WooCommerce
+    # en de publieke Store-API staat open — 762 producten, geldige JSON met
+    # naam, prijs (minor units), permalink, categorieën én maat/kleur-
+    # attributen. De hele catalogus in ±8 credits per week, waar de
+    # productpagina's (ronde 6, 09-08) niets machineleesbaars droegen.
+    firecrawl_mode: wp_store
     enrich: false
     max_categories: 20
     notes: >-
