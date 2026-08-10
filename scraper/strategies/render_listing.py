@@ -95,7 +95,11 @@ BLOCK_HINTS = re.compile(r"access denied|just a moment|are you human|captcha|"
 NAV_TITEL_RE = re.compile(
     r"^(?:shop(?:pen)?|bekijk(?:\s+alles)?|alles?\s+bekijken|meer\s+\w+|"
     r"voor\s+(?:haar|hem|meisjes|jongens|kinderen|baby'?s?|dames|heren)|"
-    r"alle\s+\w+|sale|nieuw|ontdek(?:ken)?|lees\s+meer|verder\s+winkelen)$", re.I)
+    r"alle\s+\w+|sale|nieuw|ontdek(?:ken)?|lees\s+meer|verder\s+winkelen|"
+    # C&A week 33: 'Terug naar de bovenliggende pagina' stond met -35% in de
+    # grootste prijsverlagingen — een bladerknop met een prijs uit het raster.
+    r"terug(?:\s+naar\b.*)?|vorige(?:\s+pagina)?|volgende(?:\s+pagina)?|"
+    r"naar\s+boven|toon\s+(?:alles|meer)|laad\s+meer|overzicht|home)$", re.I)
 
 DOM_SCAN_JS = """
 ([streng, prijsLos]) => {

@@ -90,7 +90,69 @@ PAGINA_JS = r"""
 """
 
 
+def _firecrawl_diagnose(url: str) -> str:
+    """Zelfde meting, maar opgehaald via Firecrawl — voor bronnen die het
+    datacenter-IP weren (Wibra, HEMA). Gebruik: `fc:` vóór de URL in
+    diagnose_urls. Een .xml-URL wordt als sitemap gelezen en toont
+    voorbeelis-URL's, zodat een vervolgdiagnose een echte productpagina heeft."""
+    import os
+
+    import requests as _rq
+
+    from .models import ScrapeResult
+    from .strategies.firecrawl_api import _firecrawl_html, _signalen
+
+    regels: list[str] = [f"## {url} *(via Firecrawl)*", ""]
+    if not os.environ.get("FIRECRAWL_API_KEY"):
+        return "\n".join(regels + ["- **FIRECRAWL_API_KEY niet gezet** — deze meting "
+                                   "kan alleen op GitHub Actions draaien."])
+    session = _rq.Session()
+    session.headers.update({"Authorization": f"Bearer {os.environ['FIRECRAWL_API_KEY']}",
+                            "Content-Type": "application/json"})
+    res = ScrapeResult(retailer_id="diagnose")
+    raw = url.lower().endswith(".xml")
+    html = _firecrawl_html(session, url, res, raw=raw, wait_ms=0 if raw else 8000)
+    for n in res.notes:
+        regels.append(f"- {n}")
+    if res.error:
+        regels.append(f"- **{res.error}**")
+    if html is None:
+        return "\n".join(regels + ["- geen HTML terug — zie de notities hierboven."])
+
+    if raw:
+        locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", html)
+        regels.append(f"- sitemap: {len(locs)} URL's")
+        per_seg: dict[str, int] = {}
+        for u in locs:
+            seg = (re.sub(r"^https?://[^/]+", "", u).strip("/").split("/") or [""])[0]
+            per_seg[seg] = per_seg.get(seg, 0) + 1
+        top = sorted(per_seg.items(), key=lambda kv: -kv[1])[:5]
+        regels.append(f"- grootste padsegmenten: {top}")
+        regels.append("- voorbeelden: " + ", ".join(locs[:6]))
+        return "\n".join(regels)
+
+    prods = products_from_html(html, url)
+    regels += [
+        f"- signalen: {_signalen(html)}",
+        f"- producten via de gewone extractie: {len(prods)}"
+        + (f", bv. {prods[0].title[:40]!r} à {prods[0].price}" if prods else ""),
+    ]
+    # productachtige links: de grondstof voor een vervolgdiagnose per artikel
+    hrefs: list[str] = []
+    for m in re.finditer(r'href\s*=\s*["\']([^"\']+)["\']', html, re.I):
+        h = m.group(1)
+        if re.search(r"product|assortiment|artikel|/p/|/a/|\d{5,}", h) and h not in hrefs:
+            hrefs.append(h)
+        if len(hrefs) >= 8:
+            break
+    if hrefs:
+        regels.append("- productachtige links: " + ", ".join(h[:80] for h in hrefs))
+    return "\n".join(regels)
+
+
 def diagnose(url: str, render: bool = True) -> str:
+    if url.startswith("fc:"):
+        return _firecrawl_diagnose(url[3:])
     regels: list[str] = [f"## {url}", ""]
     http = Http(min_delay=0.5, respect_robots=True)
     resp = http.get(url)

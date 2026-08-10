@@ -344,3 +344,45 @@ def test_kanarie_kijkt_naar_json_niet_naar_de_kaartoogst(monkeypatch):
     assert len(calls) == 2              # gestopt op de kanarie, niet alle zes
     assert res.products                 # de kaartoogst blijft wél in de opbrengst
     assert any("kanarie" in n for n in res.notes)
+
+
+def test_wait_ms_overschrijft_de_standaard(monkeypatch):
+    """firecrawl_wait_ms uit retailers.yml moet in de payload belanden."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(html=LISTING_HTML)])
+    cfg = _cfg(seeds=["https://www.wibra.nl/dames/ondergoed"], firecrawl_wait_ms=8000)
+    firecrawl_api.scrape(cfg, http=None)
+    assert firecrawl_api._test_payloads[0]["waitFor"] == 8000
+
+
+def test_miss_signaal_bij_onleesbare_productpagina(monkeypatch):
+    """Een lege pagina kost een credit; de meting wáárom hij leeg was moet
+    dan meteen in de notes staan, mét URL voor een vervolgdiagnose."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(body={"success": True,
+                                      "data": {"rawHtml": SITEMAP_XML}}),
+                          _Resp(html=LEGE_PRODUCTPAGINA)])
+    cfg = _cfg(firecrawl_mode="pages", firecrawl_page_cap=50,
+               firecrawl_canary=1, focus_categories="pyjama|ondergoed")
+    res = firecrawl_api.scrape(cfg, http=None)
+    sig = [n for n in res.notes if n.startswith("miss-signaal")]
+    assert sig and "/assortiment/artikel-0-baby-pyjama/" in sig[0]
+    assert "dataLayer=nee" in sig[0]
+
+
+def test_credits_overleven_de_strategiewrapper(monkeypatch):
+    """run() overschrijft requests_done met de gewone-HTTP-teller; het
+    Firecrawl-verbruik moet dat overleven (week 33: 'Wibra 0, HEMA 1')."""
+    from scraper import strategies
+
+    nep = firecrawl_api.ScrapeResult(retailer_id="wibra", strategy="firecrawl",
+                                     requests_done=9)
+
+    class _StilleHttp:
+        def __init__(self, **kw): self.requests_done = 2; self.robots_skipped = 0
+
+    monkeypatch.setitem(strategies.FIXED, "firecrawl", lambda cfg, http, limit: nep)
+    monkeypatch.setattr(strategies, "Http", _StilleHttp)
+    res = strategies.run(_cfg())
+    assert res.credits_used == 9          # de credits
+    assert res.requests_done == 2         # de gewone teller, apart

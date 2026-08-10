@@ -91,3 +91,19 @@ def test_kleurfilterpaden_tellen_niet_als_categorie():
         "https://www.kik.nl/c/dames/dameskleding-ondergoed/c_wit",
     ])
     assert cats == ["https://www.kik.nl/c/dames/dameskleding-ondergoed"]
+
+
+def test_bladerknoppen_zijn_geen_artikel():
+    """C&A week 33: 'Terug naar de bovenliggende pagina' stond met -35% in de
+    grootste prijsverlagingen."""
+    from scraper.strategies.render_listing import NAV_TITEL_RE, cards_from_html
+    for titel in ("Terug naar de bovenliggende pagina", "Vorige pagina",
+                  "Volgende", "Toon alles", "Overzicht"):
+        assert NAV_TITEL_RE.match(titel), titel
+    assert NAV_TITEL_RE.match("Hipster met hartjes") is None
+    html = """<a href="/nl/nl/shop/dames"><img alt="Terug naar de bovenliggende pagina">
+              <span>€ 12,99</span></a>
+              <a href="/nl/nl/shop/p/slip-123"><img alt="Katoenen slip">
+              <span>€ 5,99</span></a>"""
+    kaarten = cards_from_html(html, "https://www.c-and-a.com/nl/nl/shop")
+    assert [p.title for p in kaarten] == ["Katoenen slip"]

@@ -21,7 +21,7 @@ on:
         required: false
         default: "40"
       diagnose_urls:
-        description: "Losse pagina's diepgaand onderzoeken (spaties ertussen; leeg = overslaan)"
+        description: "Losse pagina's diepgaand onderzoeken (spaties ertussen; leeg = overslaan; fc: vóór een URL meet via Firecrawl — voor bronnen die het datacenter-IP weren)"
         required: false
         default: ""
 

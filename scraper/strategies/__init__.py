@@ -30,6 +30,11 @@ def run(cfg: RetailerCfg, limit: int | None = None) -> ScrapeResult:
     except Exception as e:  # één bron mag nooit de hele weekrun breken
         result.error = f"{type(e).__name__}: {e}"
     result.retailer_id = cfg.id
+    if result.strategy == "firecrawl":
+        # requests_done telt hierboven de Firecrawl-aanroepen; bewaar die als
+        # creditverbruik vóór de teller hieronder de gewone-HTTP-stand krijgt.
+        # (Week 33 rapporteerde hierdoor 'Wibra 0, HEMA 1 credit' — onwaar.)
+        result.credits_used = result.requests_done
     result.requests_done = http.requests_done
     if http.robots_skipped:
         result.notes.append(f"{http.robots_skipped} URL(s) overgeslagen wegens robots.txt.")

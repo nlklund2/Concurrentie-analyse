@@ -50,6 +50,32 @@ ACTIES_SCROLL = [
     {"type": "wait", "milliseconds": 1200},
 ]
 
+_PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)")
+_API_HINT_RE = re.compile(
+    r"https?://[^\s\"'<>\\]{6,140}(?:api|graphql|search|catalog)[^\s\"'<>\\]{0,80}",
+    re.I)
+
+
+def _signalen(html: str) -> str:
+    """Compacte meting van een pagina die niets opleverde: waar zou extractie
+    op kúnnen aanhaken? Elke fetch kost een credit, dus meet meteen mee in
+    plaats van later een aparte diagnoserit te rijden."""
+    apis: list[str] = []
+    for m in _API_HINT_RE.finditer(html):
+        u = m.group(0).split("?")[0][:90]
+        if u not in apis:
+            apis.append(u)
+        if len(apis) >= 3:
+            break
+    jsonld = html.count("application/ld+json")
+    jscripts = html.count("application/json") - jsonld
+    return (f"{len(html)} tekens, {html.count('€')}×€, "
+            f"{len(_PRIJS_LOS_RE.findall(html))} prijsachtig, "
+            f"jsonld={jsonld}, jsonscripts={jscripts}, "
+            f"dataLayer={'ja' if 'dataLayer' in html else 'nee'}, "
+            f"nextdata={'ja' if '__NEXT_DATA__' in html else 'nee'}"
+            + (f", api-hints: {apis}" if apis else ""))
+
 
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
     res = ScrapeResult(retailer_id=cfg.id, strategy="firecrawl")
@@ -93,9 +119,11 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     credits = res.requests_done   # navigatie-opvraag telt mee
     uit_kaarten = 0
     uit_json = 0
+    missers = 0
     for n, cat_url in enumerate(cats, start=1):
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
-        html = _firecrawl_html(session, cat_url, res, actions=ACTIES_SCROLL)
+        html = _firecrawl_html(session, cat_url, res, actions=ACTIES_SCROLL,
+                               wait_ms=cfg.firecrawl_wait_ms)
         credits += 1
         if html is None:
             if res.error:      # sleutel ongeldig of credits op: stoppen
@@ -108,6 +136,11 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             # kaartweergave zelf de enige bron (zelfde vangnet als de DOM-scan).
             found = cards_from_html(html, cat_url)
             uit_kaarten += len(found)
+            if not found and missers < 2:
+                # Waaróm leeg? Meet het ter plekke — dat scheelt een aparte
+                # diagnoserit van een credit per pagina (les van week 32).
+                missers += 1
+                res.notes.append(f"miss-signaal {cat_url[:70]}: {_signalen(html)}")
         for p in found:
             # crawlpad (doelgroep) én bron-categorie (producttype) allebei bewaren
             p.category_raw = _voeg_samen(cat_path, p.category_raw)
@@ -252,7 +285,7 @@ def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,
                 "(bespaart credits; levert de kanarie wél data, dan loopt de "
                 "run door tot de cap)")
             break
-        html = _firecrawl_html(session, url, res)
+        html = _firecrawl_html(session, url, res, wait_ms=cfg.firecrawl_wait_ms)
         credits += 1
         if html is None:
             if res.error:
@@ -262,6 +295,11 @@ def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,
             or product_from_meta(html, url)
         if p is None:
             gemist += 1
+            if gemist <= 2:
+                # Waaróm onleesbaar? Meet het ter plekke, mét de URL — zo is
+                # het pad naar een echte productpagina meteen bekend voor een
+                # gerichte vervolg-diagnose.
+                res.notes.append(f"miss-signaal {url[:80]}: {_signalen(html)}")
             continue
         if p.key in gezien:     # gedeeld blok i.p.v. eigen artikel (Zeeman-les)
             herhaald += 1
@@ -336,15 +374,17 @@ def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
 
 
 def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
-                    raw: bool = False, actions: list | None = None) -> str | None:
+                    raw: bool = False, actions: list | None = None,
+                    wait_ms: int = 0) -> str | None:
     """raw=True haalt de onbewerkte bron op (sitemap-XML) zonder rendering;
-    actions (scrollen/wachten) laten lui ladende rasters eerst renderen."""
+    actions (scrollen/wachten) laten lui ladende rasters eerst renderen;
+    wait_ms > 0 vervangt de standaard-rendertijd van 5000 ms."""
     payload = {
         "url": url,
         "formats": ["rawHtml"] if raw else ["html"],
         "onlyMainContent": False,
         # HEMA's raster rendert traag; bij 2500 ms was de lijst nog leeg
-        "waitFor": 0 if raw else 5000,
+        "waitFor": 0 if raw else (wait_ms or 5000),
         "timeout": 30000 if not actions else 45000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
     }
@@ -373,7 +413,8 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
         # dan komt er in elk geval een snapshot (zonder scroll) terug
         if "acties niet geaccepteerd — zonder acties verder" not in res.notes:
             res.notes.append("acties niet geaccepteerd — zonder acties verder")
-        return _firecrawl_html(session, url, res, raw=raw, actions=None)
+        return _firecrawl_html(session, url, res, raw=raw, actions=None,
+                               wait_ms=wait_ms)
     if r.status_code == 402:
         res.error = "Firecrawl-credits op (HTTP 402) — tegoed bijvullen of tier verhogen"
         return None

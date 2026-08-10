@@ -39,6 +39,9 @@ class RetailerCfg:
     # kost 1 credit per artikel per week (cap hieronder).
     firecrawl_mode: str = "listing"
     firecrawl_page_cap: int = 120
+    # Extra rendertijd per Firecrawl-fetch in ms; 0 = de standaard (5000).
+    # Voor rasters die ook na scrollen traag hydrateren (HEMA-hypothese).
+    firecrawl_wait_ms: int = 0
     # Kanarie: een bron die aantoonbaar geen data prijsgeeft mag wél elke week
     # opnieuw geprobeerd worden, maar niet tegen de volle prijs. Na dit aantal
     # opvragingen zonder leesbaar artikel stopt de run; levert de kanarie wél
