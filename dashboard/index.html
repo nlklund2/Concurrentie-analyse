@@ -217,15 +217,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+// Supabase antwoordt met kale Engelse API-fouten. Een collega die inlogt leest
+// "Signups not allowed for this instance" en weet niet wat hij moet doen; dit
+// vertaalt de gevallen die in de praktijk voorkomen naar een volgende stap.
+const LOGIN_FOUTEN = [
+  [/signups? not allowed|not allowed for otp|user not found|invalid login/i,
+   "Dit e-mailadres heeft nog geen toegang tot de monitor. " +
+   "Vraag de beheerder om een uitnodiging."],
+  [/rate limit|too many|429/i,
+   "Er zijn op dit moment te veel inloglinks verstuurd. Probeer het over een uur nog eens."],
+  [/invalid email|malformed/i, "Dat lijkt geen geldig e-mailadres."],
+];
+
 async function login() {
   const email = document.getElementById("email").value.trim();
   const msg = document.getElementById("melding");
   if (!email) { msg.textContent = "Vul een e-mailadres in."; return; }
   msg.textContent = "Versturen…";
+  // shouldCreateUser false: toegang loopt via uitnodigingen in Supabase. Staat
+  // dat ook in de code, dan kan het dashboard nooit stilletjes accounts openen
+  // als de schakelaar in Supabase ooit weer omgaat.
   const { error } = await sb.auth.signInWithOtp({ email,
-    options: { emailRedirectTo: location.origin + location.pathname } });
-  msg.textContent = error ? `Mislukt: ${error.message}` :
-    "Verstuurd — check je inbox (alleen uitgenodigde accounts kunnen inloggen).";
+    options: { emailRedirectTo: location.origin + location.pathname,
+               shouldCreateUser: false } });
+  if (!error) {
+    msg.textContent = "Verstuurd — check je inbox (alleen uitgenodigde accounts kunnen inloggen).";
+    return;
+  }
+  const vertaald = LOGIN_FOUTEN.find(([rx]) => rx.test(error.message || ""));
+  msg.textContent = vertaald ? vertaald[1] : `Inloggen mislukt: ${error.message}`;
 }
 
 async function fetchAll(build) {
