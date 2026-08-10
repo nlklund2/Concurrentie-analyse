@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urlsplit
 
 from .http import Http
 from .jsonscan import deep_find_products, products_from_html
@@ -374,7 +375,13 @@ def diagnose_rapport(urls: list[str], render: bool = True) -> str:
     kop = ["# Paginadiagnose", "",
            "*Waarom levert een pagina niets op? Deze meting toont álle signalen waar de "
            "extractie op kan aanhaken, inclusief de signalen die we nog niet gebruiken.*", ""]
-    delen = [diagnose(u, render=render) for u in urls]
+    delen = []
+    for u in urls:
+        try:
+            delen.append(diagnose(u, render=render))
+        except Exception as e:  # één kapotte URL mag de rest niet meenemen
+            delen.append(f"## {u}\n\n- **diagnosefout:** {type(e).__name__}: "
+                         f"{str(e)[:200]}")
     return "\n".join(kop + delen)
 
 
