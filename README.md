@@ -18,7 +18,7 @@ Kosten: **€0/maand** (GitHub Actions + Supabase free tier + Netlify free tier)
 ## Hoe het werkt
 
 ```
-GitHub Actions (cron, ma ±06:00 NL)      Supabase (Postgres)
+GitHub Actions (cron, ma ±06:07 NL)      Supabase (Postgres)
 ┌─────────────────────────────┐          ┌──────────────────────────────┐
 │ scraper (Python)            │─ REST ──►│ staging → process_staging()  │
 │  Shopify-JSON /             │          │ products, price_events,      │
