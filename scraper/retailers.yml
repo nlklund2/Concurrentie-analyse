@@ -63,12 +63,15 @@ retailers:
     segment: kern
     url_filter: "/nl"
     color_slot: 2
-    # Meting 10-08: categoriepagina's hydrateren niet (ook niet in een echte
-    # browser) en /api/* is per robots.txt verboden. De productpagina's laden
-    # wél gewoon; met de nieuwe js-state/escaped-attrs-extractie is de
-    # sitemap-route de kansrijkste — de sitemap staat in robots.txt
-    # (/sitemap/index.xml → nl-nl/sitemap/products.xml).
-    strategy: sitemap_pages
+    # EINDOORDEEL 10-08 (slotprobe): langs alle wegen gemeten en uitgeput.
+    # Categoriepagina's hydrateren niet (ook niet in een echte browser met
+    # consent en scrollen), /api/* is per robots.txt verboden en dat
+    # respecteren we, en de productpagina's uit de sitemap (9.672 binnen
+    # focus) dragen geen eigen productdata: 19 van 25 proefpagina's gaven
+    # hetzelfde gedeelde aanraderblok terug, ook aan de nieuwe js-state- en
+    # escaped-attrs-extractie. Bron blijft rood met de poort dicht; de
+    # weekfolder is het alternatief voor prijspeiling.
+    strategy: render
     enrich: false
     max_categories: 30
     max_pages_per_category: 10
