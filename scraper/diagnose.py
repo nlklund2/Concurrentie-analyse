@@ -197,6 +197,25 @@ def _firecrawl_diagnose(url: str) -> str:
             break
     if hrefs:
         regels.append("- productachtige links: " + ", ".join(h[:80] for h in hrefs))
+    # De tegel zelf uitknippen: het artifact met de volledige dump is vanuit
+    # de ontwikkelomgeving niet te downloaden (proxy), dus het fragment moet
+    # het rapport in — dáár wordt de kaartstructuur leesbaar.
+    eerste = next((m for m in re.finditer(
+        r'href\s*=\s*["\'][^"\']*(?:lingerie|ondergoed|product)[^"\']*["\']',
+        html, re.I)), None)
+    if eerste is not None:
+        frag = html[max(0, eerste.start() - 400):eerste.start() + 2400]
+        frag = re.sub(r'(srcset|src|style|class)\s*=\s*"[^"]{60,}"', r'\1="…"', frag)
+        frag = re.sub(r"\s+", " ", frag)
+        regels += ["- fragment rond de eerste producttegel:",
+                   "", "```html", frag, "```"]
+        prijs = PRIJS_LOS_RE.search(html, eerste.start())
+        if prijs is not None:
+            ctx = html[max(0, prijs.start() - 250):prijs.end() + 120]
+            ctx = re.sub(r"\s+", " ", ctx)
+            regels += [f"- eerste prijsachtige treffer ná de tegel "
+                       f"(afstand {prijs.start() - eerste.start()} tekens):",
+                       "", "```html", ctx, "```"]
     return "\n".join(regels)
 
 
@@ -209,13 +228,21 @@ def diagnose(url: str, render: bool = True) -> str:
     if resp is None:
         regels.append("- **HTTP: geen antwoord** — geblokkeerd, robots.txt of netwerkfout.")
     elif url.lower().endswith(".xml"):
-        return "\n".join(regels + [f"- HTTP {resp.status_code}"]
-                         + _sitemap_regels(resp.text))
+        uit = regels + [f"- HTTP {resp.status_code}"] + _sitemap_regels(resp.text)
+        if "<loc>" not in resp.text:
+            # 200 zonder locs = soft-404 of een heel ander formaat; het begin
+            # van het antwoord vertelt welke van de twee.
+            uit.append("- begin van het antwoord: `"
+                       + " ".join(resp.text[:300].split()) + "`")
+        return "\n".join(uit)
     elif url.lower().endswith(".txt"):
         # robots.txt: verklapt de echte sitemap-locatie (Zeeman's
         # /sitemap.xml gaf HTTP 200 met nul URL's — verkeerd pad).
-        kop = " | ".join(resp.text[:600].splitlines())
+        sitemaps = [r for r in resp.text.splitlines()
+                    if r.lower().startswith("sitemap")]
+        kop = " | ".join(resp.text[:1500].splitlines())
         return "\n".join(regels + [f"- HTTP {resp.status_code}",
+                                   f"- sitemap-regels: {sitemaps or 'geen'}",
                                    f"- inhoud: `{kop}`"])
     else:
         html = resp.text
