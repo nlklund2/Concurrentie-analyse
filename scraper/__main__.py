@@ -83,9 +83,9 @@ def cmd_scrape(args) -> int:
             print(f"  ✗ {note}")
         # Firecrawl is de enige betaalde stap; het tegoed is eindig en raakt
         # anders ongemerkt op. Verbruik dus mee het weekrapport in.
-        if res.strategy == "firecrawl":
-            credits[cfg.id] = res.requests_done
-            note = f"{note} · {res.requests_done} Firecrawl-credits"
+        if res.credits_used:
+            credits[cfg.id] = res.credits_used
+            note = f"{note} · {res.credits_used} Firecrawl-credits"
         try:
             db.log_run(cfg.id, week, res.strategy or cfg.strategy, len(rows), status, note)
         except Exception as e:
@@ -113,10 +113,11 @@ def _beoordeel(db, cfg, rows, error: str) -> tuple[str, str]:
     if len(rows) < cfg.min_products_expected:
         return "fout", (f"slechts {len(rows)} artikelen "
                         f"(minimum {cfg.min_products_expected}); {error or 'bron gewijzigd?'}")
-    prev = db.active_count(cfg.id)
+    prev = db.last_ok_count(cfg.id)
     if prev > 0 and len(rows) < 0.5 * prev:
-        return "afwijkend", (f"{len(rows)} artikelen is <50% van vorige stand ({prev}); "
-                             "week niet verwerkt om de trend niet te vervuilen")
+        return "afwijkend", (f"{len(rows)} artikelen is <50% van de laatste "
+                             f"goedgekeurde meting ({prev}); week niet verwerkt "
+                             "om de trend niet te vervuilen")
     if error:
         return "afwijkend", f"deels gelukt met fout: {error}"
     return "ok", ""

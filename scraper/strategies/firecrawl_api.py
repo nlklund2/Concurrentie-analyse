@@ -15,6 +15,8 @@ geen automatische stap in de waterval.
 """
 from __future__ import annotations
 
+import html as html_lib
+import json
 import os
 import re
 import time
@@ -25,7 +27,7 @@ import requests
 from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
-from ..jsonscan import product_from_meta, products_from_html
+from ..jsonscan import product_from_meta, products_from_html, url_key
 from ..models import Product, ScrapeResult
 from .listing_crawl import _voeg_samen
 from .render_listing import cards_from_html, lees_ankers
@@ -50,6 +52,32 @@ ACTIES_SCROLL = [
     {"type": "wait", "milliseconds": 1200},
 ]
 
+_PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)")
+_API_HINT_RE = re.compile(
+    r"https?://[^\s\"'<>\\]{6,140}(?:api|graphql|search|catalog)[^\s\"'<>\\]{0,80}",
+    re.I)
+
+
+def _signalen(html: str) -> str:
+    """Compacte meting van een pagina die niets opleverde: waar zou extractie
+    op kúnnen aanhaken? Elke fetch kost een credit, dus meet meteen mee in
+    plaats van later een aparte diagnoserit te rijden."""
+    apis: list[str] = []
+    for m in _API_HINT_RE.finditer(html):
+        u = m.group(0).split("?")[0][:90]
+        if u not in apis:
+            apis.append(u)
+        if len(apis) >= 3:
+            break
+    jsonld = html.count("application/ld+json")
+    jscripts = html.count("application/json") - jsonld
+    return (f"{len(html)} tekens, {html.count('€')}×€, "
+            f"{len(_PRIJS_LOS_RE.findall(html))} prijsachtig, "
+            f"jsonld={jsonld}, jsonscripts={jscripts}, "
+            f"dataLayer={'ja' if 'dataLayer' in html else 'nee'}, "
+            f"nextdata={'ja' if '__NEXT_DATA__' in html else 'nee'}"
+            + (f", api-hints: {apis}" if apis else ""))
+
 
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
     res = ScrapeResult(retailer_id=cfg.id, strategy="firecrawl")
@@ -64,6 +92,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     session.headers.update({"Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json"})
 
+    if cfg.firecrawl_mode == "wp_store":
+        return _scrape_wp_store(session, cfg, res, limit)
     if cfg.firecrawl_mode == "pages":
         return _scrape_productpaginas(session, cfg, res, limit)
 
@@ -93,9 +123,11 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     credits = res.requests_done   # navigatie-opvraag telt mee
     uit_kaarten = 0
     uit_json = 0
+    missers = 0
     for n, cat_url in enumerate(cats, start=1):
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
-        html = _firecrawl_html(session, cat_url, res, actions=ACTIES_SCROLL)
+        html = _firecrawl_html(session, cat_url, res, actions=ACTIES_SCROLL,
+                               wait_ms=cfg.firecrawl_wait_ms)
         credits += 1
         if html is None:
             if res.error:      # sleutel ongeldig of credits op: stoppen
@@ -108,16 +140,23 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             # kaartweergave zelf de enige bron (zelfde vangnet als de DOM-scan).
             found = cards_from_html(html, cat_url)
             uit_kaarten += len(found)
+            if not found and missers < 2:
+                # Waaróm leeg? Meet het ter plekke — dat scheelt een aparte
+                # diagnoserit van een credit per pagina (les van week 32).
+                missers += 1
+                res.notes.append(f"miss-signaal {cat_url[:70]}: {_signalen(html)}")
         for p in found:
             # crawlpad (doelgroep) én bron-categorie (producttype) allebei bewaren
             p.category_raw = _voeg_samen(cat_path, p.category_raw)
             seen.setdefault(p.key, p)
         if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
             break
-        # Kanarie: bij HEMA rendert het productraster niet, en dan leest het
-        # kaart-vangnet alleen de promoblokken eromheen (koffie, koekjes). Het
-        # eerlijke signaal is dus de JSON-route, niet de kaartoogst.
-        if cfg.firecrawl_canary and n >= cfg.firecrawl_canary and not uit_json:
+        # Kanarie: bij HEMA rendert het productraster niet altijd, en dan leest
+        # het kaart-vangnet alleen de promoblokken eromheen (koffie, koekjes) —
+        # een handvol per pagina. Een écht raster levert tientallen tegels; die
+        # oogst mag de kanarie dus niet afkappen, promo-kruimels wel.
+        if (cfg.firecrawl_canary and n >= cfg.firecrawl_canary
+                and not uit_json and len(seen) < 15):
             res.notes.append(
                 f"kanarie: {n} categorieën zonder ingebedde productdata — "
                 f"gestopt vóór de volle {len(cats)} (bespaart credits; "
@@ -211,6 +250,81 @@ def _sitemap_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
     return cats
 
 
+def _wp_store_product(item: dict) -> Product | None:
+    """Eén artikel uit de WooCommerce Store-API. Prijzen staan er in
+    minor units ('599' met currency_minor_unit 2 = € 5,99)."""
+    naam = html_lib.unescape(item.get("name") or "").strip()
+    url = item.get("permalink") or ""
+    prijzen = item.get("prices") or {}
+    try:
+        deler = 10 ** int(prijzen.get("currency_minor_unit", 2))
+        prijs = int(prijzen.get("price")) / deler
+    except (TypeError, ValueError):
+        return None
+    if not naam or not url:
+        return None
+    was = None
+    try:
+        regulier = int(prijzen.get("regular_price")) / deler
+        if regulier > prijs:
+            was = regulier
+    except (TypeError, ValueError):
+        pass
+    cats = " > ".join(c.get("name", "") for c in item.get("categories") or [])
+    kleur, maten = "", ""
+    for attr in item.get("attributes") or []:
+        attr_naam = (attr.get("name") or "").lower()
+        termen = ", ".join(t.get("name", "") for t in attr.get("terms") or [])
+        if not termen:
+            continue
+        if "maat" in attr_naam or "size" in attr_naam:
+            maten = termen[:200]
+        elif "kleur" in attr_naam or "colour" in attr_naam or "color" in attr_naam:
+            kleur = termen[:200]
+    return Product(key=url_key(url), title=naam[:200], url=url,
+                   price=prijs, was_price=was,
+                   category_raw=html_lib.unescape(cats), color=kleur, sizes=maten)
+
+
+def _scrape_wp_store(session: requests.Session, cfg: RetailerCfg,
+                     res: ScrapeResult, limit: int | None) -> ScrapeResult:
+    """firecrawl_mode 'wp_store': de publieke WooCommerce Store-API, per 100
+    artikelen per opvraging — gemeten 10-08 bij Wibra (762 producten ≈ 8
+    credits voor de complete catalogus, mét maten en kleuren). De productpagina-
+    route bleef daar leeg: de pagina's dragen geen machineleesbare data, de
+    API wél."""
+    basis = cfg.base.rstrip("/")
+    per = 100
+    gezien: dict[str, Product] = {}
+    for pagina in range(1, 13):     # 12 × 100 — ruim boven Wibra's 762
+        url = f"{basis}/wp-json/wc/store/v1/products?per_page={per}&page={pagina}"
+        tekst = _firecrawl_html(session, url, res, raw=True)
+        res.requests_done += 1
+        if tekst is None:
+            break                   # fout staat al in res.error/notes
+        try:
+            start = tekst.find("[")
+            data = json.loads(tekst[start:]) if start >= 0 else None
+        except ValueError:
+            data = None
+        if not isinstance(data, list):
+            res.error = res.error or ("Store-API gaf geen JSON-lijst terug — "
+                                      "endpoint dicht of vorm gewijzigd")
+            break
+        for item in data:
+            p = _wp_store_product(item) if isinstance(item, dict) else None
+            if p is not None:
+                gezien.setdefault(p.key, p)
+        if len(data) < per or (limit and len(gezien) >= limit):
+            break
+    res.products = list(gezien.values())[: limit or cfg.max_products]
+    res.notes.append(f"Store-API: {len(res.products)} artikelen in "
+                     f"{res.requests_done} opvragingen")
+    if not res.products and not res.error:
+        res.error = "Store-API bereikbaar maar zonder artikelen — vorm nalopen"
+    return res
+
+
 def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,
                            res: ScrapeResult, limit: int | None) -> ScrapeResult:
     """firecrawl_mode 'pages': focus-gefilterde productpagina's uit de sitemap,
@@ -252,7 +366,7 @@ def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,
                 "(bespaart credits; levert de kanarie wél data, dan loopt de "
                 "run door tot de cap)")
             break
-        html = _firecrawl_html(session, url, res)
+        html = _firecrawl_html(session, url, res, wait_ms=cfg.firecrawl_wait_ms)
         credits += 1
         if html is None:
             if res.error:
@@ -262,6 +376,11 @@ def _scrape_productpaginas(session: requests.Session, cfg: RetailerCfg,
             or product_from_meta(html, url)
         if p is None:
             gemist += 1
+            if gemist <= 2:
+                # Waaróm onleesbaar? Meet het ter plekke, mét de URL — zo is
+                # het pad naar een echte productpagina meteen bekend voor een
+                # gerichte vervolg-diagnose.
+                res.notes.append(f"miss-signaal {url[:80]}: {_signalen(html)}")
             continue
         if p.key in gezien:     # gedeeld blok i.p.v. eigen artikel (Zeeman-les)
             herhaald += 1
@@ -336,15 +455,17 @@ def _nav_via_firecrawl(session: requests.Session, cfg: RetailerCfg,
 
 
 def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
-                    raw: bool = False, actions: list | None = None) -> str | None:
+                    raw: bool = False, actions: list | None = None,
+                    wait_ms: int = 0) -> str | None:
     """raw=True haalt de onbewerkte bron op (sitemap-XML) zonder rendering;
-    actions (scrollen/wachten) laten lui ladende rasters eerst renderen."""
+    actions (scrollen/wachten) laten lui ladende rasters eerst renderen;
+    wait_ms > 0 vervangt de standaard-rendertijd van 5000 ms."""
     payload = {
         "url": url,
         "formats": ["rawHtml"] if raw else ["html"],
         "onlyMainContent": False,
         # HEMA's raster rendert traag; bij 2500 ms was de lijst nog leeg
-        "waitFor": 0 if raw else 5000,
+        "waitFor": 0 if raw else (wait_ms or 5000),
         "timeout": 30000 if not actions else 45000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
     }
@@ -373,7 +494,8 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
         # dan komt er in elk geval een snapshot (zonder scroll) terug
         if "acties niet geaccepteerd — zonder acties verder" not in res.notes:
             res.notes.append("acties niet geaccepteerd — zonder acties verder")
-        return _firecrawl_html(session, url, res, raw=raw, actions=None)
+        return _firecrawl_html(session, url, res, raw=raw, actions=None,
+                               wait_ms=wait_ms)
     if r.status_code == 402:
         res.error = "Firecrawl-credits op (HTTP 402) — tegoed bijvullen of tier verhogen"
         return None

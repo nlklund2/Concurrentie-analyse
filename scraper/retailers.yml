@@ -63,6 +63,14 @@ retailers:
     segment: kern
     url_filter: "/nl"
     color_slot: 2
+    # EINDOORDEEL 10-08 (slotprobe): langs alle wegen gemeten en uitgeput.
+    # Categoriepagina's hydrateren niet (ook niet in een echte browser met
+    # consent en scrollen), /api/* is per robots.txt verboden en dat
+    # respecteren we, en de productpagina's uit de sitemap (9.672 binnen
+    # focus) dragen geen eigen productdata: 19 van 25 proefpagina's gaven
+    # hetzelfde gedeelde aanraderblok terug, ook aan de nieuwe js-state- en
+    # escaped-attrs-extractie. Bron blijft rood met de poort dicht; de
+    # weekfolder is het alternatief voor prijspeiling.
     strategy: render
     enrich: false
     max_categories: 30
@@ -98,13 +106,12 @@ retailers:
     segment: kern
     color_slot: 3
     strategy: firecrawl
-    firecrawl_mode: pages
-    firecrawl_page_cap: 110
-    # Besluit 09-08 (eigenaar): bron blijft wekelijks meelopen als hertest.
-    # De kanarie houdt die hertest goedkoop: acht pagina's zonder leesbare
-    # data en de run stopt (±8 i.p.v. ±40 credits). Geeft de site wél iets
-    # prijs, dan loopt hij dezelfde run door tot de cap van 110.
-    firecrawl_canary: 8
+    # DOORBRAAK 10-08 (meetronde 2): wibra.nl draait op WordPress/WooCommerce
+    # en de publieke Store-API staat open — 762 producten, geldige JSON met
+    # naam, prijs (minor units), permalink, categorieën én maat/kleur-
+    # attributen. De hele catalogus in ±8 credits per week, waar de
+    # productpagina's (ronde 6, 09-08) niets machineleesbaars droegen.
+    firecrawl_mode: wp_store
     enrich: false
     max_categories: 20
     notes: >-
@@ -166,7 +173,13 @@ retailers:
     strategy: firecrawl
     enrich: false
     max_categories: 20
-    # Besluit 09-08 (eigenaar): bron blijft wekelijks meelopen als hertest.
+    # DOORBRAAK 10-08 (meetronde 5-6): met 8 s extra rendertijd verschijnt het
+    # raster, en elke tegel draagt zijn naam, masterSKU en prijs als
+    # HTML-ge-escapete JSON in een attribuut. De escaped-attrs-extractie leest
+    # dat; bewijsprobe: 181 artikelen uit 20 categorieën, 159 binnen focus,
+    # 100% prijs- en kleurdekking, ±24 credits. De promo-drempel van 60
+    # hieronder blijft als extra slot op de deur.
+    firecrawl_wait_ms: 8000
     # De kanarie kijkt naar de JSON-route, niet naar de kaartoogst — die
     # levert bij een niet-renderend raster alleen promoblokken op. Vijf
     # categorieën zonder ingebedde productdata en de run stopt (±6 i.p.v.

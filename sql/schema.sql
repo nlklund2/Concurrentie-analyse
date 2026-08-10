@@ -233,15 +233,20 @@ begin
          s.product_type, s.category_raw, s.color, s.sizes, s.price, s.was_price, s.url
   from _snap s;
 
-  -- Verdwenen: actief maar niet in deze snapshot.
+  -- Verdwenen: actief maar niet in deze snapshot. Op de snapshot toetsen, niet
+  -- op last_seen < p_week: een herdraai binnen dezelfde week liet anders de
+  -- rijen van de eerdere poging actief staan (Action, week 32: 27 banners
+  -- bleven naast de 24 echte artikelen staan en vervuilden elke poort erna).
   insert into price_events (retailer_id, product_key, week, event, prev_price)
   select p.retailer_id, p.product_key, p_week, 'gone', p.current_price
   from products p
-  where p.retailer_id = p_retailer and p.status = 'active' and p.last_seen < p_week;
+  where p.retailer_id = p_retailer and p.status = 'active'
+    and not exists (select 1 from _snap s where s.product_key = p.product_key);
   get diagnostics v_gone = row_count;
 
-  update products set status = 'gone'
-  where retailer_id = p_retailer and status = 'active' and last_seen < p_week;
+  update products p set status = 'gone'
+  where p.retailer_id = p_retailer and p.status = 'active'
+    and not exists (select 1 from _snap s where s.product_key = p.product_key);
 
   -- Weekaggregaten (huidige actieve stand + uitstroom van deze week).
   delete from weekly_stats where retailer_id = p_retailer and week = p_week;

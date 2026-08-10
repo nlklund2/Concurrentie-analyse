@@ -8,6 +8,7 @@ Dit is de generieke motor achter de listing- en sitemap-strategieën. Werkwijze:
 from __future__ import annotations
 
 import hashlib
+import html as html_mod
 import json
 import re
 from urllib.parse import urljoin, urlsplit
@@ -24,6 +25,14 @@ _JSONSCRIPT_RE = re.compile(
 _NEXTDATA_RE = re.compile(
     r'<script[^>]+id\s*=\s*["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', re.S | re.I)
 
+# Productdata die alleen in gewone JS-code zit: dataLayer.push({...}) van
+# GTM-ecommerce en window.__STATE__-achtige toestandsobjecten. Wibra's
+# productpagina's dragen geen JSON-LD, geen JSON-scripts en geen og:prijs —
+# als de data ergens machineleesbaar staat, dan hier.
+_JS_STATE_RE = re.compile(
+    r"dataLayer\s*(?:\.\s*push\s*\(|\s*=\s*\[)|"
+    r"(?:window\s*\.\s*)?__[A-Z][A-Z_]{3,30}__\s*=\s*", re.I)
+
 NAME_KEYS = ("name", "title", "displayName", "productName", "displayTitle")
 PRICE_KEYS = ("price", "sellingPrice", "salePrice", "currentPrice", "priceValue",
               "priceIncTax", "unitPrice", "priceInCents", "priceCents", "value", "amount",
@@ -33,7 +42,10 @@ WAS_KEYS = ("listPrice", "oldPrice", "originalPrice", "strikePrice", "wasPrice",
             "advertisedPrice", "regularPrice", "strikethroughPrice", "previousPrice",
             "crossedPrice", "basePrice", "was")
 KEY_KEYS = ("sku", "productID", "productId", "product_id", "id", "objectID", "code",
-            "articleNumber", "articleId", "itemNo", "ean", "mpn", "key")
+            "articleNumber", "articleId", "itemNo", "ean", "mpn", "key",
+            # HEMA-tegels (meting 10-08) dragen alleen masterSKU/groupSKU;
+            # master eerst — dat is het artikel, group de kleurvariantgroep.
+            "masterSKU", "groupSKU")
 URL_KEYS = ("url", "productUrl", "link", "href", "slug", "seoUrl", "pdpUrl", "path")
 BRAND_KEYS = ("brand", "brandName", "vendor", "manufacturer")
 CATEGORY_KEYS = ("category", "categoryPath", "breadcrumb", "categories", "productType",
@@ -65,7 +77,9 @@ def _attr_from(d: dict, keys) -> str:
     for k in keys:
         if k in d and d[k] is not None:
             text = _text_from(d[k])
-            if text:
+            # HEMA vult een leeg maatveld met het wóórd 'empty'; dat is geen
+            # maat en zou de dekkingscijfers vals op 100% zetten.
+            if text and text.lower() not in ("empty", "null", "none", "n/a", "-"):
                 return text
     return ""
 
@@ -301,6 +315,70 @@ def product_from_meta(html: str, url: str) -> Product | None:
                    price=prijs, was_price=was)
 
 
+def _balanced_blob(text: str, start: int, cap: int = 2_000_000) -> str | None:
+    """Het gebalanceerde {...}- of [...]-blok vanaf de eerste opener,
+    string-bewust (accolades bínnen "..." tellen niet mee)."""
+    i = start
+    while i < len(text) and text[i] in " \t\r\n":
+        i += 1
+    if i >= len(text) or text[i] not in "{[":
+        return None
+    open_c, close_c = text[i], {"{": "}", "[": "]"}[text[i]]
+    diepte, in_str, escape = 0, False, False
+    for j in range(i, min(len(text), i + cap)):
+        c = text[j]
+        if in_str:
+            if escape:
+                escape = False
+            elif c == "\\":
+                escape = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == open_c:
+            diepte += 1
+        elif c == close_c:
+            diepte -= 1
+            if diepte == 0:
+                return text[i:j + 1]
+    return None
+
+
+def products_from_js_state(html: str, base_url: str = "") -> list[Product]:
+    """dataLayer.push / window.__STATE__: JS-objecten met naam én prijs.
+    Alleen geldig-JSON-blokken tellen; JS-expressies vallen stil af."""
+    products: list[Product] = []
+    for n, m in enumerate(_JS_STATE_RE.finditer(html)):
+        if n >= 12:
+            break
+        blob = _balanced_blob(html, m.end())
+        if blob is None:
+            continue
+        data = _json_loads_lenient(blob)
+        if data is not None:
+            products.extend(deep_find_products(data, base_url))
+    return products
+
+
+# JSON die HTML-ge-escaped in een attribuut zit: ="{&quot;price&quot;:…}".
+# HEMA's producttegels (meting 10-08) dragen zo hun naam, SKU en prijs —
+# onzichtbaar voor tekst-, script- én dataLayer-lezers.
+_ESCAPED_ATTR_RE = re.compile(r'"(\[?\{&quot;[^"]{20,200000}[\}\]])"')
+
+
+def products_from_escaped_attrs(html: str, base_url: str = "") -> list[Product]:
+    products: list[Product] = []
+    for n, m in enumerate(_ESCAPED_ATTR_RE.finditer(html)):
+        if n >= 400:
+            break
+        data = _json_loads_lenient(html_mod.unescape(m.group(1)))
+        if data is not None:
+            products.extend(deep_find_products(data, base_url))
+    return products
+
+
 def products_from_html(html: str, base_url: str = "") -> list[Product]:
     """Alle beschikbare extractiemethoden op één pagina, ontdubbeld op sleutel."""
     products: list[Product] = []
@@ -311,6 +389,8 @@ def products_from_html(html: str, base_url: str = "") -> list[Product]:
             data = _json_loads_lenient(m.group(1))
             if data is not None:
                 products.extend(deep_find_products(data, base_url))
+    products.extend(products_from_js_state(html, base_url))
+    products.extend(products_from_escaped_attrs(html, base_url))
 
     unique: dict[str, Product] = {}
     for p in products:

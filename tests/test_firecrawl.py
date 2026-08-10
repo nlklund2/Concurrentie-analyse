@@ -344,3 +344,127 @@ def test_kanarie_kijkt_naar_json_niet_naar_de_kaartoogst(monkeypatch):
     assert len(calls) == 2              # gestopt op de kanarie, niet alle zes
     assert res.products                 # de kaartoogst blijft wél in de opbrengst
     assert any("kanarie" in n for n in res.notes)
+
+
+def test_wait_ms_overschrijft_de_standaard(monkeypatch):
+    """firecrawl_wait_ms uit retailers.yml moet in de payload belanden."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(html=LISTING_HTML)])
+    cfg = _cfg(seeds=["https://www.wibra.nl/dames/ondergoed"], firecrawl_wait_ms=8000)
+    firecrawl_api.scrape(cfg, http=None)
+    assert firecrawl_api._test_payloads[0]["waitFor"] == 8000
+
+
+def test_miss_signaal_bij_onleesbare_productpagina(monkeypatch):
+    """Een lege pagina kost een credit; de meting wáárom hij leeg was moet
+    dan meteen in de notes staan, mét URL voor een vervolgdiagnose."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(body={"success": True,
+                                      "data": {"rawHtml": SITEMAP_XML}}),
+                          _Resp(html=LEGE_PRODUCTPAGINA)])
+    cfg = _cfg(firecrawl_mode="pages", firecrawl_page_cap=50,
+               firecrawl_canary=1, focus_categories="pyjama|ondergoed")
+    res = firecrawl_api.scrape(cfg, http=None)
+    sig = [n for n in res.notes if n.startswith("miss-signaal")]
+    assert sig and "/assortiment/artikel-0-baby-pyjama/" in sig[0]
+    assert "dataLayer=nee" in sig[0]
+
+
+def test_credits_overleven_de_strategiewrapper(monkeypatch):
+    """run() overschrijft requests_done met de gewone-HTTP-teller; het
+    Firecrawl-verbruik moet dat overleven (week 33: 'Wibra 0, HEMA 1')."""
+    from scraper import strategies
+
+    nep = firecrawl_api.ScrapeResult(retailer_id="wibra", strategy="firecrawl",
+                                     requests_done=9)
+
+    class _StilleHttp:
+        def __init__(self, **kw): self.requests_done = 2; self.robots_skipped = 0
+
+    monkeypatch.setitem(strategies.FIXED, "firecrawl", lambda cfg, http, limit: nep)
+    monkeypatch.setattr(strategies, "Http", _StilleHttp)
+    res = strategies.run(_cfg())
+    assert res.credits_used == 9          # de credits
+    assert res.requests_done == 2         # de gewone teller, apart
+
+
+# HEMA-scenario ronde 1 (10-08): het raster draagt géén €-tekens (CSS-valuta),
+# maar een promoblok mét € staat er wel op de pagina. De losse prijsronde moet
+# dan alsnog draaien en het (grotere) raster laten winnen van de promo's.
+RASTER_ZONDER_EURO = "<html><body><div>Koffiedeal <span>€ 3,00</span>" + \
+    '<a href="/promo/koffie"><img alt="snelfilterkoffie"><span>€ 3,00</span></a></div>' + \
+    "".join(
+        f'<li class="tegel"><a href="/dames/lingerie/bh/model-{i}">'
+        f'<img alt="bh model {i}"></a><span>{10 + i},00</span></li>'
+        for i in range(20)) + "</body></html>"
+
+
+def test_kaartlezer_losse_ronde_wint_van_promokruimels():
+    """Vóór de fix won de €-ronde met 1 promokaart en bleef het raster
+    onzichtbaar. Nu wint de grootste oogst; koffie eruit filteren is
+    vervolgens de taak van het focusfilter, niet van de kaartlezer."""
+    from scraper.strategies.render_listing import cards_from_html
+    kaarten = cards_from_html(RASTER_ZONDER_EURO, "https://www.hema.nl/dames/lingerie")
+    raster = [p for p in kaarten if "bh model" in p.title]
+    assert len(raster) == 20
+    assert len(kaarten) <= 21            # hooguit de ene promokaart erbij
+
+
+def test_kanarie_laat_een_kaartraster_door(monkeypatch):
+    """De kanarie stopt bij promo-kruimels, maar een pagina die tientallen
+    tegels levert is een werkende bron — ook zonder ingebedde JSON."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=RASTER_ZONDER_EURO)])
+    cfg = _cfg(id="hema", name="HEMA", base="https://www.hema.nl",
+               firecrawl_canary=2,
+               seeds=[f"https://www.hema.nl/c/{i}/lingerie" for i in range(6)])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(calls) == 6               # niet gestopt: alle categorieën bezocht
+    assert len(res.products) >= 20
+    assert not any("kanarie" in n for n in res.notes)
+
+
+# Wibra-doorbraak 10-08: de publieke WooCommerce Store-API. Prijzen in minor
+# units ('599' = € 5,99), naam met HTML-entities, maten/kleuren als attributen.
+def _wp_item(i, prijs="599", regulier=None, naam=None):
+    return {"id": 4227000 + i,
+            "name": naam or f"Baby boxpakje rib auto&#8217;s maat {i}",
+            "permalink": f"https://www.wibra.nl/assortiment/boxpakje-{i}/",
+            "prices": {"price": prijs, "regular_price": regulier or prijs,
+                       "currency_minor_unit": 2},
+            "categories": [{"name": "Baby"}, {"name": "Nachtkleding"}],
+            "attributes": [{"name": "Maat", "terms": [{"name": "50/56"},
+                                                      {"name": "62/68"}]},
+                           {"name": "Kleur", "terms": [{"name": "blauw"}]}]}
+
+
+def test_wp_store_volledige_catalogus(monkeypatch):
+    import json as _json
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    pagina1 = [_wp_item(i) for i in range(100)]
+    pagina2 = [_wp_item(100 + i, prijs="250", regulier="499") for i in range(30)]
+    calls = _sessie(monkeypatch, [
+        _Resp(body={"success": True, "data": {"rawHtml": _json.dumps(pagina1)}}),
+        _Resp(body={"success": True, "data": {"rawHtml": _json.dumps(pagina2)}}),
+    ])
+    cfg = _cfg(firecrawl_mode="wp_store")
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert res.error == ""
+    assert len(calls) == 2                      # 130 artikelen < 2×100 → klaar
+    assert "per_page=100&page=1" in calls[0] and "page=2" in calls[1]
+    assert len(res.products) == 130
+    p = res.products[0]
+    assert p.title.startswith("Baby boxpakje rib auto’s")   # entity ontcijferd
+    assert p.price == 5.99                                   # minor units
+    assert p.sizes == "50/56, 62/68" and p.color == "blauw"
+    assert p.category_raw == "Baby > Nachtkleding"
+    afgeprijsd = res.products[-1]
+    assert (afgeprijsd.price, afgeprijsd.was_price) == (2.50, 4.99)
+
+
+def test_wp_store_dichte_api_geeft_schone_fout(monkeypatch):
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    _sessie(monkeypatch, [_Resp(html="<html>404 Not Found</html>")])
+    res = firecrawl_api.scrape(_cfg(firecrawl_mode="wp_store"), http=None)
+    assert res.products == []
+    assert "Store-API" in res.error

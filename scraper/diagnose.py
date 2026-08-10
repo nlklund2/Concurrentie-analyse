@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urlsplit
 
 from .http import Http
 from .jsonscan import deep_find_products, products_from_html
@@ -27,6 +28,33 @@ from .jsonscan import deep_find_products, products_from_html
 # jaartallen en geen versienummers (5.51.0 — telde op Zeeman als prijs terwijl
 # het een scriptnaam in de cookiedialoog was). Signaal, geen extractieregel.
 PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)")
+
+
+def _sitemap_regels(xml: str) -> list[str]:
+    """Sitemap samenvatten: omvang, padsegmenten en voorbeeld-URL's — de
+    grondstof om een productpagina voor een vervolgdiagnose te kiezen."""
+    locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml)
+    per_seg: dict[str, int] = {}
+    for u in locs:
+        seg = (re.sub(r"^https?://[^/]+", "", u).strip("/").split("/") or [""])[0]
+        per_seg[seg] = per_seg.get(seg, 0) + 1
+    top = sorted(per_seg.items(), key=lambda kv: -kv[1])[:5]
+    return [f"- sitemap: {len(locs)} URL's",
+            f"- grootste padsegmenten: {top}",
+            "- voorbeelden: " + ", ".join(locs[:6])]
+
+
+def _json_of_none(text: str):
+    """JSON parsen uit een Firecrawl-rawHtml-antwoord; endpoints geven soms
+    HTML-omlijsting mee, dus ook het eerste {...}/[...]-blok proberen."""
+    for kandidaat in (text, text[text.find("{"):], text[text.find("["):]):
+        if not kandidaat:
+            continue
+        try:
+            return json.loads(kandidaat)
+        except (ValueError, TypeError):
+            continue
+    return None
 
 PAGINA_JS = r"""
 () => {
@@ -90,12 +118,132 @@ PAGINA_JS = r"""
 """
 
 
+def _firecrawl_diagnose(url: str) -> str:
+    """Zelfde meting, maar opgehaald via Firecrawl — voor bronnen die het
+    datacenter-IP weren (Wibra, HEMA). Gebruik: `fc:` vóór de URL in
+    diagnose_urls. Een .xml-URL wordt als sitemap gelezen en toont
+    voorbeelis-URL's, zodat een vervolgdiagnose een echte productpagina heeft."""
+    import os
+
+    import requests as _rq
+
+    from .models import ScrapeResult
+    from .strategies.firecrawl_api import _firecrawl_html, _signalen
+
+    regels: list[str] = [f"## {url} *(via Firecrawl)*", ""]
+    if not os.environ.get("FIRECRAWL_API_KEY"):
+        return "\n".join(regels + ["- **FIRECRAWL_API_KEY niet gezet** — deze meting "
+                                   "kan alleen op GitHub Actions draaien."])
+    session = _rq.Session()
+    session.headers.update({"Authorization": f"Bearer {os.environ['FIRECRAWL_API_KEY']}",
+                            "Content-Type": "application/json"})
+    res = ScrapeResult(retailer_id="diagnose")
+    laag = url.lower()
+    # JSON-endpoints (wp-json, .json) rauw ophalen: geen rendering, en de
+    # inhoud meteen op producten toetsen — de goedkoopste route die er is.
+    raw = laag.endswith(".xml") or "/wp-json/" in laag or ".json" in laag
+    html = _firecrawl_html(session, url, res, raw=raw, wait_ms=0 if raw else 8000)
+    for n in res.notes:
+        regels.append(f"- {n}")
+    if res.error:
+        regels.append(f"- **{res.error}**")
+    if html is None:
+        return "\n".join(regels + ["- geen HTML terug — zie de notities hierboven."])
+
+    if raw and not laag.endswith(".xml"):
+        regels.append(f"- {len(html)} tekens; begin: `{' '.join(html[:200].split())}`")
+        data = _json_of_none(html)
+        if data is None:
+            regels.append("- **geen geldige JSON** — endpoint bestaat niet of "
+                          "geeft een foutpagina")
+        else:
+            keys = list(data)[:8] if isinstance(data, dict) else f"lijst[{len(data)}]"
+            prods = deep_find_products(data, url)
+            regels.append(f"- geldige JSON, sleutels: {keys}")
+            regels.append(f"- **producten via deep_find: {len(prods)}**"
+                          + (f", bv. {prods[0].title[:40]!r} à {prods[0].price}"
+                             if prods else ""))
+        return "\n".join(regels)
+
+    if raw:
+        return "\n".join(regels + _sitemap_regels(html))
+
+    from .strategies.render_listing import cards_from_html
+
+    # De ruwe snapshot bewaren als werkbestand: raden op signalen bleef bij
+    # HEMA twee rondes lang steken; met de echte bytes is de kaartstructuur
+    # in één keer te ontleden. De workflow neemt diagnose-dump-*.html mee
+    # als artifact.
+    host = re.sub(r"[^a-z0-9.-]", "-", urlsplit(url).netloc.lower())
+    with open(f"diagnose-dump-{host}.html", "w", encoding="utf-8") as f:
+        f.write(html[:2_000_000])
+
+    prods = products_from_html(html, url)
+    kaarten = cards_from_html(html, url)
+    regels += [
+        f"- signalen: {_signalen(html)}",
+        f"- producten via de gewone extractie: {len(prods)}"
+        + (f", bv. {prods[0].title[:40]!r} à {prods[0].price}" if prods else ""),
+        f"- producten via de kaartlezer: {len(kaarten)}"
+        + (f", bv. {kaarten[0].title[:40]!r} à {kaarten[0].price}" if kaarten else ""),
+    ]
+    # productachtige links: de grondstof voor een vervolgdiagnose per artikel
+    hrefs: list[str] = []
+    for m in re.finditer(r'href\s*=\s*["\']([^"\']+)["\']', html, re.I):
+        h = m.group(1)
+        if re.search(r"product|assortiment|artikel|/p/|/a/|\d{5,}", h) and h not in hrefs:
+            hrefs.append(h)
+        if len(hrefs) >= 8:
+            break
+    if hrefs:
+        regels.append("- productachtige links: " + ", ".join(h[:80] for h in hrefs))
+    # De tegel zelf uitknippen: het artifact met de volledige dump is vanuit
+    # de ontwikkelomgeving niet te downloaden (proxy), dus het fragment moet
+    # het rapport in — dáár wordt de kaartstructuur leesbaar.
+    eerste = next((m for m in re.finditer(
+        r'href\s*=\s*["\'][^"\']*(?:lingerie|ondergoed|product)[^"\']*["\']',
+        html, re.I)), None)
+    if eerste is not None:
+        frag = html[max(0, eerste.start() - 400):eerste.start() + 2400]
+        frag = re.sub(r'(srcset|src|style|class)\s*=\s*"[^"]{60,}"', r'\1="…"', frag)
+        frag = re.sub(r"\s+", " ", frag)
+        regels += ["- fragment rond de eerste producttegel:",
+                   "", "```html", frag, "```"]
+        prijs = PRIJS_LOS_RE.search(html, eerste.start())
+        if prijs is not None:
+            ctx = html[max(0, prijs.start() - 250):prijs.end() + 120]
+            ctx = re.sub(r"\s+", " ", ctx)
+            regels += [f"- eerste prijsachtige treffer ná de tegel "
+                       f"(afstand {prijs.start() - eerste.start()} tekens):",
+                       "", "```html", ctx, "```"]
+    return "\n".join(regels)
+
+
 def diagnose(url: str, render: bool = True) -> str:
+    if url.startswith("fc:"):
+        return _firecrawl_diagnose(url[3:])
     regels: list[str] = [f"## {url}", ""]
     http = Http(min_delay=0.5, respect_robots=True)
     resp = http.get(url)
     if resp is None:
         regels.append("- **HTTP: geen antwoord** — geblokkeerd, robots.txt of netwerkfout.")
+    elif url.lower().endswith(".xml"):
+        uit = regels + [f"- HTTP {resp.status_code}"] + _sitemap_regels(resp.text)
+        if "<loc>" not in resp.text:
+            # 200 zonder locs = soft-404 of een heel ander formaat; het begin
+            # van het antwoord vertelt welke van de twee.
+            uit.append("- begin van het antwoord: `"
+                       + " ".join(resp.text[:300].split()) + "`")
+        return "\n".join(uit)
+    elif url.lower().endswith(".txt"):
+        # robots.txt: verklapt de echte sitemap-locatie (Zeeman's
+        # /sitemap.xml gaf HTTP 200 met nul URL's — verkeerd pad).
+        sitemaps = [r for r in resp.text.splitlines()
+                    if r.lower().startswith("sitemap")]
+        kop = " | ".join(resp.text[:1500].splitlines())
+        return "\n".join(regels + [f"- HTTP {resp.status_code}",
+                                   f"- sitemap-regels: {sitemaps or 'geen'}",
+                                   f"- inhoud: `{kop}`"])
     else:
         html = resp.text
         prods = products_from_html(html, url)
@@ -105,6 +253,12 @@ def diagnose(url: str, render: bool = True) -> str:
             f"{len(PRIJS_LOS_RE.findall(html))} prijsachtige getallen, "
             f"{len(prods)} producten via de gewone extractie",
         ]
+        # Waar stáán die prijsachtige getallen dan? Zeeman: 40 treffers in
+        # 686k tekens kale HTML terwijl de gerenderde pagina er 2 toont —
+        # de context beslist of het productdata in een JS-blob is of ruis.
+        for m in list(PRIJS_LOS_RE.finditer(html))[:3]:
+            ctx = html[max(0, m.start() - 60):m.end() + 40]
+            regels.append("- context: `…" + " ".join(ctx.split()) + "…`")
         if not render:
             return "\n".join(regels)
 
@@ -125,6 +279,7 @@ def _render_diagnose(url: str) -> list[str]:
 
     regels: list[str] = []
     api_treffers: list[str] = []
+    api_alle: list[str] = []
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--disable-blink-features=AutomationControlled"])
@@ -144,6 +299,12 @@ def _render_diagnose(url: str) -> list[str]:
                 data = response.json()
             except Exception:
                 return
+            # élk JSON-antwoord vastleggen — Zeeman bleek een raster te hebben
+            # dat nooit hydrateert, en dan is juist de vraag welke API's er
+            # wél of níet langskomen (en met welke sleutels).
+            if len(api_alle) < 8:
+                keys = list(data)[:5] if isinstance(data, dict) else f"lijst[{len(data)}]"
+                api_alle.append(f"{response.url[:100]} ({keys})")
             try:
                 gevonden = deep_find_products(data, response.url)
             except Exception:
@@ -201,6 +362,12 @@ def _render_diagnose(url: str) -> list[str]:
             regels += [f"    - {t}" for t in api_treffers]
         else:
             regels.append("- JSON-API's met producten: geen onderschept")
+        if api_alle:
+            regels.append("- alle JSON-antwoorden tijdens het laden:")
+            regels += [f"    - {t}" for t in api_alle]
+        else:
+            regels.append("- geen enkel JSON-antwoord tijdens het laden — de "
+                          "pagina haalt zijn data dus niet via een API op")
 
         regels.append("")
         regels.append(f"**Conclusie:** {_conclusie(info, na_render, api_treffers)}")
@@ -235,7 +402,13 @@ def diagnose_rapport(urls: list[str], render: bool = True) -> str:
     kop = ["# Paginadiagnose", "",
            "*Waarom levert een pagina niets op? Deze meting toont álle signalen waar de "
            "extractie op kan aanhaken, inclusief de signalen die we nog niet gebruiken.*", ""]
-    delen = [diagnose(u, render=render) for u in urls]
+    delen = []
+    for u in urls:
+        try:
+            delen.append(diagnose(u, render=render))
+        except Exception as e:  # één kapotte URL mag de rest niet meenemen
+            delen.append(f"## {u}\n\n- **diagnosefout:** {type(e).__name__}: "
+                         f"{str(e)[:200]}")
     return "\n".join(kop + delen)
 
 

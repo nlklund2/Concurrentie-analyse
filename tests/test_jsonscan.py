@@ -42,3 +42,58 @@ def test_deep_find_products_geneste_prijsvelden():
 def test_url_key_negeert_querystring():
     assert url_key("https://x.nl/p/abc?kleur=rood") == url_key("https://x.nl/p/abc")
     assert url_key("https://x.nl/p/abc/") == url_key("https://x.nl/p/abc")
+
+
+def test_products_from_js_state_datalayer():
+    """Wibra-hypothese: naam en prijs staan alleen in dataLayer.push(...) —
+    gewone JS, geen JSON-script. Moet toch gevonden worden."""
+    from scraper.jsonscan import products_from_html
+    html = """<html><head><script>
+      window.x = 1; dataLayer.push({"event":"productDetail","ecommerce":{
+        "detail":{"products":[{"name":"Dames hipster 2-pack","id":"W-77",
+                               "price":"3.99"}]}}});
+    </script></head><body><div id="app"></div></body></html>"""
+    prods = products_from_html(html, "https://www.wibra.nl/assortiment/x")
+    assert len(prods) == 1
+    assert prods[0].title == "Dames hipster 2-pack"
+    assert prods[0].price == 3.99
+
+
+def test_products_from_js_state_initial_state():
+    from scraper.jsonscan import products_from_html
+    html = """<script>window.__INITIAL_STATE__ = {"product":
+      {"name":"Herensok 5-pack","sku":"H1","price":4.49}};</script>"""
+    prods = products_from_html(html, "https://voorbeeld.nl/p/h1")
+    assert [p.title for p in prods] == ["Herensok 5-pack"]
+
+
+def test_js_state_slikt_geen_js_expressies():
+    """Blokken met echte JS (functies, variabelen) zijn geen JSON en moeten
+    stil afvallen, niet crashen of halve producten opleveren."""
+    from scraper.jsonscan import products_from_html
+    html = """<script>dataLayer.push({event: getEvent(), fn: function(){
+      return {name: 'nep', price: 1.00};}});</script>"""
+    assert products_from_html(html, "https://voorbeeld.nl") == []
+
+
+def test_products_from_escaped_attrs_hema_tegel():
+    """HEMA-meting 10-08: de tegel draagt zijn productdata als HTML-ge-escapete
+    JSON in een attribuut — &quot;price&quot;:&quot;8.69&quot;. Geen script,
+    geen dataLayer, geen tekstprijs."""
+    from scraper.jsonscan import products_from_html
+    html = ('<div class="product-tile" data-gtm="{&quot;name&quot;:'
+            '&quot;niet-voorgevormde top zonder beugel&quot;,'
+            '&quot;masterSKU&quot;:&quot;HEM2228294&quot;,'
+            '&quot;price&quot;:&quot;8.69&quot;,'
+            '&quot;stockStatus&quot;:&quot;IN_STOCK&quot;}">'
+            '<a href="/dames/lingerie/bh/top"></a></div>')
+    prods = products_from_html(html, "https://www.hema.nl/dames/lingerie")
+    assert len(prods) == 1
+    assert prods[0].title == "niet-voorgevormde top zonder beugel"
+    assert prods[0].price == 8.69
+
+
+def test_escaped_attrs_slikt_kapotte_json_stil():
+    from scraper.jsonscan import products_from_html
+    html = '<div data-x="{&quot;price&quot;:&quot;8.69&quot;">'   # niet afgesloten
+    assert products_from_html(html, "https://www.hema.nl") == []

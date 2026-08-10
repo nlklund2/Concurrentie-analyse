@@ -114,6 +114,17 @@ class Db:
                   headers={"Prefer": "return=minimal"})
 
     # -- lezen (rapport & drempelbewaking) -----------------------------
+    def last_ok_count(self, retailer_id: str) -> int:
+        """De artikelstand van de laatste goedgekeurde run — de eerlijke
+        vergelijkingsbasis voor de <50%-poort. active_count bleek vervuilbaar:
+        een herdraai binnen dezelfde week laat oude rijen actief staan, en
+        Action bleef daardoor elke week op '24 < 50% van 51' steken terwijl
+        24 al twee runs lang de echte, goedgekeurde stand was."""
+        rows = self._req("GET", "scrape_runs?select=products_found"
+                                f"&retailer_id=eq.{retailer_id}&status=eq.ok"
+                                "&order=run_at.desc&limit=1", timeout=30).json()
+        return int(rows[0]["products_found"]) if rows else 0
+
     def active_count(self, retailer_id: str) -> int:
         resp = self._req(
             "GET", "products", timeout=60,
