@@ -77,7 +77,9 @@ def _attr_from(d: dict, keys) -> str:
     for k in keys:
         if k in d and d[k] is not None:
             text = _text_from(d[k])
-            if text:
+            # HEMA vult een leeg maatveld met het wóórd 'empty'; dat is geen
+            # maat en zou de dekkingscijfers vals op 100% zetten.
+            if text and text.lower() not in ("empty", "null", "none", "n/a", "-"):
                 return text
     return ""
 

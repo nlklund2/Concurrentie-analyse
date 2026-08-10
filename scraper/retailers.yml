@@ -63,7 +63,12 @@ retailers:
     segment: kern
     url_filter: "/nl"
     color_slot: 2
-    strategy: render
+    # Meting 10-08: categoriepagina's hydrateren niet (ook niet in een echte
+    # browser) en /api/* is per robots.txt verboden. De productpagina's laden
+    # wél gewoon; met de nieuwe js-state/escaped-attrs-extractie is de
+    # sitemap-route de kansrijkste — de sitemap staat in robots.txt
+    # (/sitemap/index.xml → nl-nl/sitemap/products.xml).
+    strategy: sitemap_pages
     enrich: false
     max_categories: 30
     max_pages_per_category: 10
@@ -165,9 +170,12 @@ retailers:
     strategy: firecrawl
     enrich: false
     max_categories: 20
-    # Meting 10-08 (ronde 1): met 8 s extra rendertijd verschijnt het raster
-    # wél — 1,4 mln tekens met honderden producttegels. De prijzen staan er
-    # zonder €-teken (CSS-valuta), dus de kaartlezer draait de losse ronde.
+    # DOORBRAAK 10-08 (meetronde 5-6): met 8 s extra rendertijd verschijnt het
+    # raster, en elke tegel draagt zijn naam, masterSKU en prijs als
+    # HTML-ge-escapete JSON in een attribuut. De escaped-attrs-extractie leest
+    # dat; bewijsprobe: 181 artikelen uit 20 categorieën, 159 binnen focus,
+    # 100% prijs- en kleurdekking, ±24 credits. De promo-drempel van 60
+    # hieronder blijft als extra slot op de deur.
     firecrawl_wait_ms: 8000
     # De kanarie kijkt naar de JSON-route, niet naar de kaartoogst — die
     # levert bij een niet-renderend raster alleen promoblokken op. Vijf
