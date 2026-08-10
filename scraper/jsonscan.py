@@ -8,6 +8,7 @@ Dit is de generieke motor achter de listing- en sitemap-strategieën. Werkwijze:
 from __future__ import annotations
 
 import hashlib
+import html as html_mod
 import json
 import re
 from urllib.parse import urljoin, urlsplit
@@ -41,7 +42,10 @@ WAS_KEYS = ("listPrice", "oldPrice", "originalPrice", "strikePrice", "wasPrice",
             "advertisedPrice", "regularPrice", "strikethroughPrice", "previousPrice",
             "crossedPrice", "basePrice", "was")
 KEY_KEYS = ("sku", "productID", "productId", "product_id", "id", "objectID", "code",
-            "articleNumber", "articleId", "itemNo", "ean", "mpn", "key")
+            "articleNumber", "articleId", "itemNo", "ean", "mpn", "key",
+            # HEMA-tegels (meting 10-08) dragen alleen masterSKU/groupSKU;
+            # master eerst — dat is het artikel, group de kleurvariantgroep.
+            "masterSKU", "groupSKU")
 URL_KEYS = ("url", "productUrl", "link", "href", "slug", "seoUrl", "pdpUrl", "path")
 BRAND_KEYS = ("brand", "brandName", "vendor", "manufacturer")
 CATEGORY_KEYS = ("category", "categoryPath", "breadcrumb", "categories", "productType",
@@ -356,6 +360,23 @@ def products_from_js_state(html: str, base_url: str = "") -> list[Product]:
     return products
 
 
+# JSON die HTML-ge-escaped in een attribuut zit: ="{&quot;price&quot;:…}".
+# HEMA's producttegels (meting 10-08) dragen zo hun naam, SKU en prijs —
+# onzichtbaar voor tekst-, script- én dataLayer-lezers.
+_ESCAPED_ATTR_RE = re.compile(r'"(\[?\{&quot;[^"]{20,200000}[\}\]])"')
+
+
+def products_from_escaped_attrs(html: str, base_url: str = "") -> list[Product]:
+    products: list[Product] = []
+    for n, m in enumerate(_ESCAPED_ATTR_RE.finditer(html)):
+        if n >= 400:
+            break
+        data = _json_loads_lenient(html_mod.unescape(m.group(1)))
+        if data is not None:
+            products.extend(deep_find_products(data, base_url))
+    return products
+
+
 def products_from_html(html: str, base_url: str = "") -> list[Product]:
     """Alle beschikbare extractiemethoden op één pagina, ontdubbeld op sleutel."""
     products: list[Product] = []
@@ -367,6 +388,7 @@ def products_from_html(html: str, base_url: str = "") -> list[Product]:
             if data is not None:
                 products.extend(deep_find_products(data, base_url))
     products.extend(products_from_js_state(html, base_url))
+    products.extend(products_from_escaped_attrs(html, base_url))
 
     unique: dict[str, Product] = {}
     for p in products:

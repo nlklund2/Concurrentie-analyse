@@ -74,3 +74,26 @@ def test_js_state_slikt_geen_js_expressies():
     html = """<script>dataLayer.push({event: getEvent(), fn: function(){
       return {name: 'nep', price: 1.00};}});</script>"""
     assert products_from_html(html, "https://voorbeeld.nl") == []
+
+
+def test_products_from_escaped_attrs_hema_tegel():
+    """HEMA-meting 10-08: de tegel draagt zijn productdata als HTML-ge-escapete
+    JSON in een attribuut — &quot;price&quot;:&quot;8.69&quot;. Geen script,
+    geen dataLayer, geen tekstprijs."""
+    from scraper.jsonscan import products_from_html
+    html = ('<div class="product-tile" data-gtm="{&quot;name&quot;:'
+            '&quot;niet-voorgevormde top zonder beugel&quot;,'
+            '&quot;masterSKU&quot;:&quot;HEM2228294&quot;,'
+            '&quot;price&quot;:&quot;8.69&quot;,'
+            '&quot;stockStatus&quot;:&quot;IN_STOCK&quot;}">'
+            '<a href="/dames/lingerie/bh/top"></a></div>')
+    prods = products_from_html(html, "https://www.hema.nl/dames/lingerie")
+    assert len(prods) == 1
+    assert prods[0].title == "niet-voorgevormde top zonder beugel"
+    assert prods[0].price == 8.69
+
+
+def test_escaped_attrs_slikt_kapotte_json_stil():
+    from scraper.jsonscan import products_from_html
+    html = '<div data-x="{&quot;price&quot;:&quot;8.69&quot;">'   # niet afgesloten
+    assert products_from_html(html, "https://www.hema.nl") == []
