@@ -82,4 +82,5 @@ jobs:
           path: |
             probe-rapport.md
             diagnose-rapport.md
+            diagnose-dump-*.html
           if-no-files-found: ignore

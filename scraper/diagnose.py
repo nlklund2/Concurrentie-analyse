@@ -169,6 +169,14 @@ def _firecrawl_diagnose(url: str) -> str:
 
     from .strategies.render_listing import cards_from_html
 
+    # De ruwe snapshot bewaren als werkbestand: raden op signalen bleef bij
+    # HEMA twee rondes lang steken; met de echte bytes is de kaartstructuur
+    # in één keer te ontleden. De workflow neemt diagnose-dump-*.html mee
+    # als artifact.
+    host = re.sub(r"[^a-z0-9.-]", "-", urlsplit(url).netloc.lower())
+    with open(f"diagnose-dump-{host}.html", "w", encoding="utf-8") as f:
+        f.write(html[:2_000_000])
+
     prods = products_from_html(html, url)
     kaarten = cards_from_html(html, url)
     regels += [
@@ -202,6 +210,12 @@ def diagnose(url: str, render: bool = True) -> str:
     elif url.lower().endswith(".xml"):
         return "\n".join(regels + [f"- HTTP {resp.status_code}"]
                          + _sitemap_regels(resp.text))
+    elif url.lower().endswith(".txt"):
+        # robots.txt: verklapt de echte sitemap-locatie (Zeeman's
+        # /sitemap.xml gaf HTTP 200 met nul URL's — verkeerd pad).
+        kop = " | ".join(resp.text[:600].splitlines())
+        return "\n".join(regels + [f"- HTTP {resp.status_code}",
+                                   f"- inhoud: `{kop}`"])
     else:
         html = resp.text
         prods = products_from_html(html, url)
