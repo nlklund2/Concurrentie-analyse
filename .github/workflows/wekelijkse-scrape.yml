@@ -1,13 +1,19 @@
 # Wekelijkse concurrentiescrape — maandagochtend vroeg, zodat het rapport er
 # vóór het maandagochtend-overleg (09:00) ligt. Cron loopt in UTC en volgt
-# géén zomertijd: 04:00 UTC = 06:00 NL-zomertijd / 05:00 NL-wintertijd.
-# Wil je 06:00 het hele jaar rond, zet de expressie eind oktober op "0 5 * * 1"
+# géén zomertijd: 04:07 UTC = 06:07 NL-zomertijd / 05:07 NL-wintertijd.
+# Wil je 06:07 het hele jaar rond, zet de expressie eind oktober op "7 5 * * 1"
 # en eind maart weer terug.
+#
+# Waarom :07 en niet :00 — GitHub voert geplande runs 'best effort' uit en slaat
+# ze bij drukte over zónder melding. Het hele uur is veruit het drukste moment
+# (iedereen zet zijn cron op :00); GitHub raadt daarom zelf aan een paar minuten
+# ernaast te gaan zitten. Op 10-08-2026 werd de run van 04:00 UTC inderdaad
+# helemaal niet gestart en moest hij handmatig worden aangezwengeld.
 name: Wekelijkse scrape
 
 on:
   schedule:
-    - cron: "0 4 * * 1"
+    - cron: "7 4 * * 1"
   workflow_dispatch:
     inputs:
       retailers:

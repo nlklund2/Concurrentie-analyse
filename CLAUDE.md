@@ -3,8 +3,12 @@
 - Communiceer in het Nederlands.
 - **Tijden altijd in Nederlandse tijd (CET/CEST) weergeven**, nooit kaal UTC.
   Interne zaken (cron-expressies, GitHub-logs) blijven UTC; reken ze om in
-  elke boodschap aan de gebruiker. De weekcron `0 4 * * 1` = maandag
-  06:00 NL-zomertijd / 05:00 NL-wintertijd (GitHub-cron volgt geen zomertijd).
+  elke boodschap aan de gebruiker. De weekcron `7 4 * * 1` = maandag
+  06:07 NL-zomertijd / 05:07 NL-wintertijd (GitHub-cron volgt geen zomertijd).
+- GitHub voert geplande runs *best effort* uit: bij drukte worden ze vertraagd
+  of overgeslagen zónder melding. Zet cron-expressies daarom nooit op het hele
+  uur, en beloof een geplande run nooit als zekerheid — controleer achteraf of
+  hij echt gedraaid heeft.
 - Weekcijfers zijn heilig: nooit staging of weekverwerking draaien buiten de
   kwaliteitspoort om (zie `_beoordeel` in `scraper/__main__.py`).
 - Livevalidatie kan alleen op GitHub Actions ("Validatie bronnen"-workflow);
