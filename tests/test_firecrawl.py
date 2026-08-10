@@ -386,3 +386,39 @@ def test_credits_overleven_de_strategiewrapper(monkeypatch):
     res = strategies.run(_cfg())
     assert res.credits_used == 9          # de credits
     assert res.requests_done == 2         # de gewone teller, apart
+
+
+# HEMA-scenario ronde 1 (10-08): het raster draagt géén €-tekens (CSS-valuta),
+# maar een promoblok mét € staat er wel op de pagina. De losse prijsronde moet
+# dan alsnog draaien en het (grotere) raster laten winnen van de promo's.
+RASTER_ZONDER_EURO = "<html><body><div>Koffiedeal <span>€ 3,00</span>" + \
+    '<a href="/promo/koffie"><img alt="snelfilterkoffie"><span>€ 3,00</span></a></div>' + \
+    "".join(
+        f'<li class="tegel"><a href="/dames/lingerie/bh/model-{i}">'
+        f'<img alt="bh model {i}"></a><span>{10 + i},00</span></li>'
+        for i in range(20)) + "</body></html>"
+
+
+def test_kaartlezer_losse_ronde_wint_van_promokruimels():
+    """Vóór de fix won de €-ronde met 1 promokaart en bleef het raster
+    onzichtbaar. Nu wint de grootste oogst; koffie eruit filteren is
+    vervolgens de taak van het focusfilter, niet van de kaartlezer."""
+    from scraper.strategies.render_listing import cards_from_html
+    kaarten = cards_from_html(RASTER_ZONDER_EURO, "https://www.hema.nl/dames/lingerie")
+    raster = [p for p in kaarten if "bh model" in p.title]
+    assert len(raster) == 20
+    assert len(kaarten) <= 21            # hooguit de ene promokaart erbij
+
+
+def test_kanarie_laat_een_kaartraster_door(monkeypatch):
+    """De kanarie stopt bij promo-kruimels, maar een pagina die tientallen
+    tegels levert is een werkende bron — ook zonder ingebedde JSON."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=RASTER_ZONDER_EURO)])
+    cfg = _cfg(id="hema", name="HEMA", base="https://www.hema.nl",
+               firecrawl_canary=2,
+               seeds=[f"https://www.hema.nl/c/{i}/lingerie" for i in range(6)])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(calls) == 6               # niet gestopt: alle categorieën bezocht
+    assert len(res.products) >= 20
+    assert not any("kanarie" in n for n in res.notes)

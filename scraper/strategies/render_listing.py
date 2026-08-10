@@ -490,9 +490,14 @@ def cards_from_html(html: str, base_url: str) -> list[Product]:
     ankers = lees_ankers(html)
     host = urlsplit(base_url).netloc
     heeft_euro = "€" in html or "&euro;" in html
+    beste: list[Product] = []
     for prijs_los in (False, True):
-        if prijs_los and heeft_euro:
-            break   # losse getallen alleen als er nérgens een €-teken staat
+        # HEMA-meting 10-08: het raster draagt géén €-tekens, maar één
+        # promoblok mét € schakelde de losse ronde uit — waardoor 26 promo's
+        # wonnen van honderden rastertegels. De losse ronde mag daarom ook
+        # draaien als de €-ronde mager bleef; de grootste oogst wint.
+        if prijs_los and heeft_euro and len(beste) >= 8:
+            break
         producten: dict[str, Product] = {}
         for a in ankers:
             href = a["href"]
@@ -513,9 +518,9 @@ def cards_from_html(html: str, base_url: str) -> list[Product]:
                 producten[key] = Product(
                     key=key, title=titel, url=vol, price=min(prijzen),
                     was_price=max(prijzen) if max(prijzen) > min(prijzen) else None)
-        if producten:
-            return list(producten.values())
-    return []
+        if len(producten) > len(beste):
+            beste = list(producten.values())
+    return beste
 
 
 def _diagnose(page) -> str:

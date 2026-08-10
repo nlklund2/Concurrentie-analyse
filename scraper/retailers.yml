@@ -166,7 +166,10 @@ retailers:
     strategy: firecrawl
     enrich: false
     max_categories: 20
-    # Besluit 09-08 (eigenaar): bron blijft wekelijks meelopen als hertest.
+    # Meting 10-08 (ronde 1): met 8 s extra rendertijd verschijnt het raster
+    # wél — 1,4 mln tekens met honderden producttegels. De prijzen staan er
+    # zonder €-teken (CSS-valuta), dus de kaartlezer draait de losse ronde.
+    firecrawl_wait_ms: 8000
     # De kanarie kijkt naar de JSON-route, niet naar de kaartoogst — die
     # levert bij een niet-renderend raster alleen promoblokken op. Vijf
     # categorieën zonder ingebedde productdata en de run stopt (±6 i.p.v.

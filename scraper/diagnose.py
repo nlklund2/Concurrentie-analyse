@@ -28,6 +28,19 @@ from .jsonscan import deep_find_products, products_from_html
 # het een scriptnaam in de cookiedialoog was). Signaal, geen extractieregel.
 PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)")
 
+
+def _json_of_none(text: str):
+    """JSON parsen uit een Firecrawl-rawHtml-antwoord; endpoints geven soms
+    HTML-omlijsting mee, dus ook het eerste {...}/[...]-blok proberen."""
+    for kandidaat in (text, text[text.find("{"):], text[text.find("["):]):
+        if not kandidaat:
+            continue
+        try:
+            return json.loads(kandidaat)
+        except (ValueError, TypeError):
+            continue
+    return None
+
 PAGINA_JS = r"""
 () => {
   const tekst = document.body ? (document.body.innerText || '') : '';
@@ -110,7 +123,10 @@ def _firecrawl_diagnose(url: str) -> str:
     session.headers.update({"Authorization": f"Bearer {os.environ['FIRECRAWL_API_KEY']}",
                             "Content-Type": "application/json"})
     res = ScrapeResult(retailer_id="diagnose")
-    raw = url.lower().endswith(".xml")
+    laag = url.lower()
+    # JSON-endpoints (wp-json, .json) rauw ophalen: geen rendering, en de
+    # inhoud meteen op producten toetsen — de goedkoopste route die er is.
+    raw = laag.endswith(".xml") or "/wp-json/" in laag or ".json" in laag
     html = _firecrawl_html(session, url, res, raw=raw, wait_ms=0 if raw else 8000)
     for n in res.notes:
         regels.append(f"- {n}")
@@ -118,6 +134,21 @@ def _firecrawl_diagnose(url: str) -> str:
         regels.append(f"- **{res.error}**")
     if html is None:
         return "\n".join(regels + ["- geen HTML terug — zie de notities hierboven."])
+
+    if raw and not laag.endswith(".xml"):
+        regels.append(f"- {len(html)} tekens; begin: `{' '.join(html[:200].split())}`")
+        data = _json_of_none(html)
+        if data is None:
+            regels.append("- **geen geldige JSON** — endpoint bestaat niet of "
+                          "geeft een foutpagina")
+        else:
+            keys = list(data)[:8] if isinstance(data, dict) else f"lijst[{len(data)}]"
+            prods = deep_find_products(data, url)
+            regels.append(f"- geldige JSON, sleutels: {keys}")
+            regels.append(f"- **producten via deep_find: {len(prods)}**"
+                          + (f", bv. {prods[0].title[:40]!r} à {prods[0].price}"
+                             if prods else ""))
+        return "\n".join(regels)
 
     if raw:
         locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", html)
@@ -131,11 +162,16 @@ def _firecrawl_diagnose(url: str) -> str:
         regels.append("- voorbeelden: " + ", ".join(locs[:6]))
         return "\n".join(regels)
 
+    from .strategies.render_listing import cards_from_html
+
     prods = products_from_html(html, url)
+    kaarten = cards_from_html(html, url)
     regels += [
         f"- signalen: {_signalen(html)}",
         f"- producten via de gewone extractie: {len(prods)}"
         + (f", bv. {prods[0].title[:40]!r} à {prods[0].price}" if prods else ""),
+        f"- producten via de kaartlezer: {len(kaarten)}"
+        + (f", bv. {kaarten[0].title[:40]!r} à {kaarten[0].price}" if kaarten else ""),
     ]
     # productachtige links: de grondstof voor een vervolgdiagnose per artikel
     hrefs: list[str] = []
@@ -167,6 +203,12 @@ def diagnose(url: str, render: bool = True) -> str:
             f"{len(PRIJS_LOS_RE.findall(html))} prijsachtige getallen, "
             f"{len(prods)} producten via de gewone extractie",
         ]
+        # Waar stáán die prijsachtige getallen dan? Zeeman: 40 treffers in
+        # 686k tekens kale HTML terwijl de gerenderde pagina er 2 toont —
+        # de context beslist of het productdata in een JS-blob is of ruis.
+        for m in list(PRIJS_LOS_RE.finditer(html))[:3]:
+            ctx = html[max(0, m.start() - 60):m.end() + 40]
+            regels.append("- context: `…" + " ".join(ctx.split()) + "…`")
         if not render:
             return "\n".join(regels)
 
@@ -187,6 +229,7 @@ def _render_diagnose(url: str) -> list[str]:
 
     regels: list[str] = []
     api_treffers: list[str] = []
+    api_alle: list[str] = []
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--disable-blink-features=AutomationControlled"])
@@ -206,6 +249,12 @@ def _render_diagnose(url: str) -> list[str]:
                 data = response.json()
             except Exception:
                 return
+            # élk JSON-antwoord vastleggen — Zeeman bleek een raster te hebben
+            # dat nooit hydrateert, en dan is juist de vraag welke API's er
+            # wél of níet langskomen (en met welke sleutels).
+            if len(api_alle) < 8:
+                keys = list(data)[:5] if isinstance(data, dict) else f"lijst[{len(data)}]"
+                api_alle.append(f"{response.url[:100]} ({keys})")
             try:
                 gevonden = deep_find_products(data, response.url)
             except Exception:
@@ -263,6 +312,12 @@ def _render_diagnose(url: str) -> list[str]:
             regels += [f"    - {t}" for t in api_treffers]
         else:
             regels.append("- JSON-API's met producten: geen onderschept")
+        if api_alle:
+            regels.append("- alle JSON-antwoorden tijdens het laden:")
+            regels += [f"    - {t}" for t in api_alle]
+        else:
+            regels.append("- geen enkel JSON-antwoord tijdens het laden — de "
+                          "pagina haalt zijn data dus niet via een API op")
 
         regels.append("")
         regels.append(f"**Conclusie:** {_conclusie(info, na_render, api_treffers)}")

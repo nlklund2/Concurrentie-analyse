@@ -147,10 +147,12 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             seen.setdefault(p.key, p)
         if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
             break
-        # Kanarie: bij HEMA rendert het productraster niet, en dan leest het
-        # kaart-vangnet alleen de promoblokken eromheen (koffie, koekjes). Het
-        # eerlijke signaal is dus de JSON-route, niet de kaartoogst.
-        if cfg.firecrawl_canary and n >= cfg.firecrawl_canary and not uit_json:
+        # Kanarie: bij HEMA rendert het productraster niet altijd, en dan leest
+        # het kaart-vangnet alleen de promoblokken eromheen (koffie, koekjes) —
+        # een handvol per pagina. Een écht raster levert tientallen tegels; die
+        # oogst mag de kanarie dus niet afkappen, promo-kruimels wel.
+        if (cfg.firecrawl_canary and n >= cfg.firecrawl_canary
+                and not uit_json and len(seen) < 15):
             res.notes.append(
                 f"kanarie: {n} categorieën zonder ingebedde productdata — "
                 f"gestopt vóór de volle {len(cats)} (bespaart credits; "
