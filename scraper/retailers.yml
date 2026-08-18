@@ -34,7 +34,7 @@ defaults:
   # aangevuld, nieuwe artikelen eerst. Cap houdt de run kort (±2 min per bron).
   enrich: true
   enrich_limit: 150
-  focus_categories: "ondergoed|lingerie|onderkleding|underwear|nachtmode|nachtkleding|nachthemd|pyjama|homewear|lounge|\\bsok|kousen|panty|maillot|boxer|\\bbh\\b|beha|\\bslip|hemd|singlet|shapewear|ondermode"
+  focus_categories: "ondergoed|lingerie|onderkleding|underwear|nachtmode|nachtkleding|nachthemd|pyjama|onesie|homewear|lounge|\\bsok|kousen|panty|maillot|boxer|\\bbh\\b|beha|\\bslip|hemd|singlet|shapewear|ondermode"
   focus_product_types: [ondergoed, nachtmode, "sokken & panty's"]
 
 retailers:
@@ -61,20 +61,21 @@ retailers:
     name: Zeeman
     base: https://www.zeeman.com/nl
     segment: kern
-    url_filter: "/nl"
+    # DOORBRAAK 18-08 (meting op /nl-nl/product/-pagina's): het eigen artikel
+    # staat gewoon als JSON-LD in de kále HTML — geen browser nodig. De eerdere
+    # slotprobe faalde door twee configfouten, niet door de site: url_filter
+    # "/nl" matchte ook de Belgische sitemap (nl-be, dubbele/afwijkende
+    # pagina's), en de steekproef liep daardoor half door het verkeerde land.
+    # De echte bron: robots.txt → /sitemap/index.xml → nl-nl/sitemap/
+    # products.xml met 24.894 /product/-URLs (naam, kleur en artikelnummer in
+    # de slug). Cap 400 = gespreide vaste steekproef binnen de focus, ±5 min
+    # per week, ruim boven de weekdrempel; week-op-week vergelijkbaar door de
+    # deterministische spreiding.
+    url_filter: "/nl-nl/product/"
     color_slot: 2
-    # EINDOORDEEL 10-08 (slotprobe): langs alle wegen gemeten en uitgeput.
-    # Categoriepagina's hydrateren niet (ook niet in een echte browser met
-    # consent en scrollen), /api/* is per robots.txt verboden en dat
-    # respecteren we, en de productpagina's uit de sitemap (9.672 binnen
-    # focus) dragen geen eigen productdata: 19 van 25 proefpagina's gaven
-    # hetzelfde gedeelde aanraderblok terug, ook aan de nieuwe js-state- en
-    # escaped-attrs-extractie. Bron blijft rood met de poort dicht; de
-    # weekfolder is het alternatief voor prijspeiling.
-    strategy: render
+    strategy: sitemap_pages
+    sitemap_page_cap: 400
     enrich: false
-    max_categories: 30
-    max_pages_per_category: 10
     notes: >-
       Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
       OMGEZET 09-08 naar de render-strategie. Zeeman is een client-side app:
