@@ -61,16 +61,17 @@ retailers:
     name: Zeeman
     base: https://www.zeeman.com/nl
     segment: kern
-    # DOORBRAAK 18-08 (meting op /nl-nl/product/-pagina's): het eigen artikel
-    # staat gewoon als JSON-LD in de kále HTML — geen browser nodig. De eerdere
-    # slotprobe faalde door twee configfouten, niet door de site: url_filter
-    # "/nl" matchte ook de Belgische sitemap (nl-be, dubbele/afwijkende
-    # pagina's), en de steekproef liep daardoor half door het verkeerde land.
-    # De echte bron: robots.txt → /sitemap/index.xml → nl-nl/sitemap/
-    # products.xml met 24.894 /product/-URLs (naam, kleur en artikelnummer in
-    # de slug). Cap 400 = gespreide vaste steekproef binnen de focus, ±5 min
-    # per week, ruim boven de weekdrempel; week-op-week vergelijkbaar door de
-    # deterministische spreiding.
+    # EINDOORDEEL 18-08 (na hermeting op de júiste sitemap): Zeeman serveert
+    # ons op elke laag uitgeklede pagina's. De canonieke /nl-nl/product/-
+    # pagina's (24.833 stuks, via robots.txt → /sitemap/index.xml) dragen in
+    # de kale HTML alleen een klein gedeeld productsetje — 34 van 40
+    # proefpagina's vielen op dezelfde 5 sleutels samen — en ook gerenderd
+    # toont de pagina de eigen prijs niet (0 euro-tekens). /api/* is per
+    # robots.txt verboden. Bron blijft rood met de poort dicht; folder en
+    # winkelbezoek blijven het kanaal. Deze config is wél de juiste basis
+    # (nl-nl in plaats van ook nl-be, echte artikelen in plaats van
+    # badge-widgets) en draait als gratis wekelijkse hertest: zet Zeeman
+    # ooit echte servering aan, dan pakt de route het vanzelf op.
     url_filter: "/nl-nl/product/"
     color_slot: 2
     strategy: sitemap_pages
