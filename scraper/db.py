@@ -78,6 +78,23 @@ class Db:
                   params={"on_conflict": "id"},
                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
 
+    # Kolommen die pas na een migratie bestaan. Draait de weekrun vóór de
+    # migratie, dan mag dat geen hele week kosten: de kolom wordt dan
+    # weggelaten en de run gaat door (alleen de nieuwe cijfers blijven leeg).
+    NA_MIGRATIE = ("pack_size",)
+
+    def _zonder_nieuwe_kolommen(self, rows: list[dict], melding: str) -> list[dict] | None:
+        """Rijen zonder de nog niet gemigreerde kolommen, of None als dat niet speelt."""
+        if not rows:
+            return None
+        ontbreekt = [k for k in self.NA_MIGRATIE
+                     if k in rows[0] and (f"'{k}'" in melding or f'"{k}"' in melding)]
+        if not ontbreekt:
+            return None
+        print(f"  ! staging mist kolom(men) {', '.join(ontbreekt)} — "
+              "draai sql/migratie_prijs_per_stuk.sql; deze week zonder die velden")
+        return [{k: v for k, v in r.items() if k not in ontbreekt} for r in rows]
+
     def replace_staging(self, retailer_id: str, rows: list[dict]) -> None:
         """Leegmaken en vullen als één geheel.
 
@@ -85,7 +102,8 @@ class Db:
         anders dubbele sleutels in staging achterlaten, en daar loopt de
         upsert in process_staging op vast.
         """
-        for poging in range(self.POGINGEN):
+        poging = 0
+        while True:
             try:
                 self._req("DELETE", "staging_products", pogingen=1, timeout=60,
                           params={"retailer_id": f"eq.{retailer_id}"})
@@ -94,10 +112,18 @@ class Db:
                               json=rows[i:i + 500], timeout=120,
                               headers={"Prefer": "return=minimal"})
                 return
-            except DbError:
-                if poging == self.POGINGEN - 1:
+            except DbError as e:
+                # Ontbrekende migratiekolom: opnieuw zónder die velden, en dat
+                # kost geen herkansing — het is geen hapering maar een schema
+                # dat nog moet worden bijgewerkt.
+                uitgekleed = self._zonder_nieuwe_kolommen(rows, str(e))
+                if uitgekleed is not None:
+                    rows = uitgekleed
+                    continue
+                poging += 1
+                if poging >= self.POGINGEN:
                     raise
-                time.sleep(self.WACHT[min(poging, len(self.WACHT) - 1)])
+                time.sleep(self.WACHT[min(poging - 1, len(self.WACHT) - 1)])
 
     def process_week(self, retailer_id: str, week: date) -> dict:
         # process_staging is idempotent per (bron, week) — herkansen is veilig

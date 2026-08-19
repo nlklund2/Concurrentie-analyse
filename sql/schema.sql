@@ -25,6 +25,7 @@ create table if not exists products (
   product_type      text not null default 'overig',
   color             text,              -- kleur(en), best effort per bron
   sizes             text,              -- aangeboden maten, bv. "92, 104, 116" (geen voorraad!)
+  pack_size         int  not null default 1,  -- stuks in de verpakking (3-pack = 3), uit de titel
   first_seen        date not null,     -- maandag van de week van eerste waarneming
   last_seen         date not null,
   status            text not null default 'active' check (status in ('active','gone')),
@@ -70,6 +71,10 @@ create table if not exists weekly_stats (
   price_avg        numeric(10,2),
   sale_share       numeric(6,4),       -- aandeel artikelen met doorstreepte prijs (0..1)
   avg_discount_pct numeric(6,1),       -- gem. kortingsdiepte in % (alleen sale-artikelen)
+  -- Prijs per stuk: multipacks eerlijk vergelijkbaar maken (PLAN.md §11.1).
+  unit_price_median numeric(10,2),     -- mediaan van prijs ÷ stuks in de verpakking
+  unit_price_p25    numeric(10,2),     -- instapniveau per stuk
+  multipack_share   numeric(6,4),      -- aandeel artikelen met pack_size > 1 (0..1)
   primary key (retailer_id, week, audience, product_type)
 );
 create index if not exists idx_weekly_stats_week on weekly_stats (week);
@@ -88,6 +93,7 @@ create table if not exists weekly_articles (
   category_raw text,                   -- categoriepad zoals de bron het noemt
   color        text,
   sizes        text,
+  pack_size    int default 1,          -- stuks in de verpakking (3-pack = 3)
   price        numeric(10,2),          -- voor-prijs
   was_price    numeric(10,2),          -- van-prijs (leeg = geen aanbieding)
   url          text,
@@ -120,6 +126,7 @@ create table if not exists staging_products (
   product_type text not null default 'overig',
   color        text,
   sizes        text,
+  pack_size    int not null default 1,
   price        numeric(10,2),
   was_price    numeric(10,2)
 );
@@ -205,11 +212,11 @@ begin
 
   -- Actuele stand bijwerken.
   insert into products (retailer_id, product_key, url, title, brand, category_raw,
-                        audience, product_type, color, sizes, first_seen, last_seen,
-                        status, current_price, current_was_price)
+                        audience, product_type, color, sizes, pack_size, first_seen,
+                        last_seen, status, current_price, current_was_price)
   select s.retailer_id, s.product_key, s.url, s.title, s.brand, s.category_raw,
-         s.audience, s.product_type, s.color, s.sizes, p_week, p_week, 'active',
-         s.price, s.was_price
+         s.audience, s.product_type, s.color, s.sizes, coalesce(s.pack_size, 1),
+         p_week, p_week, 'active', s.price, s.was_price
   from _snap s
   on conflict (retailer_id, product_key) do update set
     url = excluded.url,
@@ -222,15 +229,17 @@ begin
     status = 'active',
     color = excluded.color,
     sizes = excluded.sizes,
+    pack_size = excluded.pack_size,
     current_price = excluded.current_price,
     current_was_price = excluded.current_was_price;
 
   -- Wekelijkse artikelfoto (artnr t/m URL) — idempotent per (bron, week).
   delete from weekly_articles where retailer_id = p_retailer and week = p_week;
   insert into weekly_articles (retailer_id, week, product_key, title, audience,
-    product_type, category_raw, color, sizes, price, was_price, url)
+    product_type, category_raw, color, sizes, pack_size, price, was_price, url)
   select s.retailer_id, p_week, s.product_key, s.title, s.audience,
-         s.product_type, s.category_raw, s.color, s.sizes, s.price, s.was_price, s.url
+         s.product_type, s.category_raw, s.color, s.sizes, coalesce(s.pack_size, 1),
+         s.price, s.was_price, s.url
   from _snap s;
 
   -- Verdwenen: actief maar niet in deze snapshot. Op de snapshot toetsen, niet
@@ -254,9 +263,11 @@ begin
   insert into weekly_stats (retailer_id, week, audience, product_type,
     active_count, new_count, gone_count,
     price_min, price_p25, price_median, price_p75, price_p90, price_avg,
-    sale_share, avg_discount_pct)
+    sale_share, avg_discount_pct,
+    unit_price_median, unit_price_p25, multipack_share)
   with snap as (
-    select audience, product_type, current_price as price, current_was_price as was_price, first_seen
+    select audience, product_type, current_price as price, current_was_price as was_price,
+           greatest(coalesce(pack_size, 1), 1) as pack_size, first_seen
     from products
     where retailer_id = p_retailer and status = 'active'
   ), snap_g as (
@@ -272,7 +283,13 @@ begin
       round(avg(case when was_price is not null and price is not null and was_price > price
                      then 1 else 0 end)::numeric, 4) as sale_share,
       round(avg(case when was_price is not null and price is not null and was_price > price
-                     then (was_price - price) / was_price * 100 end)::numeric, 1) as avg_discount_pct
+                     then (was_price - price) / was_price * 100 end)::numeric, 1) as avg_discount_pct,
+      -- Prijs per stuk: multipacks eerlijk naast losse artikelen (PLAN.md §11.1).
+      round(percentile_cont(0.50) within group (order by price / pack_size)::numeric, 2)
+        as unit_price_median,
+      round(percentile_cont(0.25) within group (order by price / pack_size)::numeric, 2)
+        as unit_price_p25,
+      round(avg(case when pack_size > 1 then 1 else 0 end)::numeric, 4) as multipack_share
     from snap
     group by 1, 2
   ), gone_g as (
@@ -289,7 +306,8 @@ begin
          coalesce(sg.new_count, 0),
          coalesce(gg.gone_count, 0),
          sg.price_min, sg.price_p25, sg.price_median, sg.price_p75, sg.price_p90,
-         sg.price_avg, sg.sale_share, sg.avg_discount_pct
+         sg.price_avg, sg.sale_share, sg.avg_discount_pct,
+         sg.unit_price_median, sg.unit_price_p25, sg.multipack_share
   from snap_g sg
   full join gone_g gg using (audience, product_type);
 
@@ -331,8 +349,10 @@ create or replace view v_artikelen_week with (security_invoker = true) as
          a.category_raw as bron_categorie,
          a.color        as kleur,
          a.sizes        as maten,
+         a.pack_size    as stuks_per_verpakking,
          a.was_price    as van_prijs,
          a.price        as voor_prijs,
+         round(a.price / greatest(coalesce(a.pack_size, 1), 1), 2) as prijs_per_stuk,
          a.url
   from weekly_articles a;
 
