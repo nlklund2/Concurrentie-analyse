@@ -31,6 +31,7 @@ Alles per **concurrent × productgroep × week**. Bewust een kleine, scherpe set
 | **Omvang** | Aantal actieve artikelen online | Waar zet de concurrent zijn geld op in? |
 | **Instroom** | Nieuwe artikelen deze week | Seizoenstiming, trendadoptie, nieuwheid |
 | **Uitstroom** | Verdwenen artikelen deze week | Sanering, uitverkoop-einde, doorloopsnelheid |
+| **Vernieuwingstempo** | Instroom en uitstroom als % van de eigen omvang | Scheidt de snelheidsspelers van de voorraadzitters; vergelijkbaar tussen grote en kleine bronnen |
 
 ### Prijsvorming
 | KPI | Definitie | Waarom het telt |
@@ -40,6 +41,7 @@ Alles per **concurrent × productgroep × week**. Bewust een kleine, scherpe set
 | **Prijspuntenverdeling** | Histogram op €-prijspunten | Waardesegment draait op prijspunten (€3,99/€4,99/€7,99). Verschuiving = stille inflatie of agressie |
 | **Sale-druk** | % artikelen met doorstreepte prijs + gem. kortingsdiepte | Marge-indicator: hoge sale-druk = voorraadprobleem bij de concurrent = kans voor ons |
 | **Prijsindex vs. terStal** | Mediaan concurrent ÷ mediaan terStal × 100 | Objectivering van "zijn wij te duur/te goedkoop?" per groep |
+| **Prijs per stuk** | Prijs ÷ aantal in de verpakking (mediaan en p25) | Het waardesegment vecht met multipacks; zonder omrekening staat "3 stuks €12,99" naast een losse boxer |
 
 Cruciaal detail: **terStal.nl wordt zélf ook wekelijks gescraped**, met exact dezelfde methode. Zonder eigen cijfers in hetzelfde formaat is elke vergelijking handwerk; mét eigen cijfers rekent de prijsindex zichzelf uit.
 
@@ -242,23 +244,23 @@ Moeite-inschatting: **S** = uren, **M** = een dag(deel), **L** = meerdere dagen 
 externe afhankelijkheid. "Data er al?" = of het uit bestaande tabellen komt zonder één
 extra opvraging bij een bron.
 
-| # | Kans | Moeite | Data er al? |
-|---|---|---|---|
-| 11.1 | Prijs per stuk (multipack-normalisatie) | S | ja |
-| 11.2 | Doorloopsnelheid als KPI | S | ja |
-| 11.3 | Afprijs-ritme (tijd tot eerste afprijzing) | M | ja |
-| 11.4 | Kleur- en matenanalyse | M | ja |
-| 11.5 | Witte-vlekken-matrix (prijspunt × doelgroep) | M | ja |
-| 11.6 | Categoriepad-diff als strategiesignaal | S | ja |
-| 11.7 | Rangpositie op de categoriepagina | M | nee (scraper) |
-| 11.8 | KVI-dagmonitor | M | nee (nieuwe run) |
-| 11.9 | Historie terughalen via het Internet Archive | L | nee (eenmalig) |
-| 11.10 | Winkelnetwerk-monitor | M | nee (nieuwe bron) |
-| 11.11 | Nieuwsbrieven en folders binnenhalen | S–M | nee (eigenaarsactie) |
-| 11.12 | Affiliate-productfeeds als legitieme route | L | nee (eigenaarsactie) |
-| 11.13 | Zeeman: geen machineleesbare route (stand van zaken) | – | n.v.t. |
-| 11.14 | Koppelen aan eigen verkoop- en margedata | L | nee (eigenaarsactie) |
-| §11E | Actieteller vastleggen in de repo | S | n.v.t. |
+| # | Kans | Moeite | Data er al? | Status |
+|---|---|---|---|---|
+| 11.1 | Prijs per stuk (multipack-normalisatie) | S | ja | ✅ gebouwd |
+| 11.2 | Doorloopsnelheid als KPI | S | ja | ✅ gebouwd |
+| 11.3 | Afprijs-ritme (tijd tot eerste afprijzing) | M | ja | – |
+| 11.4 | Kleur- en matenanalyse | M | ja | – |
+| 11.5 | Witte-vlekken-matrix (prijspunt × doelgroep) | M | ja | – |
+| 11.6 | Categoriepad-diff als strategiesignaal | S | ja | – |
+| 11.7 | Rangpositie op de categoriepagina | M | nee (scraper) | – |
+| 11.8 | KVI-dagmonitor | M | nee (nieuwe run) | – |
+| 11.9 | Historie terughalen via het Internet Archive | L | nee (eenmalig) | – |
+| 11.10 | Winkelnetwerk-monitor | M | nee (nieuwe bron) | – |
+| 11.11 | Nieuwsbrieven en folders binnenhalen | S–M | nee (eigenaarsactie) | – |
+| 11.12 | Affiliate-productfeeds als legitieme route | L | nee (eigenaarsactie) | – |
+| 11.13 | Zeeman: geen machineleesbare route (stand van zaken) | – | n.v.t. | – |
+| 11.14 | Koppelen aan eigen verkoop- en margedata | L | nee (eigenaarsactie) | – |
+| §11E | Actieteller vastleggen in de repo | S | n.v.t. | – |
 
 ### A. Uit data die er al ligt (nul extra scrapes)
 
@@ -268,7 +270,11 @@ boxer; dat is appels met peren. De pack-grootte staat al in de artikeltitel (`5 
 `3 stuks`, `2-pack`) en is met een regexregel in `normalize.py` af te leiden. Daarmee komt
 er een tweede prijsindex op **prijs per stuk** — en pas dán zijn Action, KiK en Wibra
 eerlijk te vergelijken met terStal. Kleine ingreep, groot effect op de geloofwaardigheid
-van §2. Kanttekening: de titel liegt soms (een "3-pack" van 2 stuks bestaat); toon daarom
+van §2. **Gebouwd:** `pack_size()` in `scraper/normalize.py` leest de pack-grootte uit
+de artikelnaam, de weekverwerking rekent mediaan en instapniveau per stuk uit
+(`unit_price_median`, `unit_price_p25`, `multipack_share` in `weekly_stats`), het
+weekrapport toont §5b naast de gewone index en het dashboard heeft een schakelaar
+*per stuk*. Eenmalig te draaien: `sql/migratie_prijs_per_stuk.sql`. Kanttekening: de titel liegt soms (een "3-pack" van 2 stuks bestaat); toon daarom
 het afgeleide aantal in de artikel-explorer, zodat een fout zichtbaar is en niet stilletjes
 in de index verdwijnt.
 
@@ -276,7 +282,9 @@ in de index verdwijnt.
 per week in `weekly_stats`, maar worden alleen absoluut getoond. Als percentage van de
 omvang ontstaat "vernieuwingstempo": in week 34 ververste C&A 99 in / 150 uit op 589
 artikelen (≈17%) en KiK 35/64 op 597 (≈6%). Dat scheidt de snelheidsspelers van de
-voorraadzitters — precies waar de inkoopkalender op stuurt.
+voorraadzitters — precies waar de inkoopkalender op stuurt. **Gebouwd:** §7 van het
+weekrapport en een regel per bron in de dashboardtegels; de eerste meetweek van een
+bron telt bewust niet mee (dan is alles nieuw).
 
 **11.3 Afprijs-ritme.** `price_events` bevat per artikel de hele keten nieuw → prijs af →
 weg. Daaruit rolt per concurrent: hoeveel weken staat een artikel vol prijs voordat het

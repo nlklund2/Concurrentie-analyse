@@ -80,3 +80,25 @@ def test_staging_herkanst_vanaf_de_delete(db, monkeypatch):
     monkeypatch.setattr(db.session, "request", roep)
     db.replace_staging("c-and-a", [{"product_key": "x"}])
     assert [m for m, _ in roep.pogingen] == ["DELETE", "POST", "DELETE", "POST"]
+
+
+def test_staging_gaat_door_als_de_migratiekolom_nog_ontbreekt(db, monkeypatch):
+    """pack_size bestaat pas na sql/migratie_prijs_per_stuk.sql. Draait de
+    weekrun daarvóór, dan mag dat geen week kosten: kolom weglaten en door."""
+    mist = _Resp(400)
+    mist.text = ("{\"code\":\"PGRST204\",\"message\":\"Could not find the "
+                 "'pack_size' column of 'staging_products' in the schema cache\"}")
+    verstuurd = []
+
+    def roep(method, url, **kw):
+        verstuurd.append((method, kw.get("json")))
+        if method == "POST" and any("pack_size" in r for r in (kw.get("json") or [])):
+            return mist
+        return _Resp(200)
+
+    monkeypatch.setattr(db.session, "request", roep)
+    db.replace_staging("hema", [{"product_key": "x", "pack_size": 3, "price": 12.99}])
+
+    assert [m for m, _ in verstuurd] == ["DELETE", "POST", "DELETE", "POST"]
+    laatste = verstuurd[-1][1]
+    assert laatste == [{"product_key": "x", "price": 12.99}]   # zonder pack_size

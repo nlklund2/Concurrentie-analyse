@@ -137,9 +137,12 @@
   </div>
 
   <div class="card">
-    <div class="tools"><button data-tbl="mediaan">Tabel</button></div>
+    <div class="tools">
+      <label class="hint" style="cursor:pointer"><input type="checkbox" id="perStuk"> per stuk</label>
+      <button data-tbl="mediaan">Tabel</button>
+    </div>
     <h2>Mediaanprijs per week</h2>
-    <p class="sub">Mediaan van de gekozen productgroep — kies een doelgroep én producttype; prijzen over gemengde groepen middelen is misleidend.</p>
+    <p class="sub" id="mediaanSub">Mediaan van de gekozen productgroep — kies een doelgroep én producttype; prijzen over gemengde groepen middelen is misleidend.</p>
     <div class="plot" id="mediaanPlot"><canvas id="mediaanChart"></canvas></div>
     <div class="hint hidden" id="mediaanHint">Kies eerst een doelgroep én een producttype in de filterbalk.</div>
     <div id="mediaanTbl" class="plot-wrap hidden"></div>
@@ -296,6 +299,7 @@ function buildFilters() {
     `<option value="${w}">${isoWeekLabel(w)} · ${w}</option>`).join("");
   weekSel.onchange = () => { state.week = weekSel.value; render(); };
   document.getElementById("rangeSel").onchange = e => { state.range = +e.target.value; render(); };
+  document.getElementById("perStuk").onchange = render;
 
   const auds = [...new Set(state.stats.map(s => s.audience))].sort();
   const types = [...new Set(state.stats.map(s => s.product_type))].sort();
@@ -413,7 +417,8 @@ function renderTiles() {
       <div class="naam"><span class="dot" style="width:9px;height:9px;border-radius:50%;background:${slotColor(rid)}"></span>${naam(rid)}</div>
       <div class="val">${c ? c.active_count.toLocaleString("nl-NL") : "–"}</div>
       <div class="d">${d}</div>
-      <div class="d">sale-druk ${c ? pctf(c.sale_share) : "–"}</div></div>`;
+      <div class="d">sale-druk ${c ? pctf(c.sale_share) : "–"}</div>
+      <div class="d">${tempo(c, p)}</div></div>`;
   }).join("") || `<div class="hint">Selecteer bronnen in de filterbalk.</div>`;
 }
 
@@ -428,13 +433,34 @@ function renderOmvang() {
     tableFrom(labels, ds, v => (+v).toLocaleString("nl-NL"));
 }
 
+// Instroom/uitstroom als aandeel van het eigen assortiment (PLAN.md §11.2):
+// wie hoog zit speelt op snelheid, wie laag zit zit op voorraad. Zonder vorige
+// week (eerste meting, of tegengehouden door de kwaliteitspoort) is alles
+// "nieuw" — dat is geen tempo maar een startstand, dus dan geen percentage.
+function tempo(c, p) {
+  if (!c || !c.active_count) return "vernieuwing –";
+  if (!p) return "vernieuwing: geen vergelijkweek";
+  const aandeel = n => `${Math.round((n || 0) / c.active_count * 100)}%`;
+  return `instroom ${aandeel(c.new_count)} · uitstroom ${aandeel(c.gone_count)}`;
+}
+
 function renderMediaan() {
   const ok = !!state.type && !!state.aud;
+  const perStuk = document.getElementById("perStuk").checked;
   document.getElementById("mediaanPlot").classList.toggle("hidden", !ok);
   document.getElementById("mediaanHint").classList.toggle("hidden", ok);
+  document.getElementById("mediaanSub").textContent = perStuk
+    ? "Mediaan van de prijs per stuk — multipacks (3-pack, 5 paar) omgerekend naar één stuk, "
+      + "zodat bronnen met veel packs eerlijk naast de rest staan."
+    : "Mediaan van de gekozen productgroep — kies een doelgroep én producttype; "
+      + "prijzen over gemengde groepen middelen is misleidend.";
   if (!ok) { document.getElementById("mediaanTbl").innerHTML = ""; return; }
   const labels = weeksInRange().map(isoWeekLabel);
-  const ds = seriesFromStats("price_median");
+  const ds = seriesFromStats(perStuk ? "unit_price_median" : "price_median");
+  if (perStuk && !ds.some(d => d.data.some(v => v != null))) {
+    document.getElementById("mediaanSub").textContent +=
+      " — nog geen per-stuk-cijfers in deze periode (draai sql/migratie_prijs_per_stuk.sql).";
+  }
   drawChart("mediaanChart", "line", labels, ds, eur);
   document.getElementById("mediaanTbl").innerHTML = tableFrom(labels, ds, eur);
 }
@@ -488,9 +514,9 @@ async function renderExplorer() {
   const telling = document.getElementById("explTelling");
   const q = document.getElementById("explZoek").value.trim();
   if (!state.selected.length) { box.innerHTML = `<div class="hint">Selecteer bronnen in de filterbalk.</div>`; return; }
-  let b = sb.from("weekly_articles")
-    .select("retailer_id,product_key,title,audience,product_type,color,sizes,price,was_price,url",
-            { count: "exact" })
+  // '*' in plaats van een vaste kolomlijst: zo blijft de explorer werken op een
+  // database waar de migratiekolom pack_size nog niet bestaat.
+  let b = sb.from("weekly_articles").select("*", { count: "exact" })
     .eq("week", state.week).in("retailer_id", state.selected);
   if (state.aud)  b = b.eq("audience", state.aud);
   if (state.type) b = b.eq("product_type", state.type);
@@ -505,7 +531,8 @@ async function renderExplorer() {
   telling.textContent = `${count.toLocaleString("nl-NL")} artikelen` +
     (count > 300 ? " — eerste 300 getoond; verfijn met zoeken of filters" : "");
   box.innerHTML = `<table><tr><th>Bron</th><th>Artikel</th><th>Groep</th><th>Kleur</th>
-    <th>Maten</th><th class="num">Van</th><th class="num">Voor</th></tr>` +
+    <th>Maten</th><th class="num">Van</th><th class="num">Voor</th>
+    <th class="num">Per stuk</th></tr>` +
     data.map(a => {
       const url = veiligeUrl(a.url);
       const titel = url
@@ -517,7 +544,9 @@ async function renderExplorer() {
         <td>${esc(a.audience)} / ${esc(a.product_type)}</td>
         <td>${esc(a.color)}</td><td>${esc(a.sizes)}</td>
         <td class="num">${a.was_price ? eur(a.was_price) : "–"}</td>
-        <td class="num">${a.price != null ? eur(a.price) : "–"}</td></tr>`;
+        <td class="num">${a.price != null ? eur(a.price) : "–"}</td>
+        <td class="num">${a.pack_size > 1 && a.price != null
+          ? `${eur(a.price / a.pack_size)} <span class="hint">×${a.pack_size}</span>` : "–"}</td></tr>`;
     }).join("") + `</table>`;
 }
 
