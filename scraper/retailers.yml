@@ -72,6 +72,10 @@ retailers:
     # (nl-nl in plaats van ook nl-be, echte artikelen in plaats van
     # badge-widgets) en draait als gratis wekelijkse hertest: zet Zeeman
     # ooit echte servering aan, dan pakt de route het vanzelf op.
+    # Meting 19-08: ook ?page=-paginering getoetst (dames/ondergoed?page=2,
+    # heren/ondergoed?page=1) — zelfde uitgeklede serving, 0 producten in
+    # kale én gerenderde HTML, geen product-API's onderweg. Bewijsdossier:
+    # docs/validaties/.
     url_filter: "/nl-nl/product/"
     color_slot: 2
     strategy: sitemap_pages
