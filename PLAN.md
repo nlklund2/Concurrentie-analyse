@@ -31,6 +31,7 @@ Alles per **concurrent × productgroep × week**. Bewust een kleine, scherpe set
 | **Omvang** | Aantal actieve artikelen online | Waar zet de concurrent zijn geld op in? |
 | **Instroom** | Nieuwe artikelen deze week | Seizoenstiming, trendadoptie, nieuwheid |
 | **Uitstroom** | Verdwenen artikelen deze week | Sanering, uitverkoop-einde, doorloopsnelheid |
+| **Vernieuwingstempo** | Instroom en uitstroom als % van de eigen omvang | Scheidt de snelheidsspelers van de voorraadzitters; vergelijkbaar tussen grote en kleine bronnen |
 
 ### Prijsvorming
 | KPI | Definitie | Waarom het telt |
@@ -40,6 +41,7 @@ Alles per **concurrent × productgroep × week**. Bewust een kleine, scherpe set
 | **Prijspuntenverdeling** | Histogram op €-prijspunten | Waardesegment draait op prijspunten (€3,99/€4,99/€7,99). Verschuiving = stille inflatie of agressie |
 | **Sale-druk** | % artikelen met doorstreepte prijs + gem. kortingsdiepte | Marge-indicator: hoge sale-druk = voorraadprobleem bij de concurrent = kans voor ons |
 | **Prijsindex vs. terStal** | Mediaan concurrent ÷ mediaan terStal × 100 | Objectivering van "zijn wij te duur/te goedkoop?" per groep |
+| **Prijs per stuk** | Prijs ÷ aantal in de verpakking (mediaan en p25) | Het waardesegment vecht met multipacks; zonder omrekening staat "3 stuks €12,99" naast een losse boxer |
 
 Cruciaal detail: **terStal.nl wordt zélf ook wekelijks gescraped**, met exact dezelfde methode. Zonder eigen cijfers in hetzelfde formaat is elke vergelijking handwerk; mét eigen cijfers rekent de prijsindex zichzelf uit.
 
@@ -228,6 +230,168 @@ belangrijkste openstaande technische taak; begin bij de consent-/regiostap.
 | **1. Ritueel** | Week 2–5 | Wekelijkse run + maandagoverleg; mapping aanscherpen; drempels afstellen |
 | **2. Verdieping** | Week 6–12 | KVI-koppeltabel (§6.3), fase-2-bronnen aanzetten waar gevalideerd, trendwoorden op instroom |
 | **3. Volwassen** | Kwartaal 2+ | Jaar-op-jaar-seizoensklok, folder-archief, evt. maatdiepte op vechtartikelen |
+
+De kandidaten voor fase 2 en 3 staan uitgewerkt in §11, met moeite-inschatting per punt.
+
+## 11. Kansenlijst — wat er nog meer in zit (stand 19-08-2026)
+
+Deze lijst staat bewust ná de roadmap: het zijn kandidaten, geen beloftes. De regel uit
+§3 blijft leidend — **uitbreiden mag pas als de maandag-actie-teller drie weken op rij
+≥1 staat.** Wie deze lijst gebruikt om aan de tool te blijven bouwen in plaats van
+besluiten te nemen, heeft precies de val gevonden waar §1 voor waarschuwt.
+
+Moeite-inschatting: **S** = uren, **M** = een dag(deel), **L** = meerdere dagen of een
+externe afhankelijkheid. "Data er al?" = of het uit bestaande tabellen komt zonder één
+extra opvraging bij een bron.
+
+| # | Kans | Moeite | Data er al? | Status |
+|---|---|---|---|---|
+| 11.1 | Prijs per stuk (multipack-normalisatie) | S | ja | ✅ gebouwd |
+| 11.2 | Doorloopsnelheid als KPI | S | ja | ✅ gebouwd |
+| 11.3 | Afprijs-ritme (tijd tot eerste afprijzing) | M | ja | – |
+| 11.4 | Kleur- en matenanalyse | M | ja | – |
+| 11.5 | Witte-vlekken-matrix (prijspunt × doelgroep) | M | ja | – |
+| 11.6 | Categoriepad-diff als strategiesignaal | S | ja | – |
+| 11.7 | Rangpositie op de categoriepagina | M | nee (scraper) | – |
+| 11.8 | KVI-dagmonitor | M | nee (nieuwe run) | – |
+| 11.9 | Historie terughalen via het Internet Archive | L | nee (eenmalig) | – |
+| 11.10 | Winkelnetwerk-monitor | M | nee (nieuwe bron) | – |
+| 11.11 | Nieuwsbrieven en folders binnenhalen | S–M | nee (eigenaarsactie) | – |
+| 11.12 | Affiliate-productfeeds als legitieme route | L | nee (eigenaarsactie) | – |
+| 11.13 | Zeeman: geen machineleesbare route (stand van zaken) | – | n.v.t. | – |
+| 11.14 | Koppelen aan eigen verkoop- en margedata | L | nee (eigenaarsactie) | – |
+| §11E | Actieteller vastleggen in de repo | S | n.v.t. | – |
+
+### A. Uit data die er al ligt (nul extra scrapes)
+
+**11.1 Prijs per stuk — de grootste blinde vlek nu.** In het waardesegment vecht iedereen
+met multipacks. Het rapport zet nu "kinderboxers katoen – 3 stuks €12,99" naast een losse
+boxer; dat is appels met peren. De pack-grootte staat al in de artikeltitel (`5 paar`,
+`3 stuks`, `2-pack`) en is met een regexregel in `normalize.py` af te leiden. Daarmee komt
+er een tweede prijsindex op **prijs per stuk** — en pas dán zijn Action, KiK en Wibra
+eerlijk te vergelijken met terStal. Kleine ingreep, groot effect op de geloofwaardigheid
+van §2. **Gebouwd:** `pack_size()` in `scraper/normalize.py` leest de pack-grootte uit
+de artikelnaam, de weekverwerking rekent mediaan en instapniveau per stuk uit
+(`unit_price_median`, `unit_price_p25`, `multipack_share` in `weekly_stats`), het
+weekrapport toont §5b naast de gewone index en het dashboard heeft een schakelaar
+*per stuk*. Eenmalig te draaien: `sql/migratie_prijs_per_stuk.sql`. Kanttekening: de titel liegt soms (een "3-pack" van 2 stuks bestaat); toon daarom
+het afgeleide aantal in de artikel-explorer, zodat een fout zichtbaar is en niet stilletjes
+in de index verdwijnt.
+
+**11.2 Doorloopsnelheid als KPI.** `new_count` en `gone_count` staan al per bron × groep
+per week in `weekly_stats`, maar worden alleen absoluut getoond. Als percentage van de
+omvang ontstaat "vernieuwingstempo": in week 34 ververste C&A 99 in / 150 uit op 589
+artikelen (≈17%) en KiK 35/64 op 597 (≈6%). Dat scheidt de snelheidsspelers van de
+voorraadzitters — precies waar de inkoopkalender op stuurt. **Gebouwd:** §7 van het
+weekrapport en een regel per bron in de dashboardtegels; de eerste meetweek van een
+bron telt bewust niet mee (dan is alles nieuw).
+
+**11.3 Afprijs-ritme.** `price_events` bevat per artikel de hele keten nieuw → prijs af →
+weg. Daaruit rolt per concurrent: hoeveel weken staat een artikel vol prijs voordat het
+zakt, en hoeveel weken later verdwijnt het. Dat is een voorspeller: weet je dat een
+concurrent kindersokken gemiddeld in week 6 afprijst, dan weet je wanneer je je eigen actie
+juist níet moet plannen. Wordt pas betrouwbaar na ±10 meetweken.
+
+**11.4 Kleur- en matenanalyse.** Kleur en maten worden al vastgelegd in `weekly_articles`
+(dekking wisselt per bron: HEMA 100%, Wibra 64% kleur), maar er gebeurt niets mee. Twee
+toepassingen: het **kleurenpalet van de instroom** (welke kleuren rollen concurrenten het
+seizoen in) en **matendekking** — voert een concurrent tot 3XL of stopt hij bij XL?
+Plus-size dekking in bodywear is een assortimentsgat dat stil te pakken is. Let op de
+waarschuwing uit §2: dit zijn *aangeboden* maten, geen voorraad.
+
+**11.5 Witte-vlekken-matrix.** Nu is zichtbaar dát een concurrent meer nachtmode voert dan
+terStal, niet op wélke prijspunten dat gat zit. Een matrix prijspunt × doelgroep ×
+producttype met terStal naast het veld maakt dat in één blik duidelijk. Alle data ligt er;
+het is één extra dashboardblok bij de bestaande prijspuntenverdeling.
+
+**11.6 Categoriepad-diff als strategiesignaal.** `category_raw` bewaart het pad zoals de
+bron het zelf noemt. Verschijnt bij een concurrent ineens "shapewear", of wordt "ondergoed"
+hernoemd naar "bodywear", dan is dat een navigatie- en dus strategiekeuze die maanden vóór
+het schap zichtbaar is. Een lijstje "nieuwe/verdwenen categoriepaden deze week" in het
+rapport kost bijna niets.
+
+### B. Kleine uitbreidingen aan de scraper
+
+**11.7 Rangpositie op de categoriepagina.** De volgorde waarin een concurrent zijn
+artikelen toont is een merchandising-keuze: wat vooraan staat, wil hij verkopen. De crawler
+ziet die volgorde al en gooit hem weg. Eén kolom `rank` erbij en je volgt wat een
+concurrent naar voren schuift — een signaal dat prijs- en omvangdata niet geven. Wel eerst
+per bron vaststellen of de volgorde stabiel is (gepersonaliseerde of geshuffelde rasters
+maken het signaal waardeloos).
+
+**11.8 KVI-dagmonitor.** Het weekritme klopt voor assortiment, maar is te traag voor de 30
+bekende-prijs-artikelen uit §6.3. Zodra die koppellijst er is: één lichte dagelijkse run
+over ±30 URL's (qua belasting verwaarloosbaar, ±1 minuut Actions) met mail bij wijziging.
+Dan hoor je een instapprijsverlaging op dinsdag in plaats van de maandag erna. Vereist de
+actieteller uit §11E, anders is het een tweede kanaal dat niemand leest.
+
+**11.9 Historie terughalen via het Internet Archive.** Het pijnlijkste punt van §7 is dat de
+seizoensklok pas na 52 weken werkt. Een deel van die historie is alsnog gratis te halen:
+web.archive.org heeft snapshots van deze categoriepagina's uit 2024–2025 (CDX-API). De
+dekking is grillig — niet elke week, niet elke bron, en de opgeslagen HTML mist soms juist
+de prijzen — dus dit is graafwerk met onzekere uitkomst. Lukt het voor Primark, C&A of KiK,
+dan scheelt het een half jaar wachten. Duidelijk labelen als *gereconstrueerd*, nooit
+mengen met eigen metingen.
+
+**11.10 Winkelnetwerk-monitor.** Voor een keten met ±200 winkels is niet alleen prijs
+relevant, maar ook wáár de concurrent opent en sluit. Store-locators van Action, Zeeman,
+Wibra en KiK zijn vrijwel altijd een open JSON-endpoint — één opvraging per maand per
+keten. Daarmee volg je expansie en overlap met de eigen verzorgingsgebieden. Valt buiten de
+huidige assortimentsscope, maar is technisch het goedkoopste wat er is.
+
+**11.11 Nieuwsbrieven en folders binnenhalen in plaats van scrapen.** Eén neutraal
+mailadres inschrijven op de nieuwsbrieven van alle acht bronnen: dan komt hun
+promotiekalender vanzelf binnen, zonder scrapen en zonder discussie. Gecombineerd met het
+folderarchief (fase 3) dekt dat precies het gat dat online monitoring structureel laat
+vallen — en het is de enige serieuze route naar Zeeman en de folder-vechters. Gebruik een
+adres dat niet naar terStal herleidbaar is, of accepteer bewust dat de concurrent ziet dat
+je meekijkt (§8).
+
+### C. Bronnen en toegang
+
+**11.12 Affiliate-productfeeds als legitieme route.** Staat nu alleen als noodoplossing bij
+Zeeman (TradeTracker), maar verdient een bredere blik: meerdere bronnen in dit veld draaien
+affiliateprogramma's via TradeTracker/Awin/Daisycon, en zo'n feed geeft **met toestemming**
+rijkere data dan scrapen ooit oplevert (EAN, merk, vaak voorraadstatus) — zonder blokkades,
+zonder Firecrawl-credits, juridisch waterdicht. Kost een aanmelding per programma en een
+eigenaarsbesluit, geen techniek. Aandachtspunt: een affiliatefeed is een commerciële relatie
+met de concurrent, inclusief voorwaarden over gebruik — laat dat meelopen in de toetsing van
+§8. Lukt er één, dan is dat structureel beter dan de huidige route.
+
+**11.13 Zeeman blijft het gat.** Het eindoordeel van 18-08 (§8) staat: verder sleutelen aan
+de scraper is zonde van de tijd. De reële routes zijn de affiliate-feed (11.12), de folder
+(11.11) en het gerichte winkelbezoek (§7).
+
+### D. De grootste sprong: koppelen aan eigen cijfers
+
+**11.14 Van kompas naar margebesluit.** terStal wordt nu zelf gescraped, met de bekende
+beperking dat de eigen prijsdekking niet compleet is (§9). Komt daar in plaats daarvan een
+export uit het eigen systeem voor in de plaats (artikel, prijs, inkoopprijs, weekomzet,
+voorraad), dan verandert de aard van de tool: niet meer "wij staan op index 163 t.o.v.
+C&A", maar "op deze 40 artikelen zijn wij duurder én zakt onze omzet, en hier is de marge
+om te bewegen". Eén import ver weg, en de enige uitbreiding die direct in euro's te
+verantwoorden is. Let op: vanaf dat moment staat er concurrentiegevoelige eigen data in de
+database — herzie dan de toegangslijst uit §6.10.
+
+### E. Ritueel — en wat eerst aan de beurt is (§11E)
+
+Drie dingen gaan vóór alles hierboven:
+
+- **Actieteller vastleggen.** Er zit nu niets in de repo dat de maandagbesluiten bijhoudt,
+  terwijl §6.9 daarop afrekent ("na 8 weken ≥6 acties, waarvan ≥2 met aantoonbaar
+  resultaat"). Eén `reports/besluiten.md` of een GitHub-issue per week is genoeg — zonder
+  teller is de succesvraag over acht weken niet te beantwoorden.
+- **Besluit §6.2 agenderen.** De doelpositie per productgroep stond bewust open tot er 4–6
+  meetweken waren. Met de weken 32–34 verwerkt komt dat moment nu in zicht; zonder dat
+  besluit blijft elk prijssignaal informatief in plaats van normatief.
+- **Firecrawl-knip.** Bij ±36 credits per week (HEMA ±24 + Wibra ±12) loopt het gratis
+  tegoed rond half september af. Dat is een businessbesluit met een datum: ±€16/mnd voor
+  twee volwaardig meelopende kernconcurrenten, of HEMA terugschroeven naar minder
+  categorieën (§8).
+
+**Als er maar drie dingen mogen:** 11.1 (prijs per stuk) maakt de bestaande cijfers
+geloofwaardig, 11.12 (affiliate-feeds) lost het bronnenprobleem structureel op en 11.14
+(eigen verkoop- en margedata) maakt de tool in euro's verdedigbaar.
 
 ---
 

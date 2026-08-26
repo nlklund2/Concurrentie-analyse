@@ -58,6 +58,45 @@ def parse_price(value, key_hint: str = "") -> float | None:
     return round(v, 2)
 
 
+# ---- Multipack-herkenning (prijs per stuk, PLAN.md §11.1) ----------------
+# Het waardesegment vecht met multipacks: "kinderboxers 3 stuks €12,99" naast
+# een losse boxer vergelijken is appels met peren. De pack-grootte staat in de
+# artikelnaam, dus die lezen we eruit — bewust conservatief:
+#   * alleen numerieke vormen ("3-pack", "5 paar", "3 stuks", "set van 2");
+#   * NIET "2-delig": een tweedelige pyjamaset is één artikel, geen twee stuks;
+#   * geen woordvormen als "duopack" — liever een gemiste pack dan een verzonnen,
+#     want een verzonnen pack halveert stilletjes de prijs in de index.
+PACK_MAX = 12                     # boven de 12 is het vrijwel altijd een maat
+
+_PACK_NA = re.compile(r"(?<![\d,.])(\d{1,2})\s*-?\s*(?:er\s*)?(?:pack|paar|stuks|stuk|st)\b", re.I)
+_PACK_VOOR = re.compile(r"\b(?:multi-?pack|voordeel-?pak|pack|pak|set)\s*(?:van|à|a)?\s*(\d{1,2})\b", re.I)
+
+
+_LEEFTIJDMAAT_RE = re.compile(r"\s*(?:jaar|jr|mnd|maanden|weken|cm|kg|ml)\b", re.I)
+
+
+def pack_size(title: str) -> int:
+    """Aantal stuks in de verpakking volgens de artikelnaam (1 = los artikel)."""
+    if not title:
+        return 1
+    for rx in (_PACK_NA, _PACK_VOOR):
+        for m in rx.finditer(title):
+            n = int(m.group(1))
+            if not 2 <= n <= PACK_MAX:
+                continue
+            if _LEEFTIJDMAAT_RE.match(title[m.end():]):   # "pak 2 jaar" is een maat
+                continue
+            return n
+    return 1
+
+
+def unit_price(price: float | None, pack: int) -> float | None:
+    """Prijs per stuk — de eerlijke vergelijkingsmaat tussen bronnen."""
+    if price is None or not pack or pack < 1:
+        return None
+    return round(price / pack, 2)
+
+
 @lru_cache(maxsize=1)
 def _rules() -> dict:
     raw = yaml.safe_load(MAPPING_FILE.read_text(encoding="utf-8"))
@@ -119,6 +158,7 @@ def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
             "sizes": (p.sizes or "")[:200],
             "price": p.price,
             "was_price": p.was_price if (p.was_price and p.price and p.was_price > p.price) else None,
+            "pack_size": pack_size(p.title),
         }
         # bij dubbele sleutels: rij mét prijs wint, daarna rij mét maten;
         # ontbrekende velden worden aangevuld vanuit de andere waarneming

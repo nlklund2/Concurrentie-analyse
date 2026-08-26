@@ -7,7 +7,8 @@ maandagochtend liggen er automatisch klaar:
 
 1. een **weekrapport** (markdown, in [`reports/`](reports/), in de job-samenvatting op
    GitHub en optioneel per e-mail) met bron-gezondheid, signalen, prijsverlagingen,
-   assortimentstabellen en de prijsindex t.o.v. terStal;
+   assortimentstabellen, de prijsindex t.o.v. terStal (op artikelprijs én per stuk,
+   zodat multipacks eerlijk meetellen) en het vernieuwingstempo per bron;
 2. een bijgewerkt **dashboard** (Netlify) met trends per productgroep.
 
 **Lees eerst [PLAN.md](PLAN.md)** — het strategische plan met de KPI-definities, de
@@ -46,17 +47,21 @@ GitHub Actions (cron, ma ±06:07 NL)      Supabase (Postgres)
    bestaat (regio eu-central-1, gratis tier), met het schema uit
    [`sql/schema.sql`](sql/schema.sql) toegepast én drie weken demo-data geladen
    (zie kopje *Demo-data* hieronder).
-2. ~~Schema uitvoeren~~ ✅ Al gebeurd — als migraties `init_schema` en
+2. **Nieuw sinds de prijs-per-stuk-uitbreiding:** draai eenmalig
+   [`sql/migratie_prijs_per_stuk.sql`](sql/migratie_prijs_per_stuk.sql) en voer daarna
+   `sql/schema.sql` opnieuw uit (idempotent). Zonder die migratie blijven de per-stuk-
+   cijfers leeg; de wekelijkse run blijft gewoon draaien en meldt het in de log.
+3. ~~Schema uitvoeren~~ ✅ Al gebeurd — als migraties `init_schema` en
    `artikel_snapshots` (incl. tabel `weekly_articles`, view `v_artikelen_week` en de
    kolommen kleur/maten); de artikel-demo staat ook al live. Het bestand
    [`sql/migratie_artikelsnapshots.sql`](sql/migratie_artikelsnapshots.sql) is alleen
    nog relevant voor een eventuele nieuwe, tweede installatie.
-3. Noteer uit **Project Settings → API**: de *Project URL*, de *anon public* key en de
+4. Noteer uit **Project Settings → API**: de *Project URL*, de *anon public* key en de
    *service_role* key (geheim!).
-4. **Authentication → Providers → Email**: laat *Email* aan; zet na het uitnodigen van
+5. **Authentication → Providers → Email**: laat *Email* aan; zet na het uitnodigen van
    het team *Allow new users to sign up* **uit** (alleen genodigden kunnen dan inloggen).
-5. **Authentication → URL Configuration**: zet de Netlify-URL (stap 3) als *Site URL*.
-6. Nodig dashboardgebruikers uit via **Authentication → Users → Invite user**.
+6. **Authentication → URL Configuration**: zet de Netlify-URL (stap 3) als *Site URL*.
+7. Nodig dashboardgebruikers uit via **Authentication → Users → Invite user**.
 
 ### 2. GitHub (de wekelijkse motor)
 1. Zet in de repo **Settings → Secrets and variables → Actions**:
@@ -128,6 +133,7 @@ optioneel `RESEND_API_KEY`, `REPORT_EMAIL_TO`, `REPORT_EMAIL_FROM`.
 | Geblokkeerde/client-side bron | `strategy: render` in `retailers.yml` — headless browser (Playwright) met cookiemuur-acceptatie en API-interceptie; zwaarder, dus eigen krappere caps per bron |
 | Bron die het datacenter-IP weert (Wibra, HEMA) | `strategy: firecrawl` + secret `FIRECRAWL_API_KEY` — externe scrape-dienst met residentiële proxies (**betaald**, zie PLAN.md §8); zonder sleutel blijft de bron rood |
 | Mapping verbeteren | Regels in `scraper/mapping.yml` (volgorde telt); test in `tests/` |
+| Multipack-herkenning bijstellen | `pack_size()` in `scraper/normalize.py` (regexes + `PACK_MAX`); test in `tests/test_pack_size.py` |
 | Grafiekkleur | `color_slot` (1–8) in `retailers.yml` én de `SLOTS`-map in `dashboard/index.html` — kleur volgt de bron, hergebruik een slot nooit voor een andere bron |
 | Signaaldrempels rapport | Constantes bovenin `scraper/report.py` |
 | Ruwe data terugkijken | Actions-run → artifact `ruwe-data-…` (60 dagen bewaard) |

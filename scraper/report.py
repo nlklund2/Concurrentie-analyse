@@ -17,6 +17,7 @@ COUNT_SIGNAL = 0.15    # ±15% omvangsverandering is een signaal
 MEDIAN_SIGNAL = 0.05   # ±5% mediaanverschuiving is een signaal
 ENTRY_SIGNAL = 0.08    # ±8% instapniveau (p25)
 SALE_SIGNAL = 0.10     # +10 procentpunt sale-druk
+MULTIPACK_MIN = 0.10   # vanaf 10% multipacks in een groep loont de per-stuk-index
 
 
 def eur(v) -> str:
@@ -207,6 +208,52 @@ def build(week: date) -> str:
     else:
         md.append("Geen terStal-cijfers deze week — index niet te berekenen.\n")
 
+    # ---- 5b. Prijsindex per stuk (multipacks eerlijk vergelijken) ----
+    md.append("### 5b. Prijsindex per stuk (multipacks omgerekend; terStal = 100)\n")
+    heeft_unit = any(r.get("unit_price_median") is not None for r in cur.values())
+    if not heeft_unit:
+        md.append("Nog geen per-stuk-cijfers. Die verschijnen vanaf de eerste week ná "
+                  "`sql/migratie_prijs_per_stuk.sql` (PLAN.md §11.1).\n")
+    elif not ter:
+        md.append("Geen terStal-cijfers deze week — index niet te berekenen.\n")
+    else:
+        pack_groups = [g for g in top_groups
+                       if any(float(r.get("multipack_share") or 0) >= MULTIPACK_MIN
+                              for (rid, aud, ptype), r in cur.items() if (aud, ptype) == g)]
+        if not pack_groups:
+            md.append("Geen groep met noemenswaardig aandeel multipacks deze week.\n")
+        else:
+            md.append("| Groep | " + " | ".join(name(r) for r in rids if r != "terstal") + " |")
+            md.append("|---" * len(rids) + "|")
+            for aud, ptype in pack_groups:
+                t_row = ter.get((aud, ptype))
+                if not t_row or not t_row.get("unit_price_median") or t_row["active_count"] < MIN_GROUP:
+                    continue
+                cells = []
+                for rid in rids:
+                    if rid == "terstal":
+                        continue
+                    c = cur.get((rid, aud, ptype))
+                    if c and c.get("unit_price_median") and c["active_count"] >= MIN_GROUP:
+                        idx = float(c["unit_price_median"]) / float(t_row["unit_price_median"]) * 100
+                        cells.append(f"{idx:.0f}")
+                    else:
+                        cells.append("–")
+                md.append(f"| {aud} / {ptype} | " + " | ".join(cells) + " |")
+            aandelen = []
+            for rid in rids:
+                waarden = [float(r["multipack_share"]) for (r_id, aud, ptype), r in cur.items()
+                           if r_id == rid and r.get("multipack_share") is not None
+                           and (aud, ptype) in pack_groups]
+                if waarden:
+                    aandelen.append(f"{name(rid)} {sum(waarden) / len(waarden) * 100:.0f}%")
+            md.append("\n> Prijs per stuk = prijs ÷ aantal in de verpakking, afgeleid uit de "
+                      "artikelnaam (3-pack, 5 paar). Alleen groepen waarin minstens één bron "
+                      f"≥{MULTIPACK_MIN:.0%} multipacks voert. Aandeel multipacks in die groepen: "
+                      + ", ".join(aandelen) + ".\n"
+                      "> Wijkt deze index sterk af van §5, dan zit het prijsverschil in de "
+                      "verpakkingsgrootte en niet in de prijs per stuk.\n")
+
     # ---- 6. Sale-druk ----
     md.append("## 6. Sale-druk per bron\n")
     md.append("| Bron | % afgeprijsd | t.o.v. vorige week |")
@@ -219,6 +266,30 @@ def build(week: date) -> str:
         if cur_s is not None and prev_s is not None:
             d = f"{(float(cur_s) - float(prev_s)) * 100:+.0f} pt"
         md.append(f"| {name(rid)} | {pct(cur_s)} | {d} |")
+    md.append("")
+
+    # ---- 7. Vernieuwingstempo (instroom/uitstroom als % van de omvang) ----
+    md.append("## 7. Vernieuwingstempo per bron\n")
+    md.append("| Bron | Omvang | Instroom deze week | Uitstroom deze week |")
+    md.append("|---|---:|---:|---:|")
+    for rid in rids:
+        tot = totals.get(rid, {})
+        n = tot.get("active_count")
+        if not n:
+            md.append(f"| {name(rid)} | – | – | – |")
+            continue
+        if rid not in prev_totals:
+            # Eerste meetweek van een bron, of een week die de kwaliteitspoort
+            # tegenhield: dan is 'nieuw' geen tempo maar een startstand.
+            md.append(f"| {name(rid)} | {n} | geen vergelijkweek | geen vergelijkweek |")
+            continue
+        in_n, uit_n = tot.get("new_count") or 0, tot.get("gone_count") or 0
+        md.append(f"| {name(rid)} | {n} | {in_n} ({in_n / n:.0%}) | {uit_n} ({uit_n / n:.0%}) |")
+    md.append("\n> Instroom en uitstroom als aandeel van het eigen assortiment: wie hoog zit "
+              "speelt op snelheid en nieuwheid, wie laag zit zit op voorraad. Ontbreekt de "
+              "vorige week (eerste meting of tegengehouden door de kwaliteitspoort), dan "
+              "zegt het percentage niets en blijft het leeg.\n")
+
     md.append("\n---\n*Automatisch gegenereerd. Dashboard: zie Netlify-site. "
               "Ruwe data: Actions-artifact van deze run.*")
     return "\n".join(md)
