@@ -51,6 +51,7 @@
   #vast { position:sticky; top:0; z-index:30; background:var(--page);
           border-bottom:1px solid var(--border); }
   .filterstrip { max-width:1180px; margin:0 auto; padding:0 20px 12px; }
+  .filterstrip .card { padding:12px 14px; }
   .prijsbasis { margin:8px 0 0; }
   /* Op een smal scherm zou de vaste balk het halve scherm opeten. */
   @media (max-width: 700px) { #vast { position:static; } }
@@ -167,6 +168,7 @@
   <button id="logout">Uitloggen</button>
 </header>
   <div class="filterstrip">
+   <div class="card">
     <div class="filters">
       <label>Doelgroep <select id="audSel"><option value="">alle</option></select></label>
       <label>Producttype <select id="typeSel"><option value="">alle</option></select></label>
@@ -175,6 +177,7 @@
     <p class="sub prijsbasis">Alle bedragen in dit dashboard zijn <b>voor-prijzen</b> — de prijs
       die de klant nu betaalt. De van-prijs (doorstreept) telt alleen mee in sale-druk en
       kortingsdiepte, en staat apart in de artikel-explorer.</p>
+   </div>
   </div>
 </div>
 <main>
