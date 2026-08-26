@@ -339,7 +339,11 @@ create or replace view v_retailer_week_totals with (security_invoker = true) as
 
 -- Nederlandstalige exportview: per artikel per week, kolomnamen volgens de
 -- business. CSV-export kan direct vanuit de Supabase Table Editor / SQL-editor.
-create or replace view v_artikelen_week with (security_invoker = true) as
+-- Eerst droppen: er zijn kolommen tussengevoegd (stuks_per_verpakking) en dat
+-- kan 'create or replace view' niet — de view draagt geen data, dus dit is
+-- veilig en houdt het bestand echt idempotent op bestaande installaties.
+drop view if exists v_artikelen_week;
+create view v_artikelen_week with (security_invoker = true) as
   select a.retailer_id  as bron,
          a.week,
          a.product_key  as artnr,
