@@ -138,6 +138,26 @@ def map_category(category_raw: str, title: str = "", url: str = "") -> tuple[str
     return audience, ptype
 
 
+# ---- Vangrail op de van-prijs -------------------------------------------
+# Een doorgestreepte prijs die tientallen malen hoger is dan de huidige prijs
+# is geen aanbieding maar een leesfout. KiK leverde week 35 tientallen kaarten
+# met "van €199,00 voor €0,66": de bron rendert de centen apart ("€ 1⁹⁹"), en
+# zonder komma wordt 1,99 als 199 gelezen. Zulke waarden vervuilen de sale-druk
+# en de kortingsdiepte, dus laten we de van-prijs liever weg dan hem te geloven.
+# Ruim gekozen: 80% korting (factor 5) komt in opruiming echt voor, factor 20
+# niet — dat is 95% korting.
+WAS_MAX_RATIO = 20
+
+
+def plausibele_was_prijs(price: float | None, was: float | None) -> float | None:
+    """De van-prijs, of None als hij niet te rijmen is met de voor-prijs."""
+    if not was or not price or was <= price:
+        return None
+    if was > price * WAS_MAX_RATIO:
+        return None
+    return was
+
+
 def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
     """Ontdubbelt op sleutel en bouwt rijen voor staging_products."""
     seen: dict[str, dict] = {}
@@ -157,7 +177,7 @@ def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
             "color": (p.color or "")[:200],
             "sizes": (p.sizes or "")[:200],
             "price": p.price,
-            "was_price": p.was_price if (p.was_price and p.price and p.was_price > p.price) else None,
+            "was_price": plausibele_was_prijs(p.price, p.was_price),
             "pack_size": pack_size(p.title),
         }
         # bij dubbele sleutels: rij mét prijs wint, daarna rij mét maten;

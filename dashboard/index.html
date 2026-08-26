@@ -52,6 +52,21 @@
           border-bottom:1px solid var(--border); }
   .filterstrip { max-width:1180px; margin:0 auto; padding:0 20px 12px; }
   .filterstrip .card { padding:12px 14px; }
+  /* Prijshistorie per artikel: klik een regel in de explorer open. */
+  tr.artikel { cursor:pointer; }
+  tr.artikel.open > td { border-bottom:0; }
+  td.historie { background:var(--page); padding:14px 16px; }
+  .hist { display:flex; gap:6px; align-items:flex-end; min-height:96px; margin:12px 0 4px; }
+  .hist .kolom { flex:1; min-width:34px; display:flex; flex-direction:column;
+                 justify-content:flex-end; align-items:center; gap:3px; }
+  .hist .staaf { width:100%; max-width:38px; border-radius:3px 3px 0 0; }
+  .hist .gat { width:100%; max-width:38px; border-bottom:2px dotted var(--muted); }
+  .hist .wk { font-size:11px; color:var(--muted); }
+  .hist .bedrag { font-size:11px; color:var(--ink-2); white-space:nowrap; }
+  .hist .sale { outline:2px solid var(--chip-sale-ink); outline-offset:-2px; }
+  .feiten { display:flex; flex-wrap:wrap; gap:4px 18px; font-size:12.5px; color:var(--ink-2); }
+  .tijdlijn { margin:10px 0 0; padding-left:18px; font-size:12.5px; color:var(--ink-2); }
+  .tijdlijn li { margin:2px 0; }
   .prijsbasis { margin:8px 0 0; }
   /* Op een smal scherm zou de vaste balk het halve scherm opeten. */
   @media (max-width: 700px) { #vast { position:static; } }
@@ -260,8 +275,9 @@
 
   <div class="card">
     <h2>Artikel-explorer</h2>
-    <p class="sub" id="explSub">Elk artikel van de gekozen week — klik de artikelnaam om hem op de site
-      van de concurrent te openen. De bron-, doelgroep- en producttypefilters bovenaan werken hier ook.</p>
+    <p class="sub" id="explSub">Elk artikel van de gekozen week — <b>klik een regel voor de
+      prijshistorie</b>, of klik de artikelnaam om hem op de site van de concurrent te openen.
+      De bron-, doelgroep- en producttypefilters bovenaan werken hier ook.</p>
     <div class="filters" style="margin-bottom:10px">
       <input type="search" id="explZoek" placeholder="Zoek op artikelnaam…" style="min-width:240px">
       <span class="hint" id="explTelling"></span>
@@ -793,7 +809,8 @@ async function renderExplorer() {
       const titel = url
         ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(a.title)}</a>`
         : esc(a.title);
-      return `<tr>
+      return `<tr class="artikel" data-rid="${esc(a.retailer_id)}" data-key="${esc(a.product_key)}"
+                  title="Klik voor de prijshistorie van dit artikel">
         <td><span class="dot" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${slotColor(a.retailer_id)};margin-right:6px"></span>${esc(naam(a.retailer_id))}</td>
         <td>${titel}</td>
         <td>${esc(a.audience)} / ${esc(a.product_type)}</td>
@@ -803,6 +820,99 @@ async function renderExplorer() {
         <td class="num">${a.pack_size > 1 && a.price != null
           ? `${eur(a.price / a.pack_size)} <span class="hint">×${a.pack_size}</span>` : "–"}</td></tr>`;
     }).join("") + `</table>`;
+  box.querySelectorAll("tr.artikel").forEach(tr => tr.onclick = e => {
+    if (e.target.closest("a")) return;      // de link naar de bron blijft een link
+    wisselHistorie(tr);
+  });
+}
+
+// ---- Prijshistorie van één artikel ------------------------------------
+// Alles staat al in de database: weekly_articles heeft per week de voor- en
+// van-prijs, price_events de mutaties. Dit paneel toont het naast elkaar,
+// zodat je ziet of een verlaging een actieweek was of een nieuwe prijs.
+const EVENT_TEKST = {
+  new: "nieuw in het assortiment", back: "weer terug in het assortiment",
+  price_down: "prijs omlaag", price_up: "prijs omhoog",
+  promo_start: "aanbieding gestart", promo_end: "aanbieding afgelopen",
+  gone: "uit het assortiment",
+};
+
+function wisselHistorie(tr) {
+  const open = tr.nextElementSibling && tr.nextElementSibling.classList.contains("histrij");
+  document.querySelectorAll("tr.histrij").forEach(r => r.remove());
+  document.querySelectorAll("tr.artikel.open").forEach(r => r.classList.remove("open"));
+  if (open) return;                          // tweede klik sluit het paneel
+  tr.classList.add("open");
+  const rij = document.createElement("tr");
+  rij.className = "histrij";
+  rij.innerHTML = `<td class="historie" colspan="8"><div class="hint">Historie laden…</div></td>`;
+  tr.after(rij);
+  vulHistorie(rij.firstElementChild, tr.dataset.rid, tr.dataset.key);
+}
+
+async function vulHistorie(cel, rid, key) {
+  const [snapshots, mutaties] = await Promise.all([
+    sb.from("weekly_articles").select("week,price,was_price,pack_size,title")
+      .eq("retailer_id", rid).eq("product_key", key).order("week"),
+    sb.from("price_events").select("week,event,price,prev_price")
+      .eq("retailer_id", rid).eq("product_key", key).order("week"),
+  ]);
+  if (snapshots.error) {
+    cel.innerHTML = `<div class="hint">Historie laden mislukt: ${esc(snapshots.error.message)}</div>`;
+    return;
+  }
+  const rijen = (snapshots.data || []).filter(r => r.price != null);
+  if (!rijen.length) {
+    cel.innerHTML = `<div class="hint">Nog geen prijshistorie voor dit artikel.</div>`;
+    return;
+  }
+  // Weken tussen de eerste en laatste waarneming die ontbreken zijn een gat in
+  // de reeks (artikel even weg, of de bron viel door de kwaliteitspoort) — die
+  // tonen we als onderbreking, niet als daling naar nul.
+  const gezien = new Map(rijen.map(r => [r.week, r]));
+  const alle = state.weeks.slice().sort()
+    .filter(w => w >= rijen[0].week && w <= rijen[rijen.length - 1].week);
+  const prijzen = rijen.map(r => Number(r.price));
+  const top = Math.max(...prijzen, 0.01);
+  const kleur = slotColor(rid);
+
+  const staven = alle.map(w => {
+    const r = gezien.get(w);
+    if (!r) return `<div class="kolom"><div class="gat" title="deze week niet gezien"></div>
+                    <div class="wk">${isoWeekLabel(w)}</div></div>`;
+    const p = Number(r.price);
+    const sale = r.was_price != null && Number(r.was_price) > p;
+    return `<div class="kolom" title="${isoWeekLabel(w)} · ${eur(p)}${sale ? " (was " + eur(r.was_price) + ")" : ""}">
+      <div class="bedrag">${eur(p)}</div>
+      <div class="staaf ${sale ? "sale" : ""}" style="height:${Math.max(6, p / top * 64)}px;background:${kleur}"></div>
+      <div class="wk">${isoWeekLabel(w)}</div></div>`;
+  }).join("");
+
+  const laatste = rijen[rijen.length - 1];
+  const pack = laatste.pack_size > 1 ? laatste.pack_size : 0;
+  const feiten = [
+    `eerst gezien ${isoWeekLabel(rijen[0].week)}`,
+    `laatst gezien ${isoWeekLabel(laatste.week)}`,
+    `laagst ${eur(Math.min(...prijzen))}`,
+    `hoogst ${eur(Math.max(...prijzen))}`,
+    `${rijen.filter(r => r.was_price != null && Number(r.was_price) > Number(r.price)).length} van de ${rijen.length} weken afgeprijsd`,
+  ];
+  if (pack) feiten.push(`${pack} stuks · ${eur(Number(laatste.price) / pack)} per stuk`);
+
+  const lijst = (mutaties.data || []).map(m => {
+    const tekst = EVENT_TEKST[m.event] || m.event;
+    const bedrag = m.prev_price != null && m.price != null
+      ? ` — ${eur(m.prev_price)} → ${eur(m.price)}`
+      : (m.price != null ? ` — ${eur(m.price)}` : "");
+    return `<li>${isoWeekLabel(m.week)}: ${tekst}${bedrag}</li>`;
+  }).join("");
+
+  cel.innerHTML = `<div class="hist">${staven}</div>
+    <div class="feiten">${feiten.map(f => `<span>${f}</span>`).join("")}</div>
+    ${lijst ? `<ul class="tijdlijn">${lijst}</ul>`
+            : `<div class="hint" style="margin-top:8px">Nog geen mutaties geregistreerd.</div>`}
+    <div class="hint" style="margin-top:8px">Voor-prijzen per week; een omrande staaf betekent
+      dat het artikel die week was afgeprijsd. Een stippellijn is een week zonder waarneming.</div>`;
 }
 
 async function renderMovers() {

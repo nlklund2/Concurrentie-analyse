@@ -11,6 +11,8 @@ from . import strategies
 from .config import RetailerCfg
 from .normalize import apply_focus, mapping_coverage, to_staging_rows
 
+VERDACHTE_PRIJS = 0.50   # euro; daaronder is het in ondermode geen echte prijs
+
 
 def probe_one(cfg: RetailerCfg, limit: int = 40) -> dict:
     res = strategies.run(cfg, limit=limit)
@@ -24,6 +26,12 @@ def probe_one(cfg: RetailerCfg, limit: int = 40) -> dict:
         "all_rows": all_rows,
         "rows": rows,
         "price_coverage": round(sum(1 for r in all_rows if r["price"] is not None) / n, 2),
+        # Prijzen onder de VERDACHTE_PRIJS zijn in bodywear vrijwel altijd een
+        # leesfout (stukprijs van een multipack, of centen zonder komma), geen
+        # koopje. KiK stond week 35 vol met sokken van "€0,28"; zonder dit
+        # signaal zag het validatierapport er kerngezond uit.
+        "verdacht_laag": round(sum(1 for r in all_rows
+                                   if r["price"] is not None and r["price"] < VERDACHTE_PRIJS) / n, 2),
         "color_coverage": round(sum(1 for r in all_rows if r["color"]) / n, 2),
         "sizes_coverage": round(sum(1 for r in all_rows if r["sizes"]) / n, 2),
         "mapping": mapping_coverage(all_rows),
@@ -45,6 +53,11 @@ def advies(p: dict) -> str:
         return (f"slechts {len(p['rows'])} artikelen binnen focus — onder de "
                 f"weekdrempel van {cfg.min_products_expected}, dus de weekrun keurt "
                 "dit af; controleer de notities en voorbeeldtitels hierboven")
+    if p.get("verdacht_laag", 0) >= 0.05:
+        return (f"{p['verdacht_laag']:.0%} van de prijzen ligt onder €{VERDACHTE_PRIJS:.2f} "
+                "— vrijwel zeker een leesfout (stukprijs van een multipack of centen "
+                "zonder komma); prijsextractie van deze bron nalopen vóór de cijfers "
+                "gebruikt worden")
     if p["price_coverage"] < 0.6:
         return "prijsextractie mager — bron-JSON bekijken en veldnamen aan jsonscan toevoegen"
     if p["mapping"] < 0.6:
@@ -59,13 +72,14 @@ def probe_report(probes: list[dict], limit: int) -> str:
           f"*Proefscrape met maximaal {limit} artikelen per bron — een steekproef, "
           "geen volledige telling. Kleur-/matendekking is gemeten op lijstniveau, "
           "dus vóór de verrijking via productpagina's die in de weekrun draait.*", "",
-          "| Bron | Strategie | Categorieën | Artikelen | Binnen focus | Prijs­dekking | Kleur | Maten | Mapping | Requests | Status |",
-          "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
+          "| Bron | Strategie | Categorieën | Artikelen | Binnen focus | Prijs­dekking | Verdacht laag | Kleur | Maten | Mapping | Requests | Status |",
+          "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
     for p in probes:
         cfg, res = p["cfg"], p["result"]
         status = f"🔴 {res.error[:90]}" if res.error else "🟢 ok"
         md.append(f"| {cfg.name} | {res.strategy or '–'} | {res.categories_found or '–'} "
                   f"| {len(p['all_rows'])} | {len(p['rows'])} | {p['price_coverage']:.0%} "
+                  f"| {p.get('verdacht_laag', 0):.0%} "
                   f"| {p['color_coverage']:.0%} | {p['sizes_coverage']:.0%} "
                   f"| {p['mapping']:.0%} | {res.requests_done} | {status} |")
     md.append("")
