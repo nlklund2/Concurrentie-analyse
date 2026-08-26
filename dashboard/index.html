@@ -341,22 +341,44 @@ async function fetchAll(build) {
   }
 }
 
+// showApp kan dubbel aftrappen (getSession én onAuthStateChange vuren vlak na
+// elkaar bij het binnenkomen via een inloglink); de vlag houdt er één over.
+let appGestart = false;
+
 async function showApp() {
+  if (appGestart) return;
+  appGestart = true;
   document.getElementById("login").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   try { await loadData(); } catch (e) {
+    appGestart = false;
+    // Verlopen of ingetrokken sessie: de dataqueries geven dan een JWT-fout.
+    // Terug naar het loginscherm in plaats van het misleidende "Nog geen data".
+    if (/jwt|token|expired|401/i.test(e.message || "")) {
+      await sb.auth.signOut().catch(() => {});
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("login").classList.remove("hidden");
+      document.getElementById("melding").textContent =
+        "Je sessie is verlopen — log opnieuw in.";
+      return;
+    }
     document.getElementById("tiles").innerHTML =
-      `<div class="hint">Laden mislukt: ${e.message}</div>`;
+      `<div class="hint">Laden mislukt: ${esc(e.message)}</div>`;
     return;
   }
   buildFilters(); render();
 }
 
 async function loadData() {
-  const [{ data: rws }, { data: wks }] = await Promise.all([
+  const [rw, wk] = await Promise.all([
     sb.from("retailers").select("*"),
     sb.from("v_weeks").select("week").order("week", { ascending:false }).limit(60),
   ]);
+  // Fouten niet stilletjes als "geen data" behandelen: een 401 op deze query's
+  // toonde eerder ten onrechte "Nog geen data" terwijl er vier meetweken stonden.
+  const fout = rw.error || wk.error;
+  if (fout) throw new Error(fout.message);
+  const rws = rw.data, wks = wk.data;
   (rws || []).forEach(r => state.retailers[r.id] = r);
   state.weeks = (wks || []).map(w => w.week);
   if (!state.weeks.length) {
