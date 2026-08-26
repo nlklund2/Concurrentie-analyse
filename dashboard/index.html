@@ -16,6 +16,13 @@
     --good-text: #006300;  --bad-text: #d03b3b;
     --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
     --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+    /* heatmap prijsindex: rood = concurrent onder ons, blauw = erboven */
+    --under-1:#f3bcbc; --under-2:#e58f8f; --div-mid:#f0efec;
+    --over-1:#b7d3f6;  --over-2:#6da7ec;
+    /* signaalchips (semantisch, los van bronkleuren) */
+    --chip-omvang-bg:#e3edf9; --chip-omvang-ink:#1c5cab;
+    --chip-prijs-bg:#f7ead8;  --chip-prijs-ink:#8a5a00;
+    --chip-sale-bg:#f9e3e3;   --chip-sale-ink:#b02a2a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -27,6 +34,11 @@
       --good-text: #0ca30c;  --bad-text: #e66767;
       --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
       --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+      --under-1:#6e2424; --under-2:#93392f; --div-mid:#383835;
+      --over-1:#1c5cab;  --over-2:#2a78d6;
+      --chip-omvang-bg:#1c3350; --chip-omvang-ink:#86b6ef;
+      --chip-prijs-bg:#3d2f14;  --chip-prijs-ink:#e0a33e;
+      --chip-sale-bg:#452020;   --chip-sale-ink:#ef9c9c;
     }
   }
   * { box-sizing: border-box; }
@@ -74,6 +86,38 @@
   .status-ok::before { content:"● "; color:var(--good-text); }
   .status-fout::before { content:"● "; color:var(--bad-text); }
   .status-afwijkend::before { content:"● "; color:#c98500; }
+  /* signalen + prijsindex naast elkaar op breed scherm */
+  .split { display:grid; grid-template-columns:5fr 7fr; gap:20px; }
+  @media (max-width:980px){ .split { grid-template-columns:1fr; } }
+  .sig { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--grid);
+         align-items:baseline; font-size:13px; }
+  .sig:last-child { border-bottom:none; }
+  .schip { flex:none; font-size:10.5px; font-weight:700; letter-spacing:.05em;
+           padding:2px 8px; border-radius:999px; }
+  .schip.omvang { background:var(--chip-omvang-bg); color:var(--chip-omvang-ink); }
+  .schip.prijs  { background:var(--chip-prijs-bg);  color:var(--chip-prijs-ink); }
+  .schip.sale   { background:var(--chip-sale-bg);   color:var(--chip-sale-ink); }
+  .sig .num { color:var(--ink-2); font-variant-numeric:tabular-nums; }
+  .idxcel { display:inline-block; min-width:42px; text-align:center; padding:3px 6px;
+            border-radius:5px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .idxcel.u2 { background:var(--under-2); } .idxcel.u1 { background:var(--under-1); }
+  .idxcel.mid { background:var(--div-mid); }
+  .idxcel.o1 { background:var(--over-1); } .idxcel.o2 { background:var(--over-2); }
+  .legend-div { display:flex; gap:14px; align-items:center; font-size:12px;
+                color:var(--ink-2); margin-top:10px; flex-wrap:wrap; }
+  .sw { width:13px; height:13px; border-radius:4px; display:inline-block;
+        vertical-align:-2px; margin-right:5px; }
+  /* instroom-etalage */
+  .instroom { display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:10px; }
+  .ikaart { border:1px solid var(--border); border-radius:9px; padding:11px 13px;
+            display:flex; flex-direction:column; gap:4px; font-size:13px; }
+  .ikaart .ibron { display:flex; align-items:center; gap:6px; font-size:11.5px;
+                   color:var(--ink-2); text-transform:uppercase; letter-spacing:.05em; }
+  .ikaart .iprijs { font-weight:650; font-size:15px; font-variant-numeric:tabular-nums; }
+  .ikaart .igrp { color:var(--muted); font-size:12px; }
+  .inieuw { font-size:10px; font-weight:700; color:var(--good-text);
+            border:1px solid var(--good-text); padding:1px 6px; border-radius:999px;
+            margin-left:auto; letter-spacing:.05em; }
   .pos { color:var(--ink-2); } .neg { color:var(--ink-2); }
   code { background:color-mix(in srgb, var(--surface) 90%, var(--ink) 10%); padding:1px 5px; border-radius:4px; }
 </style>
@@ -128,6 +172,29 @@
     <div class="tiles" id="tiles"></div>
   </div>
 
+  <div class="split">
+    <div class="card">
+      <h2>Signalen van de week</h2>
+      <p class="sub">Bewegingen t.o.v. de week ervoor, boven dezelfde drempels als het
+        weekrapport; gerangschikt op impact. De filters bovenaan werken hier ook.</p>
+      <div id="signalen"></div>
+    </div>
+    <div class="card">
+      <h2>Prijsindex per groep</h2>
+      <p class="sub">Mediaanprijs per groep, terStal = 100. Rood: concurrent zit ónder ons
+        (prijsdruk), blauw: erboven (marge­ruimte). Kompas, geen rechter — kwaliteitsverschil
+        is online onzichtbaar.</p>
+      <div class="plot-wrap" id="prijsindex"></div>
+      <div class="legend-div">
+        <span><span class="sw" style="background:var(--under-2)"></span>&le; 80 fors eronder</span>
+        <span><span class="sw" style="background:var(--under-1)"></span>81–94</span>
+        <span><span class="sw" style="background:var(--div-mid)"></span>95–105 pari</span>
+        <span><span class="sw" style="background:var(--over-1)"></span>106–119</span>
+        <span><span class="sw" style="background:var(--over-2)"></span>&ge; 120 fors erboven</span>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="tools"><button data-tbl="omvang">Tabel</button></div>
     <h2>Assortimentsomvang per week</h2>
@@ -164,6 +231,15 @@
   </div>
 
   <div class="card">
+    <h2>Nieuw deze week</h2>
+    <p class="sub">Wat de concurrent deze week online nieuw hing (uit de mutatieregistratie) —
+      klik een artikelnaam om hem op de site van de concurrent te openen. Per bron worden de
+      eerste vier getoond; de volledige lijst vind je via de artikel-explorer.</p>
+    <p class="sub" id="instroomTelling" style="margin-bottom:10px"></p>
+    <div class="instroom" id="instroom"></div>
+  </div>
+
+  <div class="card">
     <h2>Artikel-explorer</h2>
     <p class="sub" id="explSub">Elk artikel van de gekozen week — klik de artikelnaam om hem op de site
       van de concurrent te openen. De bron-, doelgroep- en producttypefilters bovenaan werken hier ook.</p>
@@ -188,6 +264,10 @@
    nooit de selectie. Max 8 bronnen tegelijk in de grafieken. Houd dit in lijn
    met color_slot in scraper/retailers.yml. */
 const SLOTS = { terstal:1, zeeman:2, wibra:3, primark:4, action:5, hema:6, "c-and-a":7, kik:8 };
+/* Signaaldrempels — bewust identiek aan scraper/report.py, zodat dashboard en
+   weekrapport dezelfde signalen vertellen. Wijzig ze op beide plekken tegelijk. */
+const MIN_GROUP = 8, COUNT_SIGNAL = 0.15, MEDIAN_SIGNAL = 0.05,
+      ENTRY_SIGNAL = 0.08, SALE_SIGNAL = 0.10;
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const slotColor = rid => SLOTS[rid] ? cssVar(`--s${SLOTS[rid]}`) : cssVar("--muted");
 
@@ -389,8 +469,8 @@ function tableFrom(labels, datasets, fmt) {
 }
 
 function render() {
-  renderTiles(); renderOmvang(); renderMediaan(); renderPunten();
-  renderMovers(); renderExplorer(); renderHealth();
+  renderTiles(); renderSignalen(); renderIndex(); renderOmvang(); renderMediaan();
+  renderPunten(); renderMovers(); renderInstroom(); renderExplorer(); renderHealth();
 }
 
 // zoeken in de artikel-explorer: kort wachten tot de gebruiker uitgetypt is
@@ -420,6 +500,107 @@ function renderTiles() {
       <div class="d">sale-druk ${c ? pctf(c.sale_share) : "–"}</div>
       <div class="d">${tempo(c, p)}</div></div>`;
   }).join("") || `<div class="hint">Selecteer bronnen in de filterbalk.</div>`;
+}
+
+// Zelfde signaallogica als report.py (§2): omvang, mediaan, instap (p25), sale-druk.
+function renderSignalen() {
+  const box = document.getElementById("signalen");
+  const prevWeek = state.weeks[state.weeks.indexOf(state.week) + 1];
+  if (!prevWeek) {
+    box.innerHTML = `<div class="hint">Eerste meetweek — signalen verschijnen zodra er een vergelijkingsweek is.</div>`;
+    return;
+  }
+  const inScope = s => state.selected.includes(s.retailer_id)
+    && (!state.aud || s.audience === state.aud)
+    && (!state.type || s.product_type === state.type);
+  const key = s => `${s.retailer_id}|${s.audience}|${s.product_type}`;
+  const cur = new Map(), prv = new Map();
+  state.stats.forEach(s => {
+    if (!inScope(s)) return;
+    if (s.week === state.week) cur.set(key(s), s);
+    else if (s.week === prevWeek) prv.set(key(s), s);
+  });
+  const pctS = d => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
+  const signalen = [];
+  cur.forEach((c, k) => {
+    const p = prv.get(k);
+    if (!p) return;
+    const label = `<b>${esc(naam(c.retailer_id))}</b> · ${esc(c.audience)} / ${esc(c.product_type)}`;
+    const cn = c.active_count, pn = p.active_count;
+    if (Math.max(cn, pn) >= MIN_GROUP && pn > 0) {
+      const d = (cn - pn) / pn;
+      if (Math.abs(d) >= COUNT_SIGNAL && Math.abs(cn - pn) >= 5)
+        signalen.push({ score: Math.abs(d) * 100 + Math.min(Math.abs(cn - pn), 50), soort: "omvang",
+          html: `${label}: ${d > 0 ? "breidt uit" : "saneert"} van ${pn} naar ${cn} artikelen <span class="num">(${pctS(d)})</span>` });
+    }
+    for (const [veld, drempel, nm] of [["price_median", MEDIAN_SIGNAL, "mediaanprijs"],
+                                       ["price_p25", ENTRY_SIGNAL, "instapniveau"]]) {
+      const cv = Number(c[veld]), pv = Number(p[veld]);
+      if (cv && pv && Math.min(cn, pn) >= MIN_GROUP) {
+        const d = (cv - pv) / pv;
+        if (Math.abs(d) >= drempel)
+          signalen.push({ score: Math.abs(d) * 200, soort: "prijs",
+            html: `${label}: ${nm} ${d > 0 ? "omhoog" : "omlaag"} van ${eur(pv)} naar ${eur(cv)} <span class="num">(${pctS(d)})</span>` });
+      }
+    }
+    if (c.sale_share != null && p.sale_share != null && cn >= MIN_GROUP) {
+      const d = Number(c.sale_share) - Number(p.sale_share);
+      if (Math.abs(d) >= SALE_SIGNAL)
+        signalen.push({ score: Math.abs(d) * 150, soort: "sale",
+          html: `${label}: sale-druk ${d > 0 ? "stijgt" : "daalt"} van ${pctf(Number(p.sale_share))} naar ${pctf(Number(c.sale_share))}` });
+    }
+  });
+  if (!signalen.length) {
+    box.innerHTML = `<div class="hint">Geen verschuivingen boven de drempels binnen deze filters.</div>`;
+    return;
+  }
+  const CHIP = { omvang: "Omvang", prijs: "Prijs", sale: "Sale" };
+  box.innerHTML = signalen.sort((a, b) => b.score - a.score).slice(0, 15).map(s =>
+    `<div class="sig"><span class="schip ${s.soort}">${CHIP[s.soort]}</span><span>${s.html}</span></div>`).join("");
+}
+
+// Zelfde indexberekening als report.py (§5): mediaan t.o.v. terStal, min. 8 artikelen.
+function renderIndex() {
+  const box = document.getElementById("prijsindex");
+  const rows = state.stats.filter(s => s.week === state.week
+    && (!state.aud || s.audience === state.aud)
+    && (!state.type || s.product_type === state.type));
+  const ter = new Map();
+  rows.forEach(s => { if (s.retailer_id === "terstal") ter.set(`${s.audience}|${s.product_type}`, s); });
+  if (!state.selected.includes("terstal") || !ter.size) {
+    box.innerHTML = `<div class="hint">Zet terStal aan in de filterbalk — de index rekent t.o.v. terStal.</div>`;
+    return;
+  }
+  const anderen = state.selected.filter(r => r !== "terstal");
+  const groepTotaal = new Map();
+  rows.forEach(s => {
+    if (!state.selected.includes(s.retailer_id)) return;
+    const g = `${s.audience}|${s.product_type}`;
+    groepTotaal.set(g, (groepTotaal.get(g) || 0) + s.active_count);
+  });
+  const groepen = [...groepTotaal.keys()]
+    .sort((a, b) => groepTotaal.get(b) - groepTotaal.get(a)).slice(0, 14);
+  const cel = new Map();
+  rows.forEach(s => cel.set(`${s.retailer_id}|${s.audience}|${s.product_type}`, s));
+  let html = `<table><tr><th>Groep</th>${anderen.map(r =>
+    `<th class="num">${esc(naam(r))}</th>`).join("")}</tr>`;
+  let getoond = 0;
+  for (const g of groepen) {
+    const t = ter.get(g);
+    if (!t || !Number(t.price_median) || t.active_count < MIN_GROUP) continue;
+    const cellen = anderen.map(rid => {
+      const c = cel.get(`${rid}|${g}`);
+      if (!c || !Number(c.price_median) || c.active_count < MIN_GROUP)
+        return `<td class="num" style="color:var(--muted)">–</td>`;
+      const idx = Math.round(Number(c.price_median) / Number(t.price_median) * 100);
+      const kl = idx <= 80 ? "u2" : idx < 95 ? "u1" : idx <= 105 ? "mid" : idx < 120 ? "o1" : "o2";
+      return `<td class="num"><span class="idxcel ${kl}" title="index ${idx} (terStal = 100)">${idx}</span></td>`;
+    });
+    html += `<tr><td>${esc(g.replace("|", " / "))}</td>${cellen.join("")}</tr>`;
+    getoond++;
+  }
+  box.innerHTML = getoond ? html + "</table>"
+    : `<div class="hint">Geen groepen met genoeg artikelen (minimaal ${MIN_GROUP}, bij terStal én concurrent).</div>`;
 }
 
 function renderOmvang() {
@@ -583,6 +764,62 @@ async function renderMovers() {
         <td class="num">${eur(e.prev_price)}</td><td class="num">${eur(e.price)}</td>
         <td class="num">${(e.d * 100).toFixed(0)}%</td></tr>`;
     }).join("") + `</table>`;
+}
+
+async function renderInstroom() {
+  const box = document.getElementById("instroom");
+  const telling = document.getElementById("instroomTelling");
+  box.innerHTML = `<div class="hint">Laden…</div>`;
+  telling.textContent = "";
+  const { data, error } = await sb.from("price_events")
+    .select("retailer_id,product_key,price")
+    .eq("week", state.week).eq("event", "new").limit(1000);
+  if (error) { box.innerHTML = `<div class="hint">${esc(error.message)}</div>`; return; }
+  const evs = (data || []).filter(e => state.selected.includes(e.retailer_id));
+  if (!evs.length) {
+    box.innerHTML = `<div class="hint">Geen nieuwe artikelen geregistreerd in deze week.</div>`;
+    return;
+  }
+  // artikelgegevens per bron ophalen, in stukken van 100 sleutels (Primark kan 150+ nieuw hebben)
+  const info = {};
+  await Promise.all([...new Set(evs.map(e => e.retailer_id))].map(async rid => {
+    const keys = evs.filter(e => e.retailer_id === rid).map(e => e.product_key);
+    for (let i = 0; i < keys.length; i += 100) {
+      const { data: prods } = await sb.from("products")
+        .select("product_key,title,url,audience,product_type,current_price")
+        .eq("retailer_id", rid).in("product_key", keys.slice(i, i + 100));
+      (prods || []).forEach(p => info[`${rid}|${p.product_key}`] = p);
+    }
+  }));
+  const verrijkt = evs.map(e => ({ ...e, p: info[`${e.retailer_id}|${e.product_key}`] }))
+    .filter(e => e.p && (!state.aud || e.p.audience === state.aud)
+                     && (!state.type || e.p.product_type === state.type));
+  if (!verrijkt.length) {
+    box.innerHTML = `<div class="hint">Geen nieuwe artikelen binnen deze filters.</div>`;
+    return;
+  }
+  const perBron = new Map();
+  verrijkt.forEach(e => {
+    if (!perBron.has(e.retailer_id)) perBron.set(e.retailer_id, []);
+    perBron.get(e.retailer_id).push(e);
+  });
+  const volgorde = [...perBron.keys()].sort((a, b) => (SLOTS[a] || 99) - (SLOTS[b] || 99));
+  telling.textContent = `${verrijkt.length.toLocaleString("nl-NL")} nieuw binnen de filters — ` +
+    volgorde.map(r => `${naam(r)} ${perBron.get(r).length}`).join(" · ");
+  box.innerHTML = volgorde.map(rid => perBron.get(rid)
+    .sort((a, b) => String(a.p.title).localeCompare(String(b.p.title), "nl"))
+    .slice(0, 4).map(e => {
+      const url = veiligeUrl(e.p.url);
+      const titel = url
+        ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(e.p.title)}</a>`
+        : esc(e.p.title);
+      const prijs = e.price != null ? e.price : e.p.current_price;
+      return `<div class="ikaart">
+        <span class="ibron"><span class="dot" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${slotColor(rid)}"></span>${esc(naam(rid))}<span class="inieuw">NIEUW</span></span>
+        <span>${titel}</span>
+        <span class="iprijs">${prijs != null ? eur(prijs) : "–"}</span>
+        <span class="igrp">${esc(e.p.audience)} / ${esc(e.p.product_type)}</span></div>`;
+    }).join("")).join("");
 }
 
 async function renderHealth() {
