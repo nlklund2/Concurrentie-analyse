@@ -45,7 +45,15 @@
   body { margin:0; background:var(--page); color:var(--ink);
          font:14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   header { display:flex; flex-wrap:wrap; gap:12px; align-items:center;
-           padding:14px 20px; border-bottom:1px solid var(--border); }
+           padding:14px 20px; }
+  /* Kop + filterbalk blijven staan bij het scrollen: welke week, welke groep en
+     welke bronnen je ziet is de context bij élke grafiek eronder. */
+  #vast { position:sticky; top:0; z-index:30; background:var(--page);
+          border-bottom:1px solid var(--border); }
+  .filterstrip { max-width:1180px; margin:0 auto; padding:0 20px 12px; }
+  .prijsbasis { margin:8px 0 0; }
+  /* Op een smal scherm zou de vaste balk het halve scherm opeten. */
+  @media (max-width: 700px) { #vast { position:static; } }
   header h1 { font-size:16px; margin:0 auto 0 0; font-weight:650; }
   main { max-width:1180px; margin:0 auto; padding:20px; display:grid; gap:20px; }
   .card { background:var(--surface); border:1px solid var(--border);
@@ -145,6 +153,7 @@
 </div>
 
 <div id="app" class="hidden">
+<div id="vast">
 <header>
   <h1>Concurrentiemonitor terStal</h1>
   <a href="/mockup.html" style="font-size:12.5px;color:var(--ink-2)"
@@ -157,15 +166,18 @@
   </select></label>
   <button id="logout">Uitloggen</button>
 </header>
-<main>
-  <div class="card">
+  <div class="filterstrip">
     <div class="filters">
       <label>Doelgroep <select id="audSel"><option value="">alle</option></select></label>
       <label>Producttype <select id="typeSel"><option value="">alle</option></select></label>
       <div class="chips" id="retailerChips"></div>
     </div>
+    <p class="sub prijsbasis">Alle bedragen in dit dashboard zijn <b>voor-prijzen</b> — de prijs
+      die de klant nu betaalt. De van-prijs (doorstreept) telt alleen mee in sale-druk en
+      kortingsdiepte, en staat apart in de artikel-explorer.</p>
   </div>
-
+</div>
+<main>
   <div class="card">
     <h2>Actueel assortiment</h2>
     <p class="sub">Actieve artikelen online in de gekozen week, met verschil t.o.v. de week ervoor en het aandeel afgeprijsd.</p>
@@ -176,12 +188,13 @@
     <div class="card">
       <h2>Signalen van de week</h2>
       <p class="sub">Bewegingen t.o.v. de week ervoor, boven dezelfde drempels als het
-        weekrapport; gerangschikt op impact. De filters bovenaan werken hier ook.</p>
+        weekrapport; gerangschikt op impact. Prijsbewegingen op voor-prijs (mediaan en
+        instapniveau). De filters bovenaan werken hier ook.</p>
       <div id="signalen"></div>
     </div>
     <div class="card">
       <h2>Prijsindex per groep</h2>
-      <p class="sub">Mediaanprijs per groep, terStal = 100. Rood: concurrent zit ónder ons
+      <p class="sub">Mediaan van de voor-prijs per groep, terStal = 100. Rood: concurrent zit ónder ons
         (prijsdruk), blauw: erboven (marge­ruimte). Kompas, geen rechter — kwaliteitsverschil
         is online onzichtbaar.</p>
       <div class="plot-wrap" id="prijsindex"></div>
@@ -218,7 +231,8 @@
   <div class="card">
     <div class="tools"><button data-tbl="punten">Tabel</button></div>
     <h2>Prijspuntenverdeling</h2>
-    <p class="sub">Aantal artikelen per prijsband in de actuele stand — het prijspuntenspel van het waardesegment. Kies een producttype.</p>
+    <p class="sub">Aantal artikelen per prijsband (voor-prijs) in de actuele stand — het
+      prijspuntenspel van het waardesegment. Kies een producttype.</p>
     <div class="plot" id="puntenPlot"><canvas id="puntenChart"></canvas></div>
     <div class="hint hidden" id="puntenHint">Kies eerst een producttype in de filterbalk.</div>
     <div id="puntenTbl" class="plot-wrap hidden"></div>
@@ -226,7 +240,8 @@
 
   <div class="card">
     <h2>Grootste prijsverlagingen in deze week</h2>
-    <p class="sub">Uit de mutatieregistratie (top 20 op procentuele verlaging, binnen de gekozen bronnen).</p>
+    <p class="sub">Uit de mutatieregistratie: verlaging van de ene voor-prijs naar de andere
+      (top 20 op procentuele verlaging, binnen de gekozen bronnen).</p>
     <div class="plot-wrap" id="movers"></div>
   </div>
 
@@ -234,7 +249,8 @@
     <h2>Nieuw deze week</h2>
     <p class="sub">Wat de concurrent deze week online nieuw hing (uit de mutatieregistratie) —
       klik een artikelnaam om hem op de site van de concurrent te openen. Per bron worden de
-      eerste vier getoond; de volledige lijst vind je via de artikel-explorer.</p>
+      eerste vier getoond; de volledige lijst vind je via de artikel-explorer. Het bedrag bij
+      een artikel is de voor-prijs.</p>
     <p class="sub" id="instroomTelling" style="margin-bottom:10px"></p>
     <div class="instroom" id="instroom"></div>
   </div>
@@ -439,14 +455,19 @@ function buildFilters() {
 const naam = rid => state.retailers[rid]?.name || rid;
 const weeksInRange = () => state.weeks.slice(0, state.range).reverse();
 
-function seriesFromStats(field) {
+// type "bar" (de standaard voor omvang en mediaanprijs) zet elke week als staaf naast
+// elkaar: het gaat om losse weekmetingen, niet om een doorlopend verloop, en een staaf
+// begint eerlijk bij nul. "line" blijft beschikbaar voor doorlopende reeksen.
+function seriesFromStats(field, type = "bar") {
   const weeks = weeksInRange();
-  // In de eerste weken is een lijn zonder punten onzichtbaar (1 week = 0 lijnstukken);
-  // toon dan stippen. Vanaf 3 weken nemen de lijnen het over en gaan de stippen uit.
-  const stipRadius = weeks.length <= 2 ? 4 : 0;
+  // Bij een lijn is één meetweek onzichtbaar (1 week = 0 lijnstukken); toon dan stippen.
+  const stipRadius = type === "line" && weeks.length <= 2 ? 4 : 0;
   return state.selected.map(rid => ({
     label: naam(rid), borderColor: slotColor(rid), backgroundColor: slotColor(rid),
-    borderWidth: 2, pointRadius: stipRadius, pointHoverRadius: 5, pointHitRadius: 14,
+    borderWidth: type === "bar" ? 0 : 2,
+    borderRadius: type === "bar" ? 3 : undefined,
+    maxBarThickness: type === "bar" ? 18 : undefined,
+    pointRadius: stipRadius, pointHoverRadius: 5, pointHitRadius: 14,
     tension: 0.2, spanGaps: true,
     data: weeks.map(w => {
       const rows = state.stats.filter(s => s.retailer_id === rid && s.week === w
@@ -460,7 +481,7 @@ function seriesFromStats(field) {
   }));
 }
 
-function baseOptions(yFmt) {
+function baseOptions(yFmt, vanafNul = false) {
   const ink2 = cssVar("--ink-2"), grid = cssVar("--grid"), muted = cssVar("--muted");
   return {
     responsive: true, maintainAspectRatio: false, animation: false,
@@ -471,7 +492,8 @@ function baseOptions(yFmt) {
     },
     scales: {
       x: { ticks: { color: muted }, grid: { display: false }, border: { color: cssVar("--axis") } },
-      y: { ticks: { color: muted, callback: v => yFmt(v) }, grid: { color: grid }, border: { display: false } },
+      y: { beginAtZero: vanafNul, ticks: { color: muted, callback: v => yFmt(v) },
+           grid: { color: grid }, border: { display: false } },
     },
   };
 }
@@ -479,7 +501,8 @@ function baseOptions(yFmt) {
 function drawChart(id, type, labels, datasets, yFmt) {
   if (charts[id]) charts[id].destroy();
   charts[id] = new Chart(document.getElementById(id),
-    { type, data: { labels, datasets }, options: baseOptions(yFmt) });
+    // Een staaf die niet bij nul begint liegt over de verhouding tussen de bronnen.
+    { type, data: { labels, datasets }, options: baseOptions(yFmt, type === "bar") });
 }
 
 function tableFrom(labels, datasets, fmt) {
@@ -627,11 +650,11 @@ function renderIndex() {
 
 function renderOmvang() {
   const labels = weeksInRange().map(isoWeekLabel);
-  const ds = seriesFromStats("active_count");
+  const ds = seriesFromStats("active_count", "bar");
   const scope = [state.aud || "alle doelgroepen", state.type || "alle producttypen"].join(" · ");
   document.getElementById("omvangSub").textContent =
     `Actieve artikelen per week — ${scope}.`;
-  drawChart("omvangChart", "line", labels, ds, v => (+v).toLocaleString("nl-NL"));
+  drawChart("omvangChart", "bar", labels, ds, v => (+v).toLocaleString("nl-NL"));
   document.getElementById("omvangTbl").innerHTML =
     tableFrom(labels, ds, v => (+v).toLocaleString("nl-NL"));
 }
@@ -653,18 +676,18 @@ function renderMediaan() {
   document.getElementById("mediaanPlot").classList.toggle("hidden", !ok);
   document.getElementById("mediaanHint").classList.toggle("hidden", ok);
   document.getElementById("mediaanSub").textContent = perStuk
-    ? "Mediaan van de prijs per stuk — multipacks (3-pack, 5 paar) omgerekend naar één stuk, "
-      + "zodat bronnen met veel packs eerlijk naast de rest staan."
-    : "Mediaan van de gekozen productgroep — kies een doelgroep én producttype; "
-      + "prijzen over gemengde groepen middelen is misleidend.";
+    ? "Mediaan van de voor-prijs per stuk — multipacks (3-pack, 5 paar) omgerekend naar één "
+      + "stuk, zodat bronnen met veel packs eerlijk naast de rest staan."
+    : "Mediaan van de voor-prijs in de gekozen productgroep — kies een doelgroep én "
+      + "producttype; prijzen over gemengde groepen middelen is misleidend.";
   if (!ok) { document.getElementById("mediaanTbl").innerHTML = ""; return; }
   const labels = weeksInRange().map(isoWeekLabel);
-  const ds = seriesFromStats(perStuk ? "unit_price_median" : "price_median");
+  const ds = seriesFromStats(perStuk ? "unit_price_median" : "price_median", "bar");
   if (perStuk && !ds.some(d => d.data.some(v => v != null))) {
     document.getElementById("mediaanSub").textContent +=
       " — nog geen per-stuk-cijfers in deze periode (draai sql/migratie_prijs_per_stuk.sql).";
   }
-  drawChart("mediaanChart", "line", labels, ds, eur);
+  drawChart("mediaanChart", "bar", labels, ds, eur);
   document.getElementById("mediaanTbl").innerHTML = tableFrom(labels, ds, eur);
 }
 
