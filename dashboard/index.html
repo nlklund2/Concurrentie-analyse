@@ -183,7 +183,7 @@
 <main>
   <div class="card">
     <h2>Actueel assortiment</h2>
-    <p class="sub">Actieve artikelen online in de gekozen week, met verschil t.o.v. de week ervoor en het aandeel afgeprijsd.</p>
+    <p class="sub" id="tilesSub">Actieve artikelen online in de gekozen week, met verschil t.o.v. de week ervoor en het aandeel afgeprijsd.</p>
     <div class="tiles" id="tiles"></div>
   </div>
 
@@ -528,14 +528,40 @@ document.getElementById("explZoek").addEventListener("input", () => {
   explTimer = setTimeout(renderExplorer, 300);
 });
 
+// Weektotalen per bron binnen de gekozen doelgroep/producttype. Zonder filters
+// komt dit op hetzelfde uit als de view v_retailer_week_totals; mét filters telt
+// het alleen de gekozen groepen, zodat de tegels hetzelfde beeld tonen als de
+// grafieken eronder. Sale-druk weegt mee met de omvang van elke groep — het
+// gemiddelde van percentages over ongelijke groepen is een ander getal.
+function totalenPerBron(week) {
+  const uit = {};
+  state.stats.forEach(s => {
+    if (s.week !== week) return;
+    if (state.aud && s.audience !== state.aud) return;
+    if (state.type && s.product_type !== state.type) return;
+    const t = uit[s.retailer_id] ||= { active_count: 0, new_count: 0, gone_count: 0, _sale: 0 };
+    t.active_count += s.active_count;
+    t.new_count += s.new_count || 0;
+    t.gone_count += s.gone_count || 0;
+    t._sale += Number(s.sale_share || 0) * s.active_count;
+  });
+  Object.values(uit).forEach(t => {
+    t.sale_share = t.active_count ? t._sale / t.active_count : null;
+  });
+  return uit;
+}
+
 function renderTiles() {
-  const cur = Object.fromEntries(state.totals.filter(t => t.week === state.week)
-    .map(t => [t.retailer_id, t]));
+  const cur = totalenPerBron(state.week);
   const prevWeek = state.weeks[state.weeks.indexOf(state.week) + 1];
-  const prev = Object.fromEntries(state.totals.filter(t => t.week === prevWeek)
-    .map(t => [t.retailer_id, t]));
+  const prev = prevWeek ? totalenPerBron(prevWeek) : {};
+  const scope = [state.aud || "alle doelgroepen", state.type || "alle producttypen"].join(" · ");
+  document.getElementById("tilesSub").textContent =
+    `Actieve artikelen online in de gekozen week — ${scope} — met verschil t.o.v. de `
+    + `week ervoor, het aandeel afgeprijsd en het vernieuwingstempo.`;
   document.getElementById("tiles").innerHTML = state.selected.map(rid => {
-    const c = cur[rid], p = prev[rid];
+    const c = cur[rid] && cur[rid].active_count ? cur[rid] : null;
+    const p = prev[rid] && prev[rid].active_count ? prev[rid] : null;
     let d = "–";
     if (c && p && p.active_count) {
       const dd = (c.active_count - p.active_count) / p.active_count;
