@@ -268,7 +268,7 @@ def diagnose(url: str, render: bool = True) -> str:
         # dan is hier direct te zien wát er dan in staat (W36: het hele
         # assortiment werd 'jongens/nachtmode' zonder dat de code wijzigde).
         for i, blok in enumerate(_LDJSON_RE.findall(html)[:3], 1):
-            regels.append(f"- ld+json {i}: `" + " ".join(blok.split())[:700] + "`")
+            regels.append(f"- ld+json {i}: `" + " ".join(blok.split())[:1400] + "`")
         eerste = next((p for p in prods if p.title), None)
         if eerste is not None:
             regels.append(f"- eerste extractieproduct: {eerste.title[:60]!r} à "
