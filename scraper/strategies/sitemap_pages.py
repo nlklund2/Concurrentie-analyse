@@ -211,5 +211,12 @@ def _breadcrumb(objs: list) -> str:
                     if name:
                         names.append(str(name))
             if names:
+                # Het laatste kruimelelement is vrijwel altijd het artikel
+                # zelf — een titel, geen categorie. Bij terStal (W36)
+                # maskeerde die staart bovendien het statische sjabloonpad
+                # ervóór: elke pagina leek een nét andere breadcrumb te
+                # hebben terwijl de categorielaag overal identiek was.
+                if len(names) >= 2:
+                    names = names[:-1]
                 return " > ".join(names)
     return ""

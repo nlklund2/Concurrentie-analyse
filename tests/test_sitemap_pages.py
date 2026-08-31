@@ -8,15 +8,18 @@ from scraper.config import RetailerCfg
 
 
 def _pagina(naam: str, sku: str, kruimel: str) -> str:
+    # Zoals terStal na de sitevernieuwing: het kruimelpad eindigt op het
+    # artikel zelf, waardoor elke pagina nét een andere breadcrumb lijkt te
+    # hebben terwijl de categorielaag ervóór overal identiek is.
+    items = [f'{{"@type":"ListItem","position":{i},"item":{{"@id":"https://voorbeeld.nl/{i}","name":"{n}"}}}}'
+             for i, n in enumerate(kruimel.split(" > ") + [naam], 1)]
     return f'''<html><head>
       <script type="application/ld+json">{{"@context":"http://schema.org",
         "@type":"Product","name":"{naam}","sku":"{sku}",
         "url":"https://voorbeeld.nl/{sku}.html",
         "offers":{{"price":"7.99","priceCurrency":"EUR"}}}}</script>
       <script type="application/ld+json">{{"@context":"http://schema.org",
-        "@type":"BreadcrumbList","itemListElement":[
-          {{"@type":"ListItem","position":1,"item":{{"@id":"https://voorbeeld.nl/",
-            "name":"{kruimel}"}}}}]}}</script>
+        "@type":"BreadcrumbList","itemListElement":[{",".join(items)}]}}</script>
       </head><body></body></html>'''
 
 
