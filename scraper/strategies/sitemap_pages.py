@@ -6,6 +6,7 @@ geweigerd zodat een run nooit uren op één bron blijft hangen.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from urllib.parse import urlsplit
 
 from .. import discover
@@ -52,6 +53,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     herhaald = 0
     gezien: dict[str, str] = {}     # sleutel → titel, voor de diagnose
     zonder_prijs: list[str] = []
+    kruimels: list[tuple[Product, str]] = []   # per product zijn eigen breadcrumb
     for url in product_urls[:cap]:
         resp = http.get(url)
         if resp is None:
@@ -85,13 +87,33 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         gezien[p.key] = p.title
         if p.price is None and len(zonder_prijs) < 3:
             zonder_prijs.append(url)
-        # Het URL-pad draagt bij vrijwel elke shop de doelgroep ("/dames/ondergoed/");
-        # samen met de breadcrumb geeft dat de mapping het sterkste signaal.
-        p.category_raw = " ".join(x for x in (
-            _breadcrumb(objs), p.category_raw, _pad(url)) if x)[:500]
+        kruimels.append((p, _breadcrumb(objs)))
         if not p.url:
             p.url = url
         res.products.append(p)
+    # Een breadcrumb die op (vrijwel) elke pagina identiek is, is sjabloon- of
+    # navigatieruis, geen artikelinformatie. terStal zette na de sitevernieuwing
+    # (W36) op élke productpagina 'kinderen > jongens > nachtmode > onesies',
+    # waardoor 687 artikelen — tot beha's aan toe — die groep in schoven. De
+    # doelgroep valt dan liever terug op titel/URL (desnoods 'onbekend') dan
+    # dat het hele assortiment één verzonnen groep krijgt.
+    sjabloon = ""
+    telling = Counter(bc for _, bc in kruimels if bc)
+    if len(res.products) >= 8 and telling:
+        top, n = telling.most_common(1)[0]
+        if n / len(res.products) > 0.5:
+            sjabloon = top
+            res.notes.append(
+                f"breadcrumb genegeerd als categoriebron: {n} van "
+                f"{len(res.products)} pagina's droegen exact dezelfde "
+                f"('{top[:90]}') — sjabloon, geen artikelinformatie")
+    for p, bc in kruimels:
+        if bc == sjabloon:
+            bc = ""
+        # Het URL-pad draagt bij vrijwel elke shop de doelgroep ("/dames/ondergoed/");
+        # samen met de (niet-sjabloon-)breadcrumb het sterkste mappingsignaal.
+        p.category_raw = " ".join(x for x in (
+            bc, p.category_raw, _pad(p.url or "")) if x)[:500]
     if gemist:
         res.notes.append(f"{gemist} productpagina's zonder leesbare productdata")
     if zonder_prijs:
@@ -189,5 +211,12 @@ def _breadcrumb(objs: list) -> str:
                     if name:
                         names.append(str(name))
             if names:
+                # Het laatste kruimelelement is vrijwel altijd het artikel
+                # zelf — een titel, geen categorie. Bij terStal (W36)
+                # maskeerde die staart bovendien het statische sjabloonpad
+                # ervóór: elke pagina leek een nét andere breadcrumb te
+                # hebben terwijl de categorielaag overal identiek was.
+                if len(names) >= 2:
+                    names = names[:-1]
                 return " > ".join(names)
     return ""

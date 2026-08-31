@@ -24,6 +24,10 @@ from urllib.parse import urlsplit
 from .http import Http
 from .jsonscan import deep_find_products, products_from_html
 
+_LDJSON_RE = re.compile(
+    r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+    re.I | re.S)
+
 # Prijsachtig zonder valutateken: 3,99 of 3.99, niet 35 - 46 (maten), geen
 # jaartallen en geen versienummers (5.51.0 — telde op Zeeman als prijs terwijl
 # het een scriptnaam in de cookiedialoog was). Signaal, geen extractieregel.
@@ -259,6 +263,16 @@ def diagnose(url: str, render: bool = True) -> str:
         for m in list(PRIJS_LOS_RE.finditer(html))[:3]:
             ctx = html[max(0, m.start() - 60):m.end() + 40]
             regels.append("- context: `…" + " ".join(ctx.split()) + "…`")
+        # De ld+json-blokken voluit: bij bronnen als terStal beslist de
+        # breadcrumb hierin de doelgroep — vernieuwt de site het sjabloon,
+        # dan is hier direct te zien wát er dan in staat (W36: het hele
+        # assortiment werd 'jongens/nachtmode' zonder dat de code wijzigde).
+        for i, blok in enumerate(_LDJSON_RE.findall(html)[:3], 1):
+            regels.append(f"- ld+json {i}: `" + " ".join(blok.split())[:1400] + "`")
+        eerste = next((p for p in prods if p.title), None)
+        if eerste is not None:
+            regels.append(f"- eerste extractieproduct: {eerste.title[:60]!r} à "
+                          f"{eerste.price} · category_raw: {(eerste.category_raw or '')[:200]!r}")
         if not render:
             return "\n".join(regels)
 

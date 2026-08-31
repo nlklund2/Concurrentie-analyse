@@ -26,6 +26,30 @@ def test_fc_diagnose_json_endpoint(monkeypatch):
     assert "geldige JSON" in md and "producten via deep_find: 1" in md
 
 
+def test_gewone_diagnose_toont_ldjson_en_category_raw(monkeypatch):
+    """W36: terStal vernieuwde de site en het hele assortiment werd
+    'jongens/nachtmode' — de diagnose moet de ld+json en de category_raw
+    van het extractieproduct laten zien om zoiets direct te kunnen duiden."""
+    html = ('<html><head><script type="application/ld+json">'
+            '{"@type":"Product","name":"2-pack boxershorts",'
+            '"offers":{"price":"9.99","priceCurrency":"EUR"},'
+            '"category":"Jongens > Nachtmode"}</script></head>'
+            '<body>€ 9,99</body></html>')
+
+    class _Resp:
+        status_code = 200
+        text = html
+
+    class _Http:
+        def __init__(self, **kw): ...
+        def get(self, url): return _Resp()
+
+    monkeypatch.setattr(dg, "Http", _Http)
+    md = dg.diagnose("https://voorbeeld.nl/2-pack-boxershorts-1.html", render=False)
+    assert "ld+json 1:" in md and "Jongens > Nachtmode" in md
+    assert "eerste extractieproduct" in md and "category_raw" in md
+
+
 def test_rapport_overleeft_een_kapotte_url(monkeypatch):
     def knal(*a, **kw):
         raise RuntimeError("kapot")
