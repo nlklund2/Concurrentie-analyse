@@ -91,6 +91,25 @@ def test_products_from_escaped_attrs_hema_tegel():
     assert len(prods) == 1
     assert prods[0].title == "niet-voorgevormde top zonder beugel"
     assert prods[0].price == 8.69
+    # De tegel-JSON draagt zelf geen URL; het anker in dezelfde tegel wel.
+    assert prods[0].url == "https://www.hema.nl/dames/lingerie/bh/top"
+
+
+def test_escaped_attrs_anker_dat_de_tegel_omsluit():
+    """Variant waarin de productlink vóór het attribuut staat: het anker
+    omsluit de hele tegel. Zonder link in de buurt blijft de url leeg."""
+    from scraper.jsonscan import products_from_html
+    html = ('<a href="/dames/slips/hipster-456">'
+            '<div data-gtm="{&quot;name&quot;:&quot;hipsters katoen&quot;,'
+            '&quot;masterSKU&quot;:&quot;HEM1111111&quot;,'
+            '&quot;price&quot;:&quot;6.00&quot;}"></div></a>')
+    prods = products_from_html(html, "https://www.hema.nl")
+    assert prods[0].url == "https://www.hema.nl/dames/slips/hipster-456"
+
+    kaal = ('<div data-gtm="{&quot;name&quot;:&quot;hipsters katoen&quot;,'
+            '&quot;masterSKU&quot;:&quot;HEM1111111&quot;,'
+            '&quot;price&quot;:&quot;6.00&quot;}"></div>')
+    assert products_from_html(kaal, "https://www.hema.nl")[0].url == ""
 
 
 def test_escaped_attrs_slikt_kapotte_json_stil():

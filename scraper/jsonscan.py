@@ -395,6 +395,26 @@ def products_from_js_state(html: str, base_url: str = "") -> list[Product]:
 # onzichtbaar voor tekst-, script- én dataLayer-lezers.
 _ESCAPED_ATTR_RE = re.compile(r'"(\[?\{&quot;[^"]{20,200000}[\}\]])"')
 
+_HREF_RE = re.compile(r'href="([^"#][^"]*)"')
+
+
+def _tegel_link(html: str, start: int, end: int, base_url: str) -> str:
+    """De productlink van de tegel waar het escaped attribuut in zit.
+
+    De tegel-JSON zelf draagt geen URL (593 HEMA-weekregels zonder link tot
+    W36); het anker staat in dezelfde tegel — meestal ná het attribuut
+    (anker ín de tegel), soms ervóór (anker omsluit de tegel).
+    """
+    m = _HREF_RE.search(html, end, min(len(html), end + 1500))
+    kandidaat = m.group(1) if m else ""
+    if not kandidaat:
+        ervoor = _HREF_RE.findall(html[max(0, start - 300):start])
+        kandidaat = ervoor[-1] if ervoor else ""
+    kandidaat = html_mod.unescape(kandidaat).strip()
+    if not kandidaat or kandidaat.startswith(("javascript:", "mailto:", "tel:")):
+        return ""
+    return urljoin(base_url, kandidaat)
+
 
 def products_from_escaped_attrs(html: str, base_url: str = "") -> list[Product]:
     products: list[Product] = []
@@ -402,8 +422,16 @@ def products_from_escaped_attrs(html: str, base_url: str = "") -> list[Product]:
         if n >= 400:
             break
         data = _json_loads_lenient(html_mod.unescape(m.group(1)))
-        if data is not None:
-            products.extend(deep_find_products(data, base_url))
+        if data is None:
+            continue
+        found = deep_find_products(data, base_url)
+        if found and any(not p.url for p in found):
+            link = _tegel_link(html, m.start(), m.end(), base_url)
+            if link:
+                for p in found:
+                    if not p.url:
+                        p.url = link
+        products.extend(found)
     return products
 
 
