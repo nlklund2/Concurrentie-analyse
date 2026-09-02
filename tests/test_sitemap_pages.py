@@ -7,17 +7,19 @@ from scraper import discover
 from scraper.config import RetailerCfg
 
 
-def _pagina(naam: str, sku: str, kruimel: str) -> str:
+def _pagina(naam: str, sku: str, kruimel: str,
+            prijs: str = "7.99", voorraad: str = "") -> str:
     # Zoals terStal na de sitevernieuwing: het kruimelpad eindigt op het
     # artikel zelf, waardoor elke pagina nét een andere breadcrumb lijkt te
     # hebben terwijl de categorielaag ervóór overal identiek is.
     items = [f'{{"@type":"ListItem","position":{i},"item":{{"@id":"https://voorbeeld.nl/{i}","name":"{n}"}}}}'
              for i, n in enumerate(kruimel.split(" > ") + [naam], 1)]
+    beschikbaar = f'"availability":"{voorraad}",' if voorraad else ""
     return f'''<html><head>
       <script type="application/ld+json">{{"@context":"http://schema.org",
         "@type":"Product","name":"{naam}","sku":"{sku}",
         "url":"https://voorbeeld.nl/{sku}.html",
-        "offers":{{"price":"7.99","priceCurrency":"EUR"}}}}</script>
+        "offers":{{{beschikbaar}"price":"{prijs}","priceCurrency":"EUR"}}}}</script>
       <script type="application/ld+json">{{"@context":"http://schema.org",
         "@type":"BreadcrumbList","itemListElement":[{",".join(items)}]}}</script>
       </head><body></body></html>'''
@@ -65,3 +67,24 @@ def test_wisselende_breadcrumbs_blijven_staan(monkeypatch):
     assert len(res.products) == 10
     assert all(f"afdeling-{i}" in res.products[i].category_raw for i in range(10))
     assert not any("breadcrumb genegeerd" in n for n in res.notes)
+
+
+def test_uitverkocht_zonder_prijs_telt_niet_mee(monkeypatch):
+    """terStal houdt verlopen artikelen als pagina in de sitemap met
+    OutOfStock + prijs 0.00; in W36 stonden zo 324 uitverkochte artikelen
+    als actief assortiment in de cijfers. Uitverkocht mét échte prijs
+    blijft tellen — dan is er prijsinformatie over een bestaand artikel."""
+    paginas = {
+        "https://voorbeeld.nl/actief-1.html":
+            _pagina("Actief artikel", "actief-1", "afdeling-1"),
+        "https://voorbeeld.nl/verlopen-1.html":
+            _pagina("Verlopen artikel", "verlopen-1", "afdeling-2",
+                    prijs="0.00", voorraad="http://schema.org/OutOfStock"),
+        "https://voorbeeld.nl/oos-met-prijs.html":
+            _pagina("Uitverkocht met prijs", "oos-met-prijs", "afdeling-3",
+                    prijs="9.99", voorraad="http://schema.org/OutOfStock"),
+    }
+    res = _draai(monkeypatch, paginas)
+    titels = {p.title for p in res.products}
+    assert titels == {"Actief artikel", "Uitverkocht met prijs"}
+    assert any("1 uitverkochte artikelen" in n for n in res.notes)

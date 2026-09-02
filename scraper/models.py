@@ -15,6 +15,9 @@ class Product:
     sizes: str = ""      # aangeboden maten (kommagescheiden), géén voorraadinfo
     price: float | None = None
     was_price: float | None = None
+    # Alleen gevuld als de bron het expliciet meldt (schema.org availability);
+    # None betekent "onbekend", niet "op voorraad".
+    in_stock: bool | None = None
 
 
 @dataclass
