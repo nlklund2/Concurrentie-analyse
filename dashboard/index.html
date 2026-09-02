@@ -211,8 +211,11 @@
       <div id="signalen"></div>
     </div>
     <div class="card">
+      <div class="tools">
+        <label class="hint" style="cursor:pointer"><input type="checkbox" id="idxPerStuk"> per stuk</label>
+      </div>
       <h2>Prijsindex per groep</h2>
-      <p class="sub">Mediaan van de voor-prijs per groep, terStal = 100. Rood: concurrent zit ónder ons
+      <p class="sub" id="idxSub">Mediaan van de voor-prijs per groep, terStal = 100. Rood: concurrent zit ónder ons
         (prijsdruk), blauw: erboven (marge­ruimte). Kompas, geen rechter — kwaliteitsverschil
         is online onzichtbaar.</p>
       <div class="plot-wrap" id="prijsindex"></div>
@@ -437,6 +440,7 @@ function buildFilters() {
   weekSel.onchange = () => { state.week = weekSel.value; render(); };
   document.getElementById("rangeSel").onchange = e => { state.range = +e.target.value; render(); };
   document.getElementById("perStuk").onchange = render;
+  document.getElementById("idxPerStuk").onchange = render;
 
   const auds = [...new Set(state.stats.map(s => s.audience))].sort();
   const types = [...new Set(state.stats.map(s => s.product_type))].sort();
@@ -652,6 +656,17 @@ function renderSignalen() {
 // Zelfde indexberekening als report.py (§5): mediaan t.o.v. terStal, min. 8 artikelen.
 function renderIndex() {
   const box = document.getElementById("prijsindex");
+  // 'Per stuk' rekent de index op prijs ÷ verpakkingsaantal: multipacks
+  // (3-pack, 5 paar) eerlijk naast losse verkoop — het beeld kan kantelen
+  // (Primark: sticker 100, per stuk 50 in dames/ondergoed, W36).
+  const perStuk = document.getElementById("idxPerStuk").checked;
+  const veld = perStuk ? "unit_price_median" : "price_median";
+  document.getElementById("idxSub").textContent = perStuk
+    ? "Mediaan van de prijs per stuk (multipacks omgerekend), terStal = 100. Rood: "
+      + "concurrent zit ónder ons (prijsdruk), blauw: erboven (marge­ruimte)."
+    : "Mediaan van de voor-prijs per groep, terStal = 100. Rood: concurrent zit ónder ons "
+      + "(prijsdruk), blauw: erboven (marge­ruimte). Kompas, geen rechter — "
+      + "kwaliteitsverschil is online onzichtbaar.";
   const rows = state.stats.filter(s => s.week === state.week
     && (!state.aud || s.audience === state.aud)
     && (!state.type || s.product_type === state.type));
@@ -677,12 +692,12 @@ function renderIndex() {
   let getoond = 0;
   for (const g of groepen) {
     const t = ter.get(g);
-    if (!t || !Number(t.price_median) || t.active_count < MIN_GROUP) continue;
+    if (!t || !Number(t[veld]) || t.active_count < MIN_GROUP) continue;
     const cellen = anderen.map(rid => {
       const c = cel.get(`${rid}|${g}`);
-      if (!c || !Number(c.price_median) || c.active_count < MIN_GROUP)
+      if (!c || !Number(c[veld]) || c.active_count < MIN_GROUP)
         return `<td class="num" style="color:var(--muted)">–</td>`;
-      const idx = Math.round(Number(c.price_median) / Number(t.price_median) * 100);
+      const idx = Math.round(Number(c[veld]) / Number(t[veld]) * 100);
       const kl = idx <= 80 ? "u2" : idx < 95 ? "u1" : idx <= 105 ? "mid" : idx < 120 ? "o1" : "o2";
       return `<td class="num"><span class="idxcel ${kl}" title="index ${idx} (terStal = 100)">${idx}</span></td>`;
     });
