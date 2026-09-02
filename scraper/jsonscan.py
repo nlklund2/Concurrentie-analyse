@@ -130,6 +130,33 @@ def _offer_prices(offers) -> tuple[float | None, float | None]:
     return price, was
 
 
+def _offer_availability(offers) -> bool | None:
+    """Voorraadstatus volgens schema.org availability; None = niet vermeld.
+
+    terStal (Magento) laat verlopen artikelen als pagina bestaan met
+    OutOfStock + prijs 0.00 — zulke pagina's zijn geen actief assortiment.
+    Bij meerdere offers geldt: één op voorraad = op voorraad; pas als álle
+    offers expliciet uitverkocht melden, telt het artikel als uitverkocht.
+    """
+    lijst = offers if isinstance(offers, list) else [offers]
+    gezien: set[bool] = set()
+    for o in lijst:
+        if not isinstance(o, dict):
+            continue
+        waarde = str(o.get("availability") or "").lower()
+        if not waarde:
+            continue
+        if any(w in waarde for w in ("outofstock", "soldout", "discontinued")):
+            gezien.add(False)
+        else:                       # InStock, PreOrder, BackOrder, LimitedAvailability …
+            gezien.add(True)
+    if True in gezien:
+        return True
+    if False in gezien:
+        return False
+    return None
+
+
 def products_from_jsonld(objs: list, base_url: str = "") -> list[Product]:
     """schema.org Product-objecten (los, in @graph of in ItemList)."""
     found: list[Product] = []
@@ -165,7 +192,8 @@ def products_from_jsonld(objs: list, base_url: str = "") -> list[Product]:
                 found.append(Product(key=str(key), title=name, url=url,
                                      brand=str(brand or ""), category_raw=str(cat),
                                      color=color, sizes=sizes,
-                                     price=price, was_price=was))
+                                     price=price, was_price=was,
+                                     in_stock=_offer_availability(offers)))
         for v in node.values():
             if isinstance(v, (dict, list)):
                 walk(v)

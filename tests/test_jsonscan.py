@@ -97,3 +97,31 @@ def test_escaped_attrs_slikt_kapotte_json_stil():
     from scraper.jsonscan import products_from_html
     html = '<div data-x="{&quot;price&quot;:&quot;8.69&quot;">'   # niet afgesloten
     assert products_from_html(html, "https://www.hema.nl") == []
+
+
+def test_availability_uit_jsonld_offers():
+    """terStal (W36): verlopen artikelen blijven als pagina bestaan met
+    OutOfStock + prijs 0.00 — de voorraadstatus moet dus meekomen, zodat
+    sitemap_pages ze buiten het actieve assortiment kan houden."""
+    from scraper.jsonscan import products_from_jsonld
+
+    def obj(offers):
+        return [{"@type": "Product", "name": "funny sokken", "sku": "1235365-002",
+                 "url": "https://voorbeeld.nl/funny-sokken.html", "offers": offers}]
+
+    uit = products_from_jsonld(obj({"availability": "http://schema.org/OutOfStock",
+                                    "price": "0.00", "priceCurrency": "EUR"}))
+    assert uit[0].in_stock is False and uit[0].price is None
+
+    aan = products_from_jsonld(obj({"availability": "https://schema.org/InStock",
+                                    "price": "7.99", "priceCurrency": "EUR"}))
+    assert aan[0].in_stock is True and aan[0].price == 7.99
+
+    onbekend = products_from_jsonld(obj({"price": "7.99", "priceCurrency": "EUR"}))
+    assert onbekend[0].in_stock is None
+
+    # meerdere offers: één maat leverbaar = artikel leverbaar
+    deels = products_from_jsonld(obj([
+        {"availability": "http://schema.org/OutOfStock", "price": "7.99"},
+        {"availability": "http://schema.org/InStock", "price": "7.99"}]))
+    assert deels[0].in_stock is True

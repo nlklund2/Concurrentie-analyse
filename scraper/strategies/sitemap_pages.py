@@ -51,6 +51,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                          "zijn een deelwaarneming, trends blijven vergelijkbaar")
     gemist = 0
     herhaald = 0
+    uitverkocht = 0
     gezien: dict[str, str] = {}     # sleutel → titel, voor de diagnose
     zonder_prijs: list[str] = []
     kruimels: list[tuple[Product, str]] = []   # per product zijn eigen breadcrumb
@@ -76,6 +77,14 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 p.price = micro
                 if p.was_price is None:
                     p.was_price = micro_was
+        if p.in_stock is False and p.price is None:
+            # De pagina bestaat nog, maar het artikel is niet meer te koop:
+            # terStal (Magento) houdt verlopen artikelen in de sitemap met
+            # OutOfStock + prijs 0.00. In W36 stonden zo 324 uitverkochte
+            # artikelen als 'actief assortiment' in de cijfers. Uitverkocht
+            # mét prijs blijft wél tellen — dan is er echte prijsinformatie.
+            uitverkocht += 1
+            continue
         if p.key in gezien:
             # Elke productpagina hoort een eigen artikel te leveren. Dezelfde
             # sleutel op tientallen pagina's betekent dat we een gedeeld blok
@@ -114,6 +123,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         # samen met de (niet-sjabloon-)breadcrumb het sterkste mappingsignaal.
         p.category_raw = " ".join(x for x in (
             bc, p.category_raw, _pad(p.url or "")) if x)[:500]
+    if uitverkocht:
+        res.notes.append(
+            f"{uitverkocht} uitverkochte artikelen (OutOfStock zonder prijs) "
+            "niet geteld — de pagina bestaat nog, het artikel is niet meer te koop")
     if gemist:
         res.notes.append(f"{gemist} productpagina's zonder leesbare productdata")
     if zonder_prijs:
