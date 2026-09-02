@@ -219,7 +219,9 @@ begin
          p_week, p_week, 'active', s.price, s.was_price
   from _snap s
   on conflict (retailer_id, product_key) do update set
-    url = excluded.url,
+    -- Een meting zonder URL (HEMA-tegels t/m W36) mag een bekende URL
+    -- niet wissen: de link blijft staan tot er een betere binnenkomt.
+    url = coalesce(nullif(excluded.url, ''), products.url),
     title = excluded.title,
     brand = excluded.brand,
     category_raw = excluded.category_raw,
@@ -234,13 +236,18 @@ begin
     current_was_price = excluded.current_was_price;
 
   -- Wekelijkse artikelfoto (artnr t/m URL) — idempotent per (bron, week).
+  -- URL desnoods uit de bekende stand (products is hierboven al bijgewerkt):
+  -- zo draagt de weekfoto de link ook bij bronnen die hem niet elke meting
+  -- meegeven.
   delete from weekly_articles where retailer_id = p_retailer and week = p_week;
   insert into weekly_articles (retailer_id, week, product_key, title, audience,
     product_type, category_raw, color, sizes, pack_size, price, was_price, url)
   select s.retailer_id, p_week, s.product_key, s.title, s.audience,
          s.product_type, s.category_raw, s.color, s.sizes, coalesce(s.pack_size, 1),
-         s.price, s.was_price, s.url
-  from _snap s;
+         s.price, s.was_price, coalesce(nullif(s.url, ''), p.url)
+  from _snap s
+  left join products p on p.retailer_id = s.retailer_id
+                      and p.product_key = s.product_key;
 
   -- Verdwenen: actief maar niet in deze snapshot. Op de snapshot toetsen, niet
   -- op last_seen < p_week: een herdraai binnen dezelfde week liet anders de
