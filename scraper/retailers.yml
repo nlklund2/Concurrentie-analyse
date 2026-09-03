@@ -157,20 +157,26 @@ retailers:
     enrich: false
     max_categories: 20
     max_pages_per_category: 15
-    # Gekalibreerd 09-08: Action heeft online ~24 bodywear-artikelen in de zes
-    # relevante categorieën; met de standaarddrempel van 25 zou een correcte
-    # meting elke week rood staan. De echte breukdetectie is de <50%-van-vorige-
-    # week-regel; deze drempel vangt alleen een totale instorting.
-    min_products_expected: 15
+    # Herijkt 03-09: bewijsprobe na de verse-sessie-fix leverde 222 artikelen
+    # over de zes categorieën (ondergoed 109, panty's 37, pyjama's 36, sokken
+    # 29+11). De oude "~24" was een meetfout: de sessiewering blokkeerde alles
+    # na de eerste categorie, vijf weken lang. Drempel op ±45% van de bewezen
+    # baseline; de <50%-van-vorige-week-regel blijft de fijne breukdetectie.
+    min_products_expected: 100
     notes: >-
       Prijszetter in sokken/boxers-multipacks.
       GEVALIDEERD 07-08: WERKT via de render-strategie nadat de cookiemuur wordt
-      weggeklikt (24 artikelen, 100% prijsdekking in de proef).
-      LET OP 09-08: de categoriepaden (/c/mode/ondergoed) dragen géén doelgroep,
-      dus de mapping leunt volledig op de titel. In week 32 stonden er banners
-      als artikel in de cijfers ("Veiligheidswaarschuwing…", €1,00 van €5,00);
-      de DOM-scan eist nu een echte productlink. Haalt Action daarmee de
-      drempel van 25 niet, dan blijft de bron rood — beter leeg dan vervuild.
+      weggeklikt. LET OP 09-08: de categoriepaden (/c/mode/ondergoed) dragen
+      géén doelgroep, dus de mapping leunt volledig op de titel; banners
+      geweerd via de productlink-eis in de DOM-scan.
+      DOORBRAAK 03-09: W32-36 bevatte alleen de eerste categorie (24 stuks
+      nachtmode) — Action weert de opgebouwde browsersessie: elke URL laadt
+      in een verse sessie (HTTP 200), maar binnen één sessie is al de tweede
+      goto dicht. De verse-sessie-herkansing in render_listing lost dat op
+      (probe: 17 pagina's alsnog geladen, 0 definitief geblokkeerd, 222
+      artikelen, 100% prijs). Het raster pagineert servergerenderd (?page=N);
+      kaarten dragen per-stuk-notaties ("€ 2,48/st") die niet als tweede
+      verkoopprijs tellen.
   hema:
     name: HEMA
     base: https://www.hema.nl
