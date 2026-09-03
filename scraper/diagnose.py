@@ -121,6 +121,29 @@ PAGINA_JS = r"""
     .filter(t => t && t.length < 40 &&
                  /volgende|vorige|next|prev|pagina \d|page \d|toon meer|laad meer|load more|show more/.test(t))
     .slice(0, 6);
+  // Kaarttekst van de eerste drie productkaarten, precies zoals de DOM-scan
+  // hem leest (link + klim naar de eerste voorouder met een prijs). Beslist
+  // of een gevangen promotekst bij het artikel hoort of een paginabreed
+  // element is dat in de klim meekomt — KiK gaf '-43% · -20%' op 37 kaarten.
+  const kaarten = [];
+  const padRe = /\/p\/|\/p-|\/product|\/artikel|\/dp\//i;
+  const prijsRe = /€\s*\d|\d[.,]\d{2}\s*€/;
+  for (const streng of [true, false]) {
+    const gezien = new Set();
+    for (const a of document.querySelectorAll('a[href]')) {
+      if (kaarten.length >= 3) break;
+      const href = a.href || '';
+      const laatste = (href.split(/[?#]/)[0].replace(/\/$/, '').split('/').pop() || '');
+      if (streng && !padRe.test(href) && !/\d{4,}/.test(laatste)) continue;
+      if (!href || gezien.has(href)) continue;
+      let card = a, hops = 0;
+      while (card && hops < 5 && !prijsRe.test(card.innerText || '')) { card = card.parentElement; hops++; }
+      if (!card || !prijsRe.test(card.innerText || '')) continue;
+      gezien.add(href);
+      kaarten.push(hops + '↑ ' + (card.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220));
+    }
+    if (kaarten.length) break;
+  }
   return {
     titel: (document.title || '').slice(0, 90),
     tekst: tekst.length,
@@ -128,7 +151,7 @@ PAGINA_JS = r"""
     euro: (tekst.match(/€/g) || []).length,
     eur: (tekst.match(/\bEUR\b/g) || []).length,
     prijsachtig: (tekst.match(/(?:^|[^\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)/g) || []).length,
-    attr, micro, scripts, pad, teller, pagLinks, pagKnoppen,
+    attr, micro, scripts, pad, teller, pagLinks, pagKnoppen, kaarten,
   };
 }
 """
@@ -391,6 +414,8 @@ def _render_diagnose(url: str) -> list[str]:
         if info.get("pagLinks") or info.get("pagKnoppen"):
             regels.append(f"- paginering: links {info.get('pagLinks') or 'geen'}, "
                           f"knoppen/teksten {info.get('pagKnoppen') or 'geen'}")
+        for i, kaart in enumerate(info.get("kaarten") or [], 1):
+            regels.append(f"- kaarttekst {i} (klim↑ + tekst zoals de DOM-scan leest): «{kaart}»")
 
         na_render = products_from_html(html, url)
         regels.append(f"- producten uit de gerenderde HTML: {len(na_render)}")
