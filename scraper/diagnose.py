@@ -502,12 +502,12 @@ def _render_diagnose(url: str) -> list[str]:
                           "pagina haalt zijn data dus niet via een API op")
 
         regels.append("")
-        regels.append(f"**Conclusie:** {_conclusie(info, na_render, api_treffers)}")
+        regels.append(f"**Conclusie:** {_conclusie(info, na_render, api_treffers, len(dom_kaarten))}")
         browser.close()
     return regels
 
 
-def _conclusie(info: dict, na_render: list, api_treffers: list) -> str:
+def _conclusie(info: dict, na_render: list, api_treffers: list, dom_n: int = 0) -> str:
     if info["tekst"] < 500:
         return ("de pagina laadt vrijwel geen tekst — blokkade of challenge. "
                 "Zonder residentiële proxy is deze bron niet te scrapen (PLAN.md §8).")
@@ -523,6 +523,12 @@ def _conclusie(info: dict, na_render: list, api_treffers: list) -> str:
     if info["euro"] == 0 and info["prijsachtig"] > 0:
         return ("er staan wél prijzen, maar zonder €-teken in de tekst (valutateken komt "
                 "waarschijnlijk uit CSS). De los-prijs-ronde van de DOM-scan vangt dit.")
+    if dom_n:
+        # KiK 03-09: de conclusie zei 'niet aan een kaart gekoppeld' terwijl het
+        # kaartvangnet 44 artikelen las — de vraag was niet óf, maar hoe goed.
+        return (f"het DOM-kaartvangnet koppelt {dom_n} artikelen aan een prijs — de "
+                "render-strategie werkt hier via de kaarttekst. Toets aan de kaarttekst "
+                "en prijsmarkup hierboven of prijs, was-prijs en promotekst kloppen.")
     if info["micro"] or info["attr"]:
         return ("prijzen staan in microdata of attributen in plaats van in de tekst — "
                 "daar leest de extractie nu ook op.")
