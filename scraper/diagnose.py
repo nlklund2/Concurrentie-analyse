@@ -18,11 +18,13 @@ Lees het rapport van boven naar beneden:
 from __future__ import annotations
 
 import json
+from collections import Counter
 import re
 from urllib.parse import urlsplit
 
 from .http import Http
 from .jsonscan import deep_find_products, products_from_html
+from .promo import promo_fragmenten
 
 _LDJSON_RE = re.compile(
     r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
@@ -78,7 +80,10 @@ PAGINA_JS = r"""
     .map(e => (e.getAttribute('content') || e.textContent || '').trim().slice(0, 30));
   const scripts = [...document.querySelectorAll(
       'script[type="application/json"],script[type="application/ld+json"],script#__NEXT_DATA__')]
-    .map(s => (s.id || s.type) + ' (' + (s.textContent || '').length + ' tekens)')
+    .map(s => (s.id || s.type) + ' (' + (s.textContent || '').length + ' tekens)'
+      // een id'd payload (__NUXT_DATA__, __NEXT_DATA__) kort inkijken: bij
+      // KiK is dat de enige plek waar de prijzen gestructureerd staan
+      + (s.id ? ' «' + (s.textContent || '').replace(/\s+/g, ' ').slice(0, 160) + '»' : ''))
     .slice(0, 6);
   // Waar staat het eerste prijsachtige getal? Het DOM-pad verraadt of het in
   // een productkaart zit of in een banner/voettekst.
@@ -121,6 +126,57 @@ PAGINA_JS = r"""
     .filter(t => t && t.length < 40 &&
                  /volgende|vorige|next|prev|pagina \d|page \d|toon meer|laad meer|load more|show more/.test(t))
     .slice(0, 6);
+  // Kaarttekst van de eerste drie productkaarten, precies zoals de DOM-scan
+  // hem leest (link + klim naar de eerste voorouder met een prijs). Beslist
+  // of een gevangen promotekst bij het artikel hoort of een paginabreed
+  // element is dat in de klim meekomt — KiK gaf '-43% · -20%' op 37 kaarten.
+  // Verspreid over de pagina (eerste, midden, laatste kaart): de eerste
+  // kaarten zijn vaak 'nieuw' zonder actie, de sale-kaarten staan verderop.
+  let kaarten = [];
+  let kaartHtml = [];
+  const padRe = /\/p\/|\/p-|\/product|\/artikel|\/dp\//i;
+  const prijsRe = /€\s*\d|\d[.,]\d{2}\s*€/;
+  // Hoe de prijs is opgemaakt (centen in een <sup>? doorstreept? omnibus-
+  // regel?) staat niet in innerText — KiK toont '€899' waar de kaart
+  // '€8' + '99' rendert. Het element rond het eerste €-teken, zonder
+  // svg/class/style-ruis, zegt wat de tekstlezer moet begrijpen.
+  const prijsMarkup = (card) => {
+    const w = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      if (!/€/.test(n.nodeValue || '')) continue;
+      let el = n.parentElement;
+      if (el && el.parentElement && el.parentElement !== card) el = el.parentElement;
+      return (el ? el.outerHTML : '')
+        .replace(/<svg[\s\S]*?<\/svg>/g, '')
+        .replace(/\s(?:class|style|d|srcset|src)="[^"]*"/g, '')
+        .replace(/\s+/g, ' ').slice(0, 420);
+    }
+    return '';
+  };
+  for (const streng of [true, false]) {
+    const gezien = new Set();
+    const alle = [];
+    const alleEls = [];
+    for (const a of document.querySelectorAll('a[href]')) {
+      const href = a.href || '';
+      const laatste = (href.split(/[?#]/)[0].replace(/\/$/, '').split('/').pop() || '');
+      if (streng && !padRe.test(href) && !/\d{4,}/.test(laatste)) continue;
+      if (!href || gezien.has(href)) continue;
+      let card = a, hops = 0;
+      while (card && hops < 5 && !prijsRe.test(card.innerText || '')) { card = card.parentElement; hops++; }
+      if (!card || !prijsRe.test(card.innerText || '')) continue;
+      gezien.add(href);
+      alle.push(hops + '↑ ' + (card.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220));
+      alleEls.push(card);
+    }
+    if (alle.length) {
+      const idx = [...new Set([0, Math.floor(alle.length / 2), alle.length - 1])];
+      kaarten = idx.map(i => '[' + (i + 1) + '/' + alle.length + '] ' + alle[i]);
+      kaartHtml = idx.map(i => '[' + (i + 1) + '/' + alle.length + '] ' + prijsMarkup(alleEls[i]));
+      break;
+    }
+  }
   return {
     titel: (document.title || '').slice(0, 90),
     tekst: tekst.length,
@@ -128,7 +184,7 @@ PAGINA_JS = r"""
     euro: (tekst.match(/€/g) || []).length,
     eur: (tekst.match(/\bEUR\b/g) || []).length,
     prijsachtig: (tekst.match(/(?:^|[^\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)/g) || []).length,
-    attr, micro, scripts, pad, teller, pagLinks, pagKnoppen,
+    attr, micro, scripts, pad, teller, pagLinks, pagKnoppen, kaarten, kaartHtml,
   };
 }
 """
@@ -330,7 +386,10 @@ def _render_diagnose(url: str) -> list[str]:
             # wél of níet langskomen (en met welke sleutels).
             if len(api_alle) < 8:
                 keys = list(data)[:5] if isinstance(data, dict) else f"lijst[{len(data)}]"
-                api_alle.append(f"{response.url[:100]} ({keys})")
+                # de eerste 150 tekens: 'data' als enige sleutel zegt niets,
+                # de inhoud wél (facets? producten? beide?)
+                peek = json.dumps(data, ensure_ascii=False)[:150]
+                api_alle.append(f"{response.url[:100]} ({keys}) «{peek}»")
             try:
                 gevonden = deep_find_products(data, response.url)
             except Exception:
@@ -359,13 +418,25 @@ def _render_diagnose(url: str) -> list[str]:
                     "() => document.querySelectorAll('a[href]').length")
             except Exception:
                 links_voor = None
-            # Trager en verder scrollen dan de scraper: zo blijkt of het raster
-            # alleen maar méér geduld nodig had.
-            for deel in (0.3, 0.6, 1.0):
-                page.evaluate(f"() => window.scrollTo(0, document.body.scrollHeight * {deel})")
-                page.wait_for_timeout(1200)
+            # Precies de laadroutine van de scraper (scroll-lus + 'toon meer'):
+            # de diagnose moet de pagina zien zoals de DOM-scan hem leest. Met
+            # drie losse scrolls zag de KiK-diagnose kaarten zonder percentage
+            # terwijl de probe op élke kaart '-43% · -20%' las.
+            from .models import ScrapeResult
+            from .strategies.render_listing import _scroll_tot_stabiel
+            laad = ScrapeResult(retailer_id="diagnose")
+            _scroll_tot_stabiel(page, laad)
             info = page.evaluate(PAGINA_JS)
             html = page.content()
+            laadnotities = list(laad.notes)
+            # Dezelfde DOM-kaartscan als de scraper: wat de probe per bron
+            # telt (artikelen, promo-aandeel) moet hier op één pagina
+            # naspeelbaar zijn, inclusief een voorbeeld mét en zónder promo.
+            from .strategies.render_listing import _dom_products
+            try:
+                dom_kaarten = _dom_products(page)
+            except Exception:
+                dom_kaarten = []
         except Exception as e:
             browser.close()
             return [f"- **browserfout:** {type(e).__name__}: {str(e)[:200]}"]
@@ -391,6 +462,30 @@ def _render_diagnose(url: str) -> list[str]:
         if info.get("pagLinks") or info.get("pagKnoppen"):
             regels.append(f"- paginering: links {info.get('pagLinks') or 'geen'}, "
                           f"knoppen/teksten {info.get('pagKnoppen') or 'geen'}")
+        for n in laadnotities:
+            regels.append(f"- laadroutine: {n}")
+        for kaart in info.get("kaarten") or []:
+            promo = promo_fragmenten(kaart)
+            regels.append(f"- kaarttekst [positie/aantal, klim↑, zoals de DOM-scan leest]: «{kaart}»"
+                          + (f" → promo: '{promo}'" if promo else " → promo: geen"))
+        for markup in info.get("kaartHtml") or []:
+            if markup.split("] ", 1)[-1]:
+                regels.append(f"- prijsmarkup van die kaart: `{markup}`")
+        if dom_kaarten:
+            met_promo = [p for p in dom_kaarten if p.promo_text]
+            top = Counter(p.promo_text for p in met_promo).most_common(4)
+            regels.append(f"- DOM-kaartscan van de scraper: {len(dom_kaarten)} artikelen, "
+                          f"{len(met_promo)} met promotekst"
+                          + (" — " + " | ".join(f"'{t[:40]}' ×{n}" for t, n in top) if top else ""))
+            zonder = [p for p in dom_kaarten if not p.promo_text]
+            for label, lijst in (("zonder promo", zonder), ("met promo", met_promo)):
+                if lijst:
+                    p = lijst[0]
+                    regels.append(f"    - voorbeeld {label}: {p.title[:50]!r} à {p.price}"
+                                  + (f" (was {p.was_price})" if p.was_price else "")
+                                  + (f", promo '{p.promo_text}'" if p.promo_text else ""))
+        else:
+            regels.append("- DOM-kaartscan van de scraper: 0 artikelen")
 
         na_render = products_from_html(html, url)
         regels.append(f"- producten uit de gerenderde HTML: {len(na_render)}")
@@ -407,12 +502,12 @@ def _render_diagnose(url: str) -> list[str]:
                           "pagina haalt zijn data dus niet via een API op")
 
         regels.append("")
-        regels.append(f"**Conclusie:** {_conclusie(info, na_render, api_treffers)}")
+        regels.append(f"**Conclusie:** {_conclusie(info, na_render, api_treffers, len(dom_kaarten))}")
         browser.close()
     return regels
 
 
-def _conclusie(info: dict, na_render: list, api_treffers: list) -> str:
+def _conclusie(info: dict, na_render: list, api_treffers: list, dom_n: int = 0) -> str:
     if info["tekst"] < 500:
         return ("de pagina laadt vrijwel geen tekst — blokkade of challenge. "
                 "Zonder residentiële proxy is deze bron niet te scrapen (PLAN.md §8).")
@@ -428,6 +523,12 @@ def _conclusie(info: dict, na_render: list, api_treffers: list) -> str:
     if info["euro"] == 0 and info["prijsachtig"] > 0:
         return ("er staan wél prijzen, maar zonder €-teken in de tekst (valutateken komt "
                 "waarschijnlijk uit CSS). De los-prijs-ronde van de DOM-scan vangt dit.")
+    if dom_n:
+        # KiK 03-09: de conclusie zei 'niet aan een kaart gekoppeld' terwijl het
+        # kaartvangnet 44 artikelen las — de vraag was niet óf, maar hoe goed.
+        return (f"het DOM-kaartvangnet koppelt {dom_n} artikelen aan een prijs — de "
+                "render-strategie werkt hier via de kaarttekst. Toets aan de kaarttekst "
+                "en prijsmarkup hierboven of prijs, was-prijs en promotekst kloppen.")
     if info["micro"] or info["attr"]:
         return ("prijzen staan in microdata of attributen in plaats van in de tekst — "
                 "daar leest de extractie nu ook op.")

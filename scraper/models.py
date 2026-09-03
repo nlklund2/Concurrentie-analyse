@@ -18,6 +18,10 @@ class Product:
     # Alleen gevuld als de bron het expliciet meldt (schema.org availability);
     # None betekent "onbekend", niet "op voorraad".
     in_stock: bool | None = None
+    # Ruwe promotekst van de kaart/tegel ('2 voor € 7,50', '1+1 gratis',
+    # '-30%'), zoals gevangen door promo.promo_fragmenten — stap A van het
+    # promotievormen-onderzoek: vangen en meten, nog niet interpreteren.
+    promo_text: str = ""
 
 
 @dataclass

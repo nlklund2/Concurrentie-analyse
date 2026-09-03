@@ -30,6 +30,7 @@ from ..http import Http
 from ..jsonscan import deep_find_products, products_from_html, url_key
 from ..models import Product, ScrapeResult
 from ..normalize import parse_price
+from ..promo import PROMO_RE, promo_fragmenten
 
 # API-endpoints die productlijsten teruggeven, herkenbaar aan de URL.
 # /_next/data/: Next.js-shops (Action) laden hun paginadata als losse JSON —
@@ -85,9 +86,27 @@ PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![.,]?\d)")
 
 # '€ 2,48/st' (Action): een omgerekende stukprijs direct achter het bedrag.
 UNIT_NA_PRIJS_RE = re.compile(r"^\s*/\s*(?:st(?:uk|k)?|paar|pr)\b\.?", re.I)
+# KiK rendert de centen als los element achter de euro's ('€8' + '99' in
+# superscript); innerText plakt dat aan elkaar tot '€899'. Drie of vier cijfers
+# direct achter het €-teken, zonder scheidingsteken, zijn in deze scope (max.
+# enkele tientjes) nooit een bedrag in hele euro's — de laatste twee cijfers zijn
+# de centen. Diagnose 03-09: '€899' bij een set van € 8,99, '€299' naast de
+# doorstreepprijs '€ 8,99' (mét spatie en komma, dus buiten dit patroon). Zonder
+# deze stap las de scraper €199 als prijs en €899 helemaal niet (>200-filter),
+# en viel hij terug op de stukprijs uit '(0,66 € / Stuk)'.
+CENTEN_AANEEN_RE = re.compile(r"€(\d{1,2})(\d{2})(?![\d,.])")
+
+
+def _zonder_promo(text: str) -> str:
+    """De prijs ín een actietekst ('2 voor € 7,50') is geen verkoop- of
+    doorstreepprijs: zonder deze stap werd de bundelprijs als was-prijs
+    gelezen en telde het artikel als afgeprijsd. Eerst het fragment weg,
+    dan pas prijzen afleiden."""
+    return PROMO_RE.sub(" ", text) if text else text
 
 
 def _prijzen(text: str, prijs_los: bool = False) -> list[float]:
+    text = CENTEN_AANEEN_RE.sub(r"€\1,\2", _zonder_promo(text))
     if prijs_los:
         ruw = PRICE_LOOSE_RE.findall(text)
         return [p for p in (parse_price(r) for r in ruw) if p]
@@ -281,6 +300,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             diagnoses = 0
             verse_sessies = 0
             oogst: list[str] = []
+            # Welke route de artikelen leverde bepaalt welke velden te vertrouwen
+            # zijn (promotekst uit kaarttekst versus JSON-badgeveld); zonder deze
+            # telling was KiK's '-43% · -20%' op élke kaart niet te duiden.
+            route_telling = {"API": 0, "ingebedde JSON": 0, "DOM-kaarten": 0}
             for cat_url in cats:
                 cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
                 cat_nieuw = 0
@@ -299,9 +322,14 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     # 1) onderschepte API-JSON, 2) ingebedde JSON, 3) DOM-vangnet
                     from_api = list(sink.products)
                     api_hits += len(from_api)
-                    found = from_api + products_from_html(html, url)
+                    ingebed = products_from_html(html, url)
+                    found = from_api + ingebed
                     if not found:
                         found = _dom_products(page, res)
+                        route_telling["DOM-kaarten"] += len(found)
+                    else:
+                        route_telling["API"] += len(from_api)
+                        route_telling["ingebedde JSON"] += len(ingebed)
                     new = _absorb(seen, found, cat_path)
                     cat_nieuw += new
                     if not new:
@@ -323,6 +351,9 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     break
             if oogst:
                 res.notes.append("oogst per categorie: " + ", ".join(oogst[:15]))
+            if any(route_telling.values()):
+                res.notes.append("herkomst (vóór ontdubbeling): " + ", ".join(
+                    f"{k} {v}" for k, v in route_telling.items() if v))
             if verse_sessies:
                 res.notes.append(f"{verse_sessies} pagina('s) na een blokkade alsnog "
                                  "geladen in een verse sessie (de wering hangt aan "
@@ -653,7 +684,8 @@ def cards_from_html(html: str, base_url: str) -> list[Product]:
             if key not in producten:
                 producten[key] = Product(
                     key=key, title=titel, url=vol, price=min(prijzen),
-                    was_price=max(prijzen) if max(prijzen) > min(prijzen) else None)
+                    was_price=max(prijzen) if max(prijzen) > min(prijzen) else None,
+                    promo_text=promo_fragmenten(a["kaart"]))
         if len(producten) > len(beste):
             beste = list(producten.values())
     return beste
@@ -766,7 +798,8 @@ def _dom_ronde(page, streng: bool, prijs_los: bool = False) -> list[Product]:
         if not title or NAV_TITEL_RE.match(title):
             continue
         products.append(Product(key=url_key(href), title=title, url=href,
-                                price=price, was_price=was))
+                                price=price, was_price=was,
+                                promo_text=promo_fragmenten(text)))
     return products
 
 
@@ -781,7 +814,7 @@ def _absorb(seen: dict[str, Product], found: list[Product], cat_path: str) -> in
             seen[p.key] = p
             new += 1
             continue
-        for field in ("color", "sizes", "brand", "category_raw", "url"):
+        for field in ("color", "sizes", "brand", "category_raw", "url", "promo_text"):
             if not getattr(cur, field) and getattr(p, field):
                 setattr(cur, field, getattr(p, field))
         if cur.price is None and p.price is not None:
