@@ -86,3 +86,14 @@ def test_promotekst_naar_stagingrij_en_dedupe():
     by_key = {r["product_key"]: r for r in rows}
     assert by_key["a"]["promo_text"] == "2 voor € 5"   # lege waarneming aangevuld
     assert len(by_key["b"]["promo_text"]) == 120
+
+
+def test_omnibusregel_is_geen_promotie():
+    """KiK zet onder elke afgeprijsde kaart de wettelijke omnibusregel ('30
+    dagen beste prijs: € 3,99 (-25%)'). Dat is prijshistorie, geen actie:
+    alleen de echte badge '-67%' telt."""
+    kaart = ("-67% Alleen online Super push-up bh + string Janina, 2-delige set "
+             "€ 8,99 €299 30 dagen beste prijs1: € 3,99 (-25%)")
+    assert promo_fragmenten(kaart) == "-67%"
+    assert promo_fragmenten("Hemdje met spaghettibandjes Ergee, Naadloos €499") == ""
+    assert promo_fragmenten("€299 30 dagen laagste prijs: € 3,99 (-25%)") == ""

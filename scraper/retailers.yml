@@ -279,6 +279,18 @@ retailers:
       gecrawld — alfabetisch allemaal 'dames', waardoor KiK in week 32 als
       damesspeciaalzaak in de cijfers stond. Nu 45 categorieën én spreiding
       over doelgroepen bij het afkappen.
+      LEESFOUT HERSTELD 03-09: de kaart rendert de prijs als '€' + '8' +
+      '<sup>99</sup>'; innerText plakt dat tot '€899'. Tot W36 las de
+      scraper dat als €899 (weggefilterd) of €199 (als prijs), en viel
+      hij terug op de stukprijs uit '(0,66 € / Stuk)' — vandaar 60
+      artikelen onder €1 en 196 onder €2 in W36. Diagnose 03-09 (run
+      33776017208): zonder herstel 44 van 144 kaarten gelezen, alle 44
+      afgeprijsd (alleen kaarten met een decimale doorstreepprijs
+      overleefden). Sinds 03-09 zijn drie/vier cijfers direct achter het
+      €-teken euro's+centen; multipacks dragen nu de pakprijs. Verwacht in
+      W37: prijssprong t.o.v. W36 voor multipacks (0,66 → 1,99 is een
+      leescorrectie, geen prijsverhoging). De omnibusregel '30 dagen
+      beste prijs: € 3,99 (-25%)' telt niet als promotekst.
   scapino:
     name: Scapino
     base: https://www.scapino.nl

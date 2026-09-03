@@ -86,6 +86,15 @@ PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![.,]?\d)")
 
 # '€ 2,48/st' (Action): een omgerekende stukprijs direct achter het bedrag.
 UNIT_NA_PRIJS_RE = re.compile(r"^\s*/\s*(?:st(?:uk|k)?|paar|pr)\b\.?", re.I)
+# KiK rendert de centen als los element achter de euro's ('€8' + '99' in
+# superscript); innerText plakt dat aan elkaar tot '€899'. Drie of vier cijfers
+# direct achter het €-teken, zonder scheidingsteken, zijn in deze scope (max.
+# enkele tientjes) nooit een bedrag in hele euro's — de laatste twee cijfers zijn
+# de centen. Diagnose 03-09: '€899' bij een set van € 8,99, '€299' naast de
+# doorstreepprijs '€ 8,99' (mét spatie en komma, dus buiten dit patroon). Zonder
+# deze stap las de scraper €199 als prijs en €899 helemaal niet (>200-filter),
+# en viel hij terug op de stukprijs uit '(0,66 € / Stuk)'.
+CENTEN_AANEEN_RE = re.compile(r"€(\d{1,2})(\d{2})(?![\d,.])")
 
 
 def _zonder_promo(text: str) -> str:
@@ -97,7 +106,7 @@ def _zonder_promo(text: str) -> str:
 
 
 def _prijzen(text: str, prijs_los: bool = False) -> list[float]:
-    text = _zonder_promo(text)
+    text = CENTEN_AANEEN_RE.sub(r"€\1,\2", _zonder_promo(text))
     if prijs_los:
         ruw = PRICE_LOOSE_RE.findall(text)
         return [p for p in (parse_price(r) for r in ruw) if p]

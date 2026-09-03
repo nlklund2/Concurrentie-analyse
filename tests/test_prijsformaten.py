@@ -52,3 +52,23 @@ def test_versienummers_en_maten_zijn_geen_prijs():
     # maar een echte prijs aan het zinseinde blijft gewoon staan
     assert PRICE_LOOSE_RE.search("nu 5,99.")
     assert PRIJS_LOS_RE.search("nu 5,99.")
+
+
+def test_kik_centen_aaneen_is_een_prijs_met_centen():
+    """KiK (diagnose 03-09): de centen staan als los element achter de euro's
+    en innerText plakt ze aaneen — '€899' is € 8,99. Tot nu toe viel €899 op
+    het >200-filter (kaart zonder prijs of met de stukprijs uit '(4,50 € /
+    Stuk)') en gold €199 als honderdnegenennegentig euro."""
+    assert _prijzen("Nieuw BH push-up met balconette + string Janina, Set van 2 stuks €899") == [8.99]
+    assert _prijzen("Hipsters luipaardprint 2 stuks, Janina €599 (3 € / Stuk)") == [5.99]
+    assert _prijzen("Slips met haaien 3 stuks €199 (0,66 € / Stuk)") == [1.99]
+    assert _prijzen("€1299") == [12.99]
+    # afgeprijsde kaart: doorstreepprijs mét spatie en komma, actieprijs
+    # aaneen, daaronder de omnibusregel — de actieprijs blijft de laagste
+    assert _prijzen("-67% Alleen online Super push-up bh + string Janina, 2-delige set "
+                    "€ 8,99 €299 30 dagen beste prijs1: € 3,99 (-25%)") == [8.99, 2.99, 3.99]
+    # hele euro's zonder centen (Primark '€ 8', '€12') blijven hele euro's
+    assert _prijzen("€ 8") == [8.0]
+    assert _prijzen("€12") == [12.0]
+    # met scheidingsteken verandert er niets
+    assert _prijzen("€899,00") == [899.0]

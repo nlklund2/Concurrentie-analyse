@@ -9,7 +9,10 @@ tegel-HTML, badge-velden in JSON — en levert ze als één korte, ruwe string
 pas, op basis van de dekkingsmeting die dit veld mogelijk maakt.
 
 Bewust níet als promo geteld: per-stuk-notaties ('€ 2,48/st' is een
-prijsvorm), 'nieuw'-badges, en de was/voor-prijs zelf (die is al was_price).
+prijsvorm), 'nieuw'-badges, de was/voor-prijs zelf (die is al was_price) en
+de wettelijke omnibusregel ('30 dagen beste prijs: € 3,99 (-25%)' — een
+prijshistorievermelding, geen actie; KiK zet hem onder élke afgeprijsde
+kaart naast de echte badge '-67%').
 Zie docs/promotievormen-onderzoek.md.
 """
 from __future__ import annotations
@@ -42,6 +45,9 @@ _PATRONEN = [
     r"\b(?:aanbieding|actieprijs|opruiming|uitverkoop|op=op)\b",
 ]
 PROMO_RE = re.compile("|".join(_PATRONEN), re.I)
+# Omnibusregel (EU-prijsaanduiding): de laagste prijs van de afgelopen 30 dagen
+# plus het verschil daarmee. Gaat vóór de herkenning uit de tekst.
+OMNIBUS_RE = re.compile(r"30\s*dagen\s*(?:beste|laagste)\s*prijs[^()]{0,40}(?:\([^)]*\))?", re.I)
 
 
 def promo_fragmenten(text: str | None) -> str:
@@ -49,7 +55,7 @@ def promo_fragmenten(text: str | None) -> str:
     afgekapt op MAX_LEN. Leeg als er niets promotie-achtigs in staat."""
     if not text:
         return ""
-    schoon = re.sub(r"\s+", " ", str(text))
+    schoon = OMNIBUS_RE.sub(" ", re.sub(r"\s+", " ", str(text)))
     gezien: list[str] = []
     for m in PROMO_RE.finditer(schoon):
         frag = re.sub(r"\s+", " ", m.group(0)).strip(" ,.;:")
