@@ -109,6 +109,18 @@ PAGINA_JS = r"""
       }
     }
   }
+  // Artikelteller en paginering: onmisbaar om een deels geladen raster te
+  // duiden — Action toonde 24 tegels terwijl de categorie er (veel) meer
+  // heeft, en zonder deze signalen is niet te zien of de rest achter
+  // scrollen, een knop of een volgende pagina zit.
+  const teller = (tekst.match(/\d+\s*(?:producten|artikelen|resultaten|items)|\b\d+\s*van\s+\d+\b/i) || [''])[0];
+  const pagLinks = [...document.querySelectorAll('a[href*="page="], a[href*="/page/"]')]
+    .map(a => (a.getAttribute('href') || '').slice(0, 60)).slice(0, 5);
+  const pagKnoppen = [...document.querySelectorAll('button, [role="button"], a')]
+    .map(e => ((e.getAttribute('aria-label') || '') + ' ' + (e.innerText || '')).trim().toLowerCase())
+    .filter(t => t && t.length < 40 &&
+                 /volgende|vorige|next|prev|pagina \d|page \d|toon meer|laad meer|load more|show more/.test(t))
+    .slice(0, 6);
   return {
     titel: (document.title || '').slice(0, 90),
     tekst: tekst.length,
@@ -116,7 +128,7 @@ PAGINA_JS = r"""
     euro: (tekst.match(/€/g) || []).length,
     eur: (tekst.match(/\bEUR\b/g) || []).length,
     prijsachtig: (tekst.match(/(?:^|[^\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)/g) || []).length,
-    attr, micro, scripts, pad,
+    attr, micro, scripts, pad, teller, pagLinks, pagKnoppen,
   };
 }
 """
@@ -342,6 +354,11 @@ def _render_diagnose(url: str) -> list[str]:
                 geklikt = accept_consent(page)
                 if geklikt:
                     page.wait_for_timeout(1000)
+            try:
+                links_voor = page.evaluate(
+                    "() => document.querySelectorAll('a[href]').length")
+            except Exception:
+                links_voor = None
             # Trager en verder scrollen dan de scraper: zo blijkt of het raster
             # alleen maar méér geduld nodig had.
             for deel in (0.3, 0.6, 1.0):
@@ -357,7 +374,8 @@ def _render_diagnose(url: str) -> list[str]:
             f"- browser: HTTP {status}, cookiemuur "
             f"{'weggeklikt' if geklikt else 'niet gevonden (ook niet bij de tweede poging)'}",
             f"- titel: {info['titel']!r}",
-            f"- {info['tekst']} tekens tekst, {info['links']} links",
+            f"- {info['tekst']} tekens tekst, {info['links']} links"
+            + (f" (vóór het scrollen: {links_voor})" if links_voor is not None else ""),
             f"- prijssignalen: {info['euro']}× €, {info['eur']}× 'EUR', "
             f"{info['prijsachtig']}× prijsachtig getal (3,99-patroon)",
         ]
@@ -368,6 +386,11 @@ def _render_diagnose(url: str) -> list[str]:
         if info["attr"]:
             regels.append(f"- prijs-attributen: {info['attr']}")
         regels.append(f"- JSON-scripts in de pagina: {info['scripts'] or 'geen'}")
+        if info.get("teller"):
+            regels.append(f"- artikelteller op de pagina: «{info['teller']}»")
+        if info.get("pagLinks") or info.get("pagKnoppen"):
+            regels.append(f"- paginering: links {info.get('pagLinks') or 'geen'}, "
+                          f"knoppen/teksten {info.get('pagKnoppen') or 'geen'}")
 
         na_render = products_from_html(html, url)
         regels.append(f"- producten uit de gerenderde HTML: {len(na_render)}")

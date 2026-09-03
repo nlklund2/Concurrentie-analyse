@@ -32,8 +32,11 @@ from ..models import Product, ScrapeResult
 from ..normalize import parse_price
 
 # API-endpoints die productlijsten teruggeven, herkenbaar aan de URL.
+# /_next/data/: Next.js-shops (Action) laden hun paginadata als losse JSON —
+# de props daarvan dragen vaak de volledige productlijst.
 API_URL_RE = re.compile(r"product|search|catalog|listing|/plp|/api/|graphql|"
-                        r"algolia|findify|bloomreach|/browse|/category", re.I)
+                        r"algolia|findify|bloomreach|/browse|/category|"
+                        r"/_next/data/", re.I)
 
 STEALTH_JS = """
 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
@@ -76,12 +79,29 @@ PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)"
 PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![.,]?\d)")
 
 
+# '€ 2,48/st' (Action): een omgerekende stukprijs direct achter het bedrag.
+UNIT_NA_PRIJS_RE = re.compile(r"^\s*/\s*(?:st(?:uk|k)?|paar|pr)\b\.?", re.I)
+
+
 def _prijzen(text: str, prijs_los: bool = False) -> list[float]:
     if prijs_los:
         ruw = PRICE_LOOSE_RE.findall(text)
-    else:
-        ruw = [m.group(1) or m.group(2) for m in PRICE_TEXT_RE.finditer(text)]
-    return [p for p in (parse_price(r) for r in ruw) if p]
+        return [p for p in (parse_price(r) for r in ruw) if p]
+    gewoon: list[float] = []
+    per_stuk: list[float] = []
+    for m in PRICE_TEXT_RE.finditer(text):
+        p = parse_price(m.group(1) or m.group(2))
+        if not p:
+            continue
+        if UNIT_NA_PRIJS_RE.match(text[m.end():m.end() + 12]):
+            per_stuk.append(p)
+        else:
+            gewoon.append(p)
+    # Naast een pakprijs mag de stukprijs niet meetellen: min() zou hem als
+    # actieprijs nemen en de echte verkoopprijs als doorstreepprijs opvoeren.
+    # Staat er alléén een /st-prijs (los verkocht artikel), dan is dat gewoon
+    # de verkoopprijs.
+    return gewoon or per_stuk
 # prijsdelen uit de kaarttekst knippen om de titel over te houden — titel en
 # prijs staan lang niet altijd op een eigen regel
 PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
@@ -177,6 +197,43 @@ class _ApiSink:
             pass
 
 
+def _verse_pagina(browser, sink):
+    """Nieuwe browsercontext (schone cookies) met dezelfde inrichting als de
+    hoofdsessie, inclusief API-sink."""
+    context = browser.new_context(
+        locale="nl-NL",
+        timezone_id="Europe/Amsterdam",
+        viewport={"width": 1366, "height": 900},
+        extra_http_headers={"Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8"},
+        user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"))
+    context.add_init_script(STEALTH_JS)
+    page = context.new_page()
+    page.on("response", sink.handle)
+    return context, page
+
+
+def _load_of_verse_sessie(browser, sink, context, page, url, res=None):
+    """Pagina laden; bij een blokkade één herkansing in een verse context.
+
+    Action-diagnose 03-09: binnen één sessie is al de twééde goto geblokkeerd
+    (alle categorieën na de eerste bleven op 0), terwijl dezelfde URL's in een
+    verse sessie stuk voor stuk HTTP 200 kregen — de wering hangt aan de
+    opgebouwde sessie, niet aan URL of IP. Schone cookies zijn dan de bewezen
+    route. Retourneert (context, page, html, vers): de aanroeper moet de
+    mogelijk vernieuwde context/page overnemen."""
+    html = _load(page, url, res=res)
+    if html is not None:
+        return context, page, html, False
+    try:
+        context.close()
+    except Exception:
+        pass
+    context, page = _verse_pagina(browser, sink)
+    return context, page, _load(page, url, res=res), True
+
+
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
     res = ScrapeResult(retailer_id=cfg.id, strategy="render")
     try:
@@ -196,18 +253,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         browser = pw.chromium.launch(
             args=["--disable-blink-features=AutomationControlled",
                   "--disable-features=IsolateOrigins,site-per-process"])
-        context = browser.new_context(
-            locale="nl-NL",
-            timezone_id="Europe/Amsterdam",
-            viewport={"width": 1366, "height": 900},
-            extra_http_headers={"Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8"},
-            user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/126.0.0.0 Safari/537.36"))
-        context.add_init_script(STEALTH_JS)
         sink = _ApiSink()
-        page = context.new_page()
-        page.on("response", sink.handle)
+        context, page = _verse_pagina(browser, sink)
         try:
             if not cats:
                 cats = _nav_categories_via_browser(page, cfg)
@@ -226,13 +273,19 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
 
             blocked_pages = 0
             diagnoses = 0
+            verse_sessies = 0
+            oogst: list[str] = []
             for cat_url in cats:
                 cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
+                cat_nieuw = 0
                 for n in range(1, cfg.max_pages_per_category + 1):
                     url = cat_url if n == 1 else \
                         f"{cat_url}{'&' if '?' in cat_url else '?'}page={n}"
                     sink.reset()
-                    html = _load(page, url)
+                    context, page, html, vers = _load_of_verse_sessie(
+                        browser, sink, context, page, url, res=res)
+                    if vers and html is not None:
+                        verse_sessies += 1
                     time.sleep(pause)
                     if html is None:
                         blocked_pages += 1
@@ -244,6 +297,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     if not found:
                         found = _dom_products(page, res)
                     new = _absorb(seen, found, cat_path)
+                    cat_nieuw += new
                     if not new:
                         # Meerdere diagnoses: één pagina zegt te weinig. Bij Zeeman
                         # bleek de eerste categorie een redactionele pagina te zijn
@@ -254,8 +308,19 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                         break
                     if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
                         break
+                # Waar de artikelen vandaan komen bepaalt of een ondertelling aan
+                # één categorie ligt (raster laadt niet) of aan de categorielijst
+                # zelf — bij Action was dat zonder deze telling niet te zien.
+                oogst.append(f"{urlsplit(cat_url).path.rstrip('/').split('/')[-1]}"
+                             f" {cat_nieuw}")
                 if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
                     break
+            if oogst:
+                res.notes.append("oogst per categorie: " + ", ".join(oogst[:15]))
+            if verse_sessies:
+                res.notes.append(f"{verse_sessies} pagina('s) na een blokkade alsnog "
+                                 "geladen in een verse sessie (de wering hangt aan "
+                                 "de opgebouwde sessie, niet aan de URL)")
             if blocked_pages:
                 res.notes.append(f"{blocked_pages} pagina('s) geblokkeerd of niet geladen")
             if api_hits:
@@ -350,7 +415,67 @@ def accept_consent(page) -> bool:
     return False
 
 
-def _load(page, url: str, consent: bool = True) -> str | None:
+# 'Toon meer'-knop onder een lui geladen raster. Alleen echte knoppen: een
+# <a> met een echte href is paginanavigatie en zou de meting wegvoeren.
+KLIK_MEER_JS = """
+() => {
+  const re = /^\\s*(?:toon|laad)\\s+meer\\b|^\\s*meer\\s+(?:producten|artikelen|resultaten)\\b|^\\s*meer\\s+(?:tonen|laden)\\b|^\\s*(?:show|load)\\s+more\\b/i;
+  for (const el of document.querySelectorAll('button, [role="button"]')) {
+    if (el.tagName === 'A') {
+      const h = el.getAttribute('href') || '';
+      if (h && h !== '#' && !h.startsWith('javascript')) continue;
+    }
+    const tekst = ((el.innerText || '') + ' ' +
+                   (el.getAttribute('aria-label') || '')).trim();
+    if (!re.test(tekst)) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    el.scrollIntoView({block: 'center'});
+    el.click();
+    return tekst.slice(0, 40);
+  }
+  return null;
+}
+"""
+
+
+def _scroll_tot_stabiel(page, res=None, max_rondes: int = 12) -> bool:
+    """Lui ladende rasters (Action) vullen zich pas bij het scrollen, soms met
+    een 'toon meer'-knop ertussen; twee vaste scrolls lazen daar alleen de
+    eerste batch (±24 tegels van een veel groter raster). Daarom: scrollen tot
+    de linktelling twee rondes stilstaat, met een klikpoging zodra de groei
+    stokt. Een gewone pagina stabiliseert direct en kost ±3 rondes.
+    False alleen als de pagina meteen al onleesbaar is (weggenavigeerd)."""
+    vorige, stil, kliks = -1, 0, 0
+    for ronde in range(max_rondes):
+        try:
+            page.evaluate("() => window.scrollTo(0, document.body.scrollHeight * 0.6)")
+            page.wait_for_timeout(350)
+            page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(750)
+            telling = page.evaluate(
+                "() => document.querySelectorAll('a[href]').length")
+            if telling == vorige and kliks < 3 and page.evaluate(KLIK_MEER_JS):
+                kliks += 1
+                stil = 0
+                page.wait_for_timeout(1100)
+                continue
+        except Exception:
+            return ronde > 0
+        if telling == vorige:
+            stil += 1
+            if stil >= 2:
+                break
+        else:
+            stil = 0
+        vorige = telling
+    if kliks and res is not None and \
+            not any(n.startswith("'toon meer'") for n in res.notes):
+        res.notes.append(f"'toon meer' {kliks}x aangeklikt om het raster te vullen")
+    return True
+
+
+def _load(page, url: str, consent: bool = True, res=None) -> str | None:
     """Pagina laden, cookiemuur wegklikken en laten renderen.
     None bij fout of blokkadepagina."""
     try:
@@ -369,12 +494,7 @@ def _load(page, url: str, consent: bool = True) -> str | None:
         page.wait_for_load_state("networkidle", timeout=12000)
     except Exception:
         pass  # druk-bezette pagina's worden nooit 'idle' — inhoud is er vaak al
-    try:
-        page.evaluate("() => window.scrollTo(0, document.body.scrollHeight / 2)")
-        page.wait_for_timeout(700)
-        page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
-        page.wait_for_timeout(900)
-    except Exception:
+    if not _scroll_tot_stabiel(page, res):
         return None
     if not geklikt:
         # Cookiemuren (Cookiebot e.d.) laden asynchroon en staan er vaak pas ná
@@ -554,7 +674,8 @@ def _clean_title(raw_title: str, card_text: str) -> str:
     for bron in (raw_title, card_text):
         for line in (bron or "").splitlines():
             kandidaat = PRICE_STRIP_RE.sub(" ", line)
-            kandidaat = re.sub(r"\(\s*/?\s*stuk\s*\)|/\s*stuk|per stuk", " ", kandidaat, flags=re.I)
+            kandidaat = re.sub(r"\(\s*/?\s*stuk\s*\)|/\s*st(?:uk|k)?\b\.?|/\s*paar\b|per stuk",
+                               " ", kandidaat, flags=re.I)
             # Action plakt de maatvermelding en varianten aan de titel vast:
             # "CompressiesokkenMaten 35 - 46 | 2 paar | diverse kleuren".
             # Alles vanaf de eerste scheiding of maatvermelding valt weg.
