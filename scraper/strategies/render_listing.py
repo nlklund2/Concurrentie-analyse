@@ -30,6 +30,7 @@ from ..http import Http
 from ..jsonscan import deep_find_products, products_from_html, url_key
 from ..models import Product, ScrapeResult
 from ..normalize import parse_price
+from ..promo import PROMO_RE, promo_fragmenten
 
 # API-endpoints die productlijsten teruggeven, herkenbaar aan de URL.
 # /_next/data/: Next.js-shops (Action) laden hun paginadata als losse JSON —
@@ -87,7 +88,16 @@ PRICE_LOOSE_RE = re.compile(r"(?<![\d.,])(\d{1,3}[.,]\d{2})(?![.,]?\d)")
 UNIT_NA_PRIJS_RE = re.compile(r"^\s*/\s*(?:st(?:uk|k)?|paar|pr)\b\.?", re.I)
 
 
+def _zonder_promo(text: str) -> str:
+    """De prijs ín een actietekst ('2 voor € 7,50') is geen verkoop- of
+    doorstreepprijs: zonder deze stap werd de bundelprijs als was-prijs
+    gelezen en telde het artikel als afgeprijsd. Eerst het fragment weg,
+    dan pas prijzen afleiden."""
+    return PROMO_RE.sub(" ", text) if text else text
+
+
 def _prijzen(text: str, prijs_los: bool = False) -> list[float]:
+    text = _zonder_promo(text)
     if prijs_los:
         ruw = PRICE_LOOSE_RE.findall(text)
         return [p for p in (parse_price(r) for r in ruw) if p]
@@ -653,7 +663,8 @@ def cards_from_html(html: str, base_url: str) -> list[Product]:
             if key not in producten:
                 producten[key] = Product(
                     key=key, title=titel, url=vol, price=min(prijzen),
-                    was_price=max(prijzen) if max(prijzen) > min(prijzen) else None)
+                    was_price=max(prijzen) if max(prijzen) > min(prijzen) else None,
+                    promo_text=promo_fragmenten(a["kaart"]))
         if len(producten) > len(beste):
             beste = list(producten.values())
     return beste
@@ -766,7 +777,8 @@ def _dom_ronde(page, streng: bool, prijs_los: bool = False) -> list[Product]:
         if not title or NAV_TITEL_RE.match(title):
             continue
         products.append(Product(key=url_key(href), title=title, url=href,
-                                price=price, was_price=was))
+                                price=price, was_price=was,
+                                promo_text=promo_fragmenten(text)))
     return products
 
 
@@ -781,7 +793,7 @@ def _absorb(seen: dict[str, Product], found: list[Product], cat_path: str) -> in
             seen[p.key] = p
             new += 1
             continue
-        for field in ("color", "sizes", "brand", "category_raw", "url"):
+        for field in ("color", "sizes", "brand", "category_raw", "url", "promo_text"):
             if not getattr(cur, field) and getattr(p, field):
                 setattr(cur, field, getattr(p, field))
         if cur.price is None and p.price is not None:

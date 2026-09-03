@@ -15,6 +15,7 @@ from urllib.parse import urljoin, urlsplit
 
 from .models import Product
 from .normalize import parse_price
+from .promo import promo_fragmenten, promo_uit_html
 
 _LDJSON_RE = re.compile(
     r'<script[^>]+type\s*=\s*["\']application/ld\+json["\'][^>]*>(.*?)</script>',
@@ -54,6 +55,12 @@ COLOR_KEYS = ("color", "colour", "kleur", "colorName", "colourName", "baseColor"
               "colorDescription", "variantColor", "colorFamily", "mainColor")
 SIZE_KEYS = ("sizes", "maten", "availableSizes", "sizeVariants", "sizeList",
              "availableSizeNames", "size")
+# Badge-/actievelden in product-JSON. 'label' bewust niet: te generiek
+# (maat- en kleurlabels). De waarde gaat door promo_fragmenten, dus een
+# 'Nieuw'-badge telt niet als promotie.
+PROMO_KEYS = ("promotion", "promotions", "promotionText", "promoText", "promo",
+              "promoLabel", "badges", "badge", "labels", "flags", "flag",
+              "offerText", "actie", "actieTekst", "sticker", "stickers", "campaign")
 
 
 def _text_from(value) -> str:
@@ -279,7 +286,8 @@ def deep_find_products(obj, base_url: str = "", _depth: int = 0) -> list[Product
                                  brand=str(brand or ""), category_raw=cat,
                                  color=_attr_from(obj, COLOR_KEYS),
                                  sizes=_attr_from(obj, SIZE_KEYS),
-                                 price=price, was_price=was))
+                                 price=price, was_price=was,
+                                 promo_text=promo_fragmenten(_attr_from(obj, PROMO_KEYS))))
             return found  # niet verder afdalen in een gevonden product
 
     for v in obj.values():
@@ -431,6 +439,14 @@ def products_from_escaped_attrs(html: str, base_url: str = "") -> list[Product]:
                 for p in found:
                     if not p.url:
                         p.url = link
+        if found and any(not p.promo_text for p in found):
+            # De tegel-JSON draagt prijs en voorraad, de actiebadge staat als
+            # los element in dezelfde tegel-HTML (zelfde venster als de link).
+            promo = promo_uit_html(html[max(0, m.start() - 300):m.end() + 1500])
+            if promo:
+                for p in found:
+                    if not p.promo_text:
+                        p.promo_text = promo
         products.extend(found)
     return products
 
@@ -457,7 +473,7 @@ def products_from_html(html: str, base_url: str = "") -> list[Product]:
         if cur.price is None and p.price is not None:
             unique[p.key], cur, p = p, p, cur
         # ontbrekende velden aanvullen vanuit de andere waarneming
-        for field in ("color", "sizes", "brand", "category_raw", "url"):
+        for field in ("color", "sizes", "brand", "category_raw", "url", "promo_text"):
             if not getattr(cur, field) and getattr(p, field):
                 setattr(cur, field, getattr(p, field))
         if cur.was_price is None and p.was_price is not None:

@@ -817,7 +817,8 @@ async function renderExplorer() {
   telling.textContent = `${count.toLocaleString("nl-NL")} artikelen` +
     (count > 300 ? " — eerste 300 getoond; verfijn met zoeken of filters" : "");
   box.innerHTML = `<table><tr><th>Bron</th><th>Artikel</th><th>Groep</th><th>Kleur</th>
-    <th>Maten</th><th class="num">Van</th><th class="num">Voor</th>
+    <th>Maten</th><th title="Ruwe actietekst van de kaart, nog niet geïnterpreteerd">Actie</th>
+    <th class="num">Van</th><th class="num">Voor</th>
     <th class="num">Per stuk</th></tr>` +
     data.map(a => {
       const url = veiligeUrl(a.url);
@@ -830,6 +831,7 @@ async function renderExplorer() {
         <td>${titel}</td>
         <td>${esc(a.audience)} / ${esc(a.product_type)}</td>
         <td>${esc(a.color)}</td><td>${esc(a.sizes)}</td>
+        <td>${esc(a.promo_text || "")}</td>
         <td class="num">${a.was_price ? eur(a.was_price) : "–"}</td>
         <td class="num">${a.price != null ? eur(a.price) : "–"}</td>
         <td class="num">${a.pack_size > 1 && a.price != null

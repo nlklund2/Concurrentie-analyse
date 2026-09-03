@@ -179,6 +179,8 @@ def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
             "price": p.price,
             "was_price": plausibele_was_prijs(p.price, p.was_price),
             "pack_size": pack_size(p.title),
+            # ruwe promotekst (stap A promotievormen): best effort, leeg is eerlijk leeg
+            "promo_text": (p.promo_text or "")[:120],
         }
         # bij dubbele sleutels: rij mét prijs wint, daarna rij mét maten;
         # ontbrekende velden worden aangevuld vanuit de andere waarneming
@@ -190,7 +192,8 @@ def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
         if (old["price"] is None and row["price"] is not None) or \
            (old["price"] is not None) == (row["price"] is not None) and not old["sizes"] and row["sizes"]:
             best, rest = row, old
-        for field in ("color", "sizes", "brand", "category_raw", "url", "was_price"):
+        for field in ("color", "sizes", "brand", "category_raw", "url", "was_price",
+                      "promo_text"):
             if not best.get(field):
                 best[field] = rest.get(field) or best.get(field)
         seen[row["product_key"]] = best
