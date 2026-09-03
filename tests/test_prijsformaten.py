@@ -15,6 +15,17 @@ def test_beide_europosities():
     assert _prijzen("€5,-") == [5.0]
 
 
+def test_maat_voor_euroteken_is_geen_prijs():
+    """Action-maillots (W36): de kaart schrijft 'Maten 40 - 42 € 0,84/st'.
+    De kale-integer-variant van getal-eerst las de maat '42 €' als prijs én
+    at het €-teken op, zodat de echte prijs erna wegviel — twintig panty's
+    kregen hun maat (42/46/50, kinderlengte 170) als prijs in de weekfoto."""
+    assert _prijzen("Maten 40 - 42 € 0,84/st") == [0.84]
+    assert _prijzen("Maten 164 - 170 € 1,70/st") == [1.70]
+    # kale integer vóór een € blijft bewust ongelezen (nooit een NL-prijsvorm)
+    assert _prijzen("42 €") == []
+
+
 def test_per_stuk_notatie_is_geen_tweede_verkoopprijs():
     """Action (03-09): kaarten schrijven '€ 2,48/st'. Naast een pakprijs is dat
     een omgerekende stukprijs — zonder filter zou min() de stukprijs als
