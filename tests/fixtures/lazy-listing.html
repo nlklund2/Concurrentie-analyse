@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- Action-patroon (diagnose 03-09): het productraster laadt in batches bij
+     het scrollen (Next.js/IntersectionObserver-stijl) en toont na twee
+     batches een 'Toon meer'-knop voor de rest. Twee vaste scrolls zagen
+     alleen de eerste batch(es); de scroll-lus moet alle 30 kaarten vangen.
+     Prijzen in de Action-notatie '€ 2,48/st'. -->
+<html lang="nl">
+<head><meta charset="utf-8"><title>Ondergoed</title>
+<style>
+  #raster a { display: block; height: 300px; border: 1px solid #ddd; }
+</style>
+</head>
+<body>
+<h1>Ondergoed</h1>
+<div id="raster"></div>
+<button id="meer" hidden>Toon meer</button>
+<nav><a href="/nl-nl/klantenservice/">Klantenservice</a></nav>
+<script>
+  var raster = document.getElementById('raster');
+  function voegToe(n) {
+    for (var i = 0; i < n; i++) {
+      var id = raster.children.length + 1;
+      var a = document.createElement('a');
+      a.href = '/nl-nl/p/' + (3213000 + id) + '/artikel-' + id + '/';
+      a.innerHTML = '<img alt="Boxershorts model ' + id + '">' +
+                    '<span>€ ' + (2 + (id % 5)) + ',48/st</span>';
+      raster.appendChild(a);
+    }
+  }
+  voegToe(8);                       // eerste batch staat er direct
+  var extraBatches = 0;
+  window.addEventListener('scroll', function () {
+    var onderaan = window.scrollY + window.innerHeight >=
+                   document.body.scrollHeight - 60;
+    if (onderaan && extraBatches < 2) {
+      extraBatches++;
+      setTimeout(function () { voegToe(8); }, 250);   // lui: komt nét later
+      if (extraBatches === 2) {
+        setTimeout(function () {
+          document.getElementById('meer').hidden = false;
+        }, 300);
+      }
+    }
+  });
+  document.getElementById('meer').addEventListener('click', function () {
+    this.remove();
+    voegToe(6);                     // laatste rest achter de knop
+  });
+</script>
+</body>
+</html>

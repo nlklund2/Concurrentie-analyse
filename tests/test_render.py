@@ -131,6 +131,25 @@ def test_titel_uit_kaarttekst_zonder_maten_en_varianten():
         browser.close()
 
 
+def test_lui_ladend_raster_wordt_volgescrold_en_toon_meer_geklikt():
+    """Action-patroon (03-09): het raster vult zich per scrollbatch en de rest
+    zit achter een 'Toon meer'-knop. Met twee vaste scrolls bleef de teller op
+    de eerste batches steken (±24 van veel meer tegels); de scroll-lus moet
+    doorgaan tot de telling stilstaat én de knop aanklikken."""
+    from playwright.sync_api import sync_playwright
+    fixture = (Path(__file__).parent / "fixtures" / "lazy-listing.html").resolve()
+    with sync_playwright() as pw:
+        browser = _browser(pw)
+        page = browser.new_page()
+        _load(page, fixture.as_uri(), consent=False)
+        found = _dom_products(page)
+        assert len(found) == 30
+        # '€ 3,48/st' is bij een los artikel de verkoopprijs, nooit een was-prijs
+        assert all(p.was_price is None for p in found)
+        assert {p.price for p in found} == {2.48, 3.48, 4.48, 5.48, 6.48}
+        browser.close()
+
+
 def test_prijzen_zonder_euroteken_in_de_tekst():
     """Shops die het €-teken via CSS neerzetten maken een €-gebaseerde scan
     blind. De losse prijsronde springt bij, maar alleen als er nérgens op de

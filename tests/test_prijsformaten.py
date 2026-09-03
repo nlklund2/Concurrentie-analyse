@@ -15,6 +15,19 @@ def test_beide_europosities():
     assert _prijzen("€5,-") == [5.0]
 
 
+def test_per_stuk_notatie_is_geen_tweede_verkoopprijs():
+    """Action (03-09): kaarten schrijven '€ 2,48/st'. Naast een pakprijs is dat
+    een omgerekende stukprijs — zonder filter zou min() de stukprijs als
+    actieprijs nemen en de echte verkoopprijs als doorstreepprijs opvoeren."""
+    assert _prijzen("€ 4,95 € 2,48/st") == [4.95]
+    assert _prijzen("€ 4,95 (€ 2,48/stuk)") == [4.95]
+    assert _prijzen("€ 1,24/paar € 2,48") == [2.48]
+    # los verkocht artikel: de /st-prijs is gewoon dé verkoopprijs
+    assert _prijzen("€ 2,48/st") == [2.48]
+    # echte afprijzing houdt twee prijzen (was/voor blijft werken)
+    assert _prijzen("van € 14,99 voor € 9,99") == [14.99, 9.99]
+
+
 def test_los_getal_telt_alleen_in_de_losse_ronde():
     assert _prijzen("gewoon 5,99 zonder teken") == []
     assert _prijzen("gewoon 5,99 zonder teken", prijs_los=True) == [5.99]
