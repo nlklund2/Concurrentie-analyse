@@ -1,5 +1,7 @@
 """Render-strategie: alleen uitvoerbaar waar Playwright + Chromium aanwezig zijn
 (lokaal en in de scrape-/validatieworkflows); in de kale CI wordt dit overgeslagen."""
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
@@ -7,7 +9,9 @@ import pytest
 pytest.importorskip("playwright.sync_api")
 
 from scraper.jsonscan import products_from_html
-from scraper.strategies.render_listing import _ApiSink, _dom_products, _load
+from scraper.strategies.render_listing import (_ApiSink, _dom_products, _load,
+                                               _load_of_verse_sessie,
+                                               _verse_pagina)
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "render-listing.html").resolve()
 CONSENT_FIXTURE = (Path(__file__).parent / "fixtures" / "consent-listing.html").resolve()
@@ -200,6 +204,60 @@ def test_late_cookiemuur_wordt_alsnog_weggeklikt():
         assert page.evaluate("() => window.__consent") is True
         assert page.evaluate("() => !document.getElementById('laatdialoog')")
         browser.close()
+
+
+class _SessieWeringHandler(BaseHTTPRequestHandler):
+    """Bootst het Action-patroon na (diagnose 03-09): het éérste bezoek van een
+    sessie krijgt HTTP 200 en een sessiecookie; elk vervolgbezoek mét die
+    cookie wordt met 403 geweerd. Een verse context (schone cookies) is dus de
+    enige doorgang — precies wat de herkansing moet doen."""
+
+    def do_GET(self):
+        if "sessie=1" in (self.headers.get("Cookie") or ""):
+            self.send_response(403)
+            self.end_headers()
+            self.wfile.write(b"Access denied")
+            return
+        naam = self.path.strip("/").replace("?", "-").replace("=", "-") or "start"
+        body = (f'<html><body><div><a href="/nl-nl/p/9{len(naam)}001/{naam}/">'
+                f'<img alt="Artikel {naam}"><span>€ 4,95/st</span></a>'
+                f"</div></body></html>").encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Set-Cookie", "sessie=1; Path=/")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+def test_blokkade_na_eerste_pagina_wordt_met_verse_sessie_omzeild():
+    """Action weert de opgebouwde sessie, niet de URL: goto twee van dezelfde
+    context krijgt 403 waar een verse sessie 200 krijgt. De herkansing moet de
+    tweede pagina dus alsnog binnenhalen, in een nieuwe context."""
+    from playwright.sync_api import sync_playwright
+    server = HTTPServer(("127.0.0.1", 0), _SessieWeringHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with sync_playwright() as pw:
+            browser = _browser(pw)
+            sink = _ApiSink()
+            context, page = _verse_pagina(browser, sink)
+
+            context, page, html, vers = _load_of_verse_sessie(
+                browser, sink, context, page, f"{basis}/categorie-a/")
+            assert html is not None and not vers        # eerste bezoek: gewoon open
+
+            context, page, html, vers = _load_of_verse_sessie(
+                browser, sink, context, page, f"{basis}/categorie-a/?page=2")
+            assert vers                                  # zelfde sessie: geweerd
+            assert html is not None                      # verse context: alsnog open
+            assert "Artikel" in html
+            browser.close()
+    finally:
+        server.shutdown()
 
 
 def test_firecrawl_zonder_sleutel_faalt_netjes(monkeypatch):

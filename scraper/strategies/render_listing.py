@@ -197,6 +197,43 @@ class _ApiSink:
             pass
 
 
+def _verse_pagina(browser, sink):
+    """Nieuwe browsercontext (schone cookies) met dezelfde inrichting als de
+    hoofdsessie, inclusief API-sink."""
+    context = browser.new_context(
+        locale="nl-NL",
+        timezone_id="Europe/Amsterdam",
+        viewport={"width": 1366, "height": 900},
+        extra_http_headers={"Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8"},
+        user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"))
+    context.add_init_script(STEALTH_JS)
+    page = context.new_page()
+    page.on("response", sink.handle)
+    return context, page
+
+
+def _load_of_verse_sessie(browser, sink, context, page, url, res=None):
+    """Pagina laden; bij een blokkade één herkansing in een verse context.
+
+    Action-diagnose 03-09: binnen één sessie is al de twééde goto geblokkeerd
+    (alle categorieën na de eerste bleven op 0), terwijl dezelfde URL's in een
+    verse sessie stuk voor stuk HTTP 200 kregen — de wering hangt aan de
+    opgebouwde sessie, niet aan URL of IP. Schone cookies zijn dan de bewezen
+    route. Retourneert (context, page, html, vers): de aanroeper moet de
+    mogelijk vernieuwde context/page overnemen."""
+    html = _load(page, url, res=res)
+    if html is not None:
+        return context, page, html, False
+    try:
+        context.close()
+    except Exception:
+        pass
+    context, page = _verse_pagina(browser, sink)
+    return context, page, _load(page, url, res=res), True
+
+
 def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResult:
     res = ScrapeResult(retailer_id=cfg.id, strategy="render")
     try:
@@ -216,18 +253,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         browser = pw.chromium.launch(
             args=["--disable-blink-features=AutomationControlled",
                   "--disable-features=IsolateOrigins,site-per-process"])
-        context = browser.new_context(
-            locale="nl-NL",
-            timezone_id="Europe/Amsterdam",
-            viewport={"width": 1366, "height": 900},
-            extra_http_headers={"Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8"},
-            user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/126.0.0.0 Safari/537.36"))
-        context.add_init_script(STEALTH_JS)
         sink = _ApiSink()
-        page = context.new_page()
-        page.on("response", sink.handle)
+        context, page = _verse_pagina(browser, sink)
         try:
             if not cats:
                 cats = _nav_categories_via_browser(page, cfg)
@@ -246,6 +273,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
 
             blocked_pages = 0
             diagnoses = 0
+            verse_sessies = 0
             oogst: list[str] = []
             for cat_url in cats:
                 cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
@@ -254,7 +282,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     url = cat_url if n == 1 else \
                         f"{cat_url}{'&' if '?' in cat_url else '?'}page={n}"
                     sink.reset()
-                    html = _load(page, url, res=res)
+                    context, page, html, vers = _load_of_verse_sessie(
+                        browser, sink, context, page, url, res=res)
+                    if vers and html is not None:
+                        verse_sessies += 1
                     time.sleep(pause)
                     if html is None:
                         blocked_pages += 1
@@ -286,6 +317,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     break
             if oogst:
                 res.notes.append("oogst per categorie: " + ", ".join(oogst[:15]))
+            if verse_sessies:
+                res.notes.append(f"{verse_sessies} pagina('s) na een blokkade alsnog "
+                                 "geladen in een verse sessie (de wering hangt aan "
+                                 "de opgebouwde sessie, niet aan de URL)")
             if blocked_pages:
                 res.notes.append(f"{blocked_pages} pagina('s) geblokkeerd of niet geladen")
             if api_hits:
