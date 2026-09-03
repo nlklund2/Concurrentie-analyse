@@ -106,12 +106,13 @@ def probe_report(probes: list[dict], limit: int) -> str:
                           + " | ".join(f"'{t[:40]}' ×{n}" for t, n in promos.most_common(6)))
             md.append("- Voorbeelden:")
             md.append("")
-            md.append("  | Artikel | Prijs | Was | Kleur | Maten | Groep |")
-            md.append("  |---|---:|---:|---|---|---|")
+            md.append("  | Artikel | Prijs | Was | Promo | Kleur | Maten | Groep |")
+            md.append("  |---|---:|---:|---|---|---|---|")
             for r in p["rows"][:5]:
                 prijs = f"€{r['price']:.2f}" if r["price"] is not None else "–"
                 was = f"€{r['was_price']:.2f}" if r["was_price"] is not None else ""
                 md.append(f"  | {r['title'][:50]} | {prijs} | {was} "
+                          f"| {(r.get('promo_text') or '')[:30]} "
                           f"| {r['color'][:20]} | {r['sizes'][:25]} "
                           f"| {r['audience']} / {r['product_type']} |")
         md.append("")

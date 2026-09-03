@@ -23,6 +23,7 @@ from urllib.parse import urlsplit
 
 from .http import Http
 from .jsonscan import deep_find_products, products_from_html
+from .promo import promo_fragmenten
 
 _LDJSON_RE = re.compile(
     r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
@@ -125,13 +126,15 @@ PAGINA_JS = r"""
   // hem leest (link + klim naar de eerste voorouder met een prijs). Beslist
   // of een gevangen promotekst bij het artikel hoort of een paginabreed
   // element is dat in de klim meekomt — KiK gaf '-43% · -20%' op 37 kaarten.
-  const kaarten = [];
+  // Verspreid over de pagina (eerste, midden, laatste kaart): de eerste
+  // kaarten zijn vaak 'nieuw' zonder actie, de sale-kaarten staan verderop.
+  let kaarten = [];
   const padRe = /\/p\/|\/p-|\/product|\/artikel|\/dp\//i;
   const prijsRe = /€\s*\d|\d[.,]\d{2}\s*€/;
   for (const streng of [true, false]) {
     const gezien = new Set();
+    const alle = [];
     for (const a of document.querySelectorAll('a[href]')) {
-      if (kaarten.length >= 3) break;
       const href = a.href || '';
       const laatste = (href.split(/[?#]/)[0].replace(/\/$/, '').split('/').pop() || '');
       if (streng && !padRe.test(href) && !/\d{4,}/.test(laatste)) continue;
@@ -140,9 +143,13 @@ PAGINA_JS = r"""
       while (card && hops < 5 && !prijsRe.test(card.innerText || '')) { card = card.parentElement; hops++; }
       if (!card || !prijsRe.test(card.innerText || '')) continue;
       gezien.add(href);
-      kaarten.push(hops + '↑ ' + (card.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220));
+      alle.push(hops + '↑ ' + (card.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220));
     }
-    if (kaarten.length) break;
+    if (alle.length) {
+      const idx = [...new Set([0, Math.floor(alle.length / 2), alle.length - 1])];
+      kaarten = idx.map(i => '[' + (i + 1) + '/' + alle.length + '] ' + alle[i]);
+      break;
+    }
   }
   return {
     titel: (document.title || '').slice(0, 90),
@@ -414,8 +421,10 @@ def _render_diagnose(url: str) -> list[str]:
         if info.get("pagLinks") or info.get("pagKnoppen"):
             regels.append(f"- paginering: links {info.get('pagLinks') or 'geen'}, "
                           f"knoppen/teksten {info.get('pagKnoppen') or 'geen'}")
-        for i, kaart in enumerate(info.get("kaarten") or [], 1):
-            regels.append(f"- kaarttekst {i} (klim↑ + tekst zoals de DOM-scan leest): «{kaart}»")
+        for kaart in info.get("kaarten") or []:
+            promo = promo_fragmenten(kaart)
+            regels.append(f"- kaarttekst [positie/aantal, klim↑, zoals de DOM-scan leest]: «{kaart}»"
+                          + (f" → promo: '{promo}'" if promo else " → promo: geen"))
 
         na_render = products_from_html(html, url)
         regels.append(f"- producten uit de gerenderde HTML: {len(na_render)}")
