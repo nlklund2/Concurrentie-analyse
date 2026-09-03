@@ -8,7 +8,7 @@
 
 | Bron | Strategie | Deze run | In database | t.o.v. vorige week | Status |
 |---|---|---:|---:|---:|---|
-| Action | render | 222 | 222 | +825% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 222, "promo_end": 0, "price_down": 20, "promo_start": 0} |
+| Action | render | 222 | 222 | +825% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 222, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | C&A | render | 607 | 607 | +7% | 🟢 ok — {"new": 1, "back": 6, "gone": 5, "price_up": 0, "products": 607, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | HEMA | firecrawl | 137 | 137 | +2% | 🟢 ok — {"new": 0, "back": 0, "gone": 1, "price_up": 0, "products": 137, "promo_end": 0, "price_down": 0, "promo_start": 0} · 24 Firecrawl-credits |
 | KiK | render | 478 | 478 | -13% | 🟢 ok — {"new": 3, "back": 5, "gone": 6, "price_up": 0, "products": 478, "promo_end": 0, "price_down": 0, "promo_start": 0} |
@@ -42,11 +42,6 @@
 
 | Bron | Artikel | Van | Naar | Verschil |
 |---|---|---:|---:|---:|
-| Action | Thermopanty 100 denier | €170,00 | €2,49 | -99% |
-| Action | Kate Legwear panty 40 denier | €50,00 | €1,89 | -96% |
-| Action | Kate Legwear panty 60 denier | €50,00 | €1,89 | -96% |
-| Action | Kate Legwear panty 40 denier | €46,00 | €1,89 | -96% |
-| Action | Kate Legwear panty 60 denier | €46,00 | €1,89 | -96% |
 | terStal familiemode | pyjama set rib | €24,99 | €7,49 | -70% |
 | terStal familiemode | pyjama set print + uni | €19,99 | €9,99 | -50% |
 | terStal familiemode | pyjama set met print | €24,99 | €12,49 | -50% |
@@ -57,6 +52,8 @@
 | HEMA | heren pyjamabroek Pepijn regular fit poplin strepen gebroken | €21,99 | €10,00 | -55% |
 | HEMA | heren pyjamabroek regular fit ruit donkerblauw | €21,99 | €10,00 | -55% |
 | HEMA | heren pyjamabroek Pepijn regular fit poplin middenblauw | €21,99 | €10,00 | -55% |
+| Wibra | Jongens sokken 3 paar maat 19/22 – 35/38 | €3,49 | €2,25 | -36% |
+| Wibra | Jog jeans grijs maat 74 t/m 86 | €11,99 | €8,00 | -33% |
 
 ## 4. Assortimentsomvang per groep (verschil t.o.v. vorige week)
 
