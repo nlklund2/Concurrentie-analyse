@@ -32,7 +32,7 @@ GitHub Actions (cron, ma ±06:07 NL)      Supabase (Postgres)
 
 - Opslag: **mutaties** (nieuw/prijswijziging/promo/verdwenen) + weekaggregaten voor de
   trends, én per artikel per week een **artikelfoto** (artnr, naam, categorieën, kleur,
-  maten, van-/voor-prijs, URL) — exporteerbaar als CSV via de view `v_artikelen_week`
+  maten, van-/voor-prijs, ruwe actietekst, URL) — exporteerbaar als CSV via de view `v_artikelen_week`
   in Supabase. Ontbrekende kleur/maten worden via de productpagina aangevuld
   (gecapt, `enrich_limit`).
 - Een **kwaliteitspoort** voorkomt vervuiling: levert een bron minder dan 50% van de

@@ -138,3 +138,46 @@ Geschatte omvang: 1 dagdeel bouwen + 1 bewijsronde; €0 extra kosten.
 Akkoord op stap A (vangen + meten)? Dan volgt de bewijsprobe en daarna pas
 het besluit over parser, migratie en dashboardweergave op basis van echte
 dekkingscijfers.
+
+## 6. Uitkomst stap A (gebouwd en gemeten op 3 september 2026)
+
+Akkoord gegeven op 3-09; gebouwd in PR #32. Wat er staat:
+
+- Veld `promo_text` op product, staging, `products` en de weekfoto
+  (`weekly_articles`, kolom `actie` in `v_artikelen_week`); migratie live.
+  Kolom "Actie" in de artikelverkenner van het dashboard.
+- Patronen in `scraper/promo.py`: multibuy ("2 voor € 7,50", "3 halen 2
+  betalen", "1+1 gratis", "2e halve prijs", "2e artikel 50%"),
+  percentages ("-30%", "tot 50% korting") en ondubbelzinnige actiebadges.
+  Bewust niet: per-stuk-notaties, "nieuw", samenstellingen ("95% katoen"),
+  de was/voor-zin zelf en de wettelijke omnibusregel ("30 dagen beste
+  prijs: € 3,99 (-25%)" is prijshistorie, geen actie).
+- Het validatierapport meet per bron het aandeel artikelen met gevangen
+  tekst (kolom "Promo") en toont de gevangen teksten.
+
+Gemeten dekking (bewijsprobes 3-09, 0 credits):
+
+| Bron | Promo-dekking | Wat er gevangen is |
+|---|---:|---|
+| Action | 0% | niets — Action voert online geen actiebadges op de kaart |
+| C&A | 6% | echte kortingsbadges ("-23%", "-30%"), passend bij was/voor |
+| KiK | ±31% van de kaarten (144 kaarten dames-ondergoed) | kortingsbadges ("-50%", "-67%", "-72%"), passend bij was/voor |
+| HEMA | nog niet gemeten | volgt in de eerstvolgende weekrun (Firecrawl-tegoed) |
+| terStal, Primark, Wibra, Zeeman | n.v.t. op lijstniveau | JSON-/API-routes zonder badgeveld; alleen was/voor |
+
+Bijvangst van de meting (beide hersteld in PR #32):
+
+1. De prijs ín een actietekst gold als doorstreepprijs ("2 voor € 7,50"
+   naast € 4,95 telde als afgeprijsd). Promofragmenten gaan nu vóór de
+   prijsafleiding uit de kaarttekst.
+2. KiK rendert de centen als los element ('€' + '8' + '<sup>99</sup>');
+   innerText plakt dat tot '€899'. De eerste probe meldde daardoor 100%
+   promo-dekking: alleen afgeprijsde kaarten (met een decimale
+   doorstreepprijs) overleefden de prijslezer, en multipacks kregen sinds
+   de start de stukprijs uit "(0,66 € / Stuk)" als prijs. Drie of vier
+   cijfers direct achter het €-teken zijn nu euro's + centen. Diagnose
+   3-09 (run 33776551152): 144 van 144 kaarten gelezen, was 44.
+
+Volgende stap: pas na een besluit van de eigenaar — stap B (parser) heeft
+met deze cijfers vooral zin voor de %-badges (C&A, KiK) en de HEMA-meting
+moet er nog bij.
