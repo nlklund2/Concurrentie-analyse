@@ -291,6 +291,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             diagnoses = 0
             verse_sessies = 0
             oogst: list[str] = []
+            # Welke route de artikelen leverde bepaalt welke velden te vertrouwen
+            # zijn (promotekst uit kaarttekst versus JSON-badgeveld); zonder deze
+            # telling was KiK's '-43% · -20%' op élke kaart niet te duiden.
+            route_telling = {"API": 0, "ingebedde JSON": 0, "DOM-kaarten": 0}
             for cat_url in cats:
                 cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
                 cat_nieuw = 0
@@ -309,9 +313,14 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     # 1) onderschepte API-JSON, 2) ingebedde JSON, 3) DOM-vangnet
                     from_api = list(sink.products)
                     api_hits += len(from_api)
-                    found = from_api + products_from_html(html, url)
+                    ingebed = products_from_html(html, url)
+                    found = from_api + ingebed
                     if not found:
                         found = _dom_products(page, res)
+                        route_telling["DOM-kaarten"] += len(found)
+                    else:
+                        route_telling["API"] += len(from_api)
+                        route_telling["ingebedde JSON"] += len(ingebed)
                     new = _absorb(seen, found, cat_path)
                     cat_nieuw += new
                     if not new:
@@ -333,6 +342,9 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                     break
             if oogst:
                 res.notes.append("oogst per categorie: " + ", ".join(oogst[:15]))
+            if any(route_telling.values()):
+                res.notes.append("herkomst (vóór ontdubbeling): " + ", ".join(
+                    f"{k} {v}" for k, v in route_telling.items() if v))
             if verse_sessies:
                 res.notes.append(f"{verse_sessies} pagina('s) na een blokkade alsnog "
                                  "geladen in een verse sessie (de wering hangt aan "
