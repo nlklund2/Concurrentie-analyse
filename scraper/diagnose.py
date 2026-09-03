@@ -389,13 +389,17 @@ def _render_diagnose(url: str) -> list[str]:
                     "() => document.querySelectorAll('a[href]').length")
             except Exception:
                 links_voor = None
-            # Trager en verder scrollen dan de scraper: zo blijkt of het raster
-            # alleen maar méér geduld nodig had.
-            for deel in (0.3, 0.6, 1.0):
-                page.evaluate(f"() => window.scrollTo(0, document.body.scrollHeight * {deel})")
-                page.wait_for_timeout(1200)
+            # Precies de laadroutine van de scraper (scroll-lus + 'toon meer'):
+            # de diagnose moet de pagina zien zoals de DOM-scan hem leest. Met
+            # drie losse scrolls zag de KiK-diagnose kaarten zonder percentage
+            # terwijl de probe op élke kaart '-43% · -20%' las.
+            from .models import ScrapeResult
+            from .strategies.render_listing import _scroll_tot_stabiel
+            laad = ScrapeResult(retailer_id="diagnose")
+            _scroll_tot_stabiel(page, laad)
             info = page.evaluate(PAGINA_JS)
             html = page.content()
+            laadnotities = list(laad.notes)
         except Exception as e:
             browser.close()
             return [f"- **browserfout:** {type(e).__name__}: {str(e)[:200]}"]
@@ -421,6 +425,8 @@ def _render_diagnose(url: str) -> list[str]:
         if info.get("pagLinks") or info.get("pagKnoppen"):
             regels.append(f"- paginering: links {info.get('pagLinks') or 'geen'}, "
                           f"knoppen/teksten {info.get('pagKnoppen') or 'geen'}")
+        for n in laadnotities:
+            regels.append(f"- laadroutine: {n}")
         for kaart in info.get("kaarten") or []:
             promo = promo_fragmenten(kaart)
             regels.append(f"- kaarttekst [positie/aantal, klim↑, zoals de DOM-scan leest]: «{kaart}»"
