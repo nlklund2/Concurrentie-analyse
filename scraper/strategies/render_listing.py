@@ -69,8 +69,12 @@ CONSENT_TEXTS = ("alles toestaan", "sta alle cookies toe", "alles accepteren",
 
 # Beide schrijfwijzen: '€ 24,99' én '24,99 €' — C&A zet het teken achter het
 # getal, waardoor een €-eerst-regex maar een fractie van de kaarten las.
+# De getal-eerst-variant eist decimalen: Action-panty's (W36) schrijven
+# 'Maten 40 - 42 € 0,84/st', en een kale-integer-match las de maat '42 €'
+# als prijs én at het €-teken op, zodat de echte prijs erna onleesbaar werd —
+# twintig panty's kregen zo hun maat als prijs (42, 46, 50, kinderlengte 170).
 PRICE_TEXT_RE = re.compile(r"€\s*(\d+(?:[.,]\d{2})?|\d+[.,]-)"
-                           r"|(\d+(?:[.,]\d{2})?)\s*€")
+                           r"|(\d+[.,]\d{2})\s*€")
 # Sommige shops zetten het €-teken via CSS (::before) neer; dan staat er in de
 # tekst alleen '3,99'. Bewust smal: twee decimalen achter een komma/punt, geen
 # maten ('35 - 46'), geen losse getallen en geen versienummers ('5.51.0' —
@@ -125,9 +129,11 @@ DOM_SCAN_JS = """
 ([streng, prijsLos]) => {
   const out = [];
   const seen = new Set();
-  // '€ 24,99' én '24,99 €' (C&A); losse ronde weert versienummers als 5.51.0
+  // '€ 24,99' én '24,99 €' (C&A); losse ronde weert versienummers als 5.51.0.
+  // Getal-eerst eist decimalen, anders telt een maat vóór een € ('40 - 42 €')
+  // als prijssignaal (zie PRICE_TEXT_RE in de Python-kant).
   const priceRe = prijsLos ? /(?:^|[^\\d.,])\\d{1,3}[.,]\\d{2}(?![.,]?\\d)/
-                           : /€\\s*\\d|\\d[\\d.,]*\\s*€/;
+                           : /€\\s*\\d|\\d[.,]\\d{2}\\s*€/;
   // Productkaart = een link naar een productpagina, met ergens in de
   // omliggende kaart een prijs. Titel komt uit aria-label / img-alt /
   // heading, niet uit de ruwe kaarttekst (die is vervuild met prijs/labels).
