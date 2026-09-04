@@ -176,3 +176,37 @@ KiK "de stand van vrijdag 4-09", de mutaties zijn "maandag t.o.v. W35".
 - PR #32 — prijslezer KiK (centen achter het €-teken) en stap A promotekst.
 - Vergelijk `docs/validaties/2026-09-03-action-valse-prijsverlagingen.md`
   (zelfde werkwijze: herverwerken, dan de herdraai-artefacten schonen).
+
+## Addendum 4-09, 10:17–10:35 NL: verpakkingsgrootte uit de stukprijs
+
+Met de herstelde prijslezer droeg een KiK-kaart de pakprijs, maar zonder
+verpakkingsgrootte (KiK zet die niet in de artikelnaam) stond een 3-pack
+slips voor €1,99 als één stuk in de per-stuk-index. PR #34 leidt de
+pack-grootte nu af uit pakprijs ÷ stukprijs op de kaart ("(0,66 € /
+Stuk)"). Na akkoord van de eigenaar is KiK W36 daarom nog één keer
+hermeten (run 33852684145, kwaliteitspoort ok): 643 artikelen, waarvan
+368 met een pack-grootte (gemiddeld 2,7 stuks).
+
+De hermeting logde 5 waarnemingen binnen de week (1 back, 4 gone; ook
+geschoond volgens de regel hierboven, CSV nu 875 regels). Prijs- en
+promo-events: 0 — de prijzen zijn identiek aan die van 09:20.
+`new_count`/`gone_count` opnieuw herberekend (25 / 52). Stand
+`price_events` ongewijzigd: new 30, back 23, gone 52, promo_start 9,
+promo_end 55.
+
+Controle: de per-stuk-medianen komen nu vrijwel exact uit op de
+stukprijzen die de oude lezer per ongeluk las — het bewijs dat beide
+correcties samen kloppen:
+
+| doelgroep | producttype | pakprijs mediaan | per stuk nu | per stuk oude lezing (W36 vóór) | multipack-aandeel |
+|---|---|---:|---:|---:|---:|
+| heren | ondergoed | 5,99 | 2,50 | 2,75 | 100% |
+| heren | sokken & panty's | 2,99 | 0,80 | 0,80 | 100% |
+| jongens | ondergoed | 2,99 | 1,50 | 1,50 | 100% |
+| jongens | sokken & panty's | 1,99 | 0,66 | 0,66 | 100% |
+| meisjes | ondergoed | 3,99 | 1,58 | 1,58 | 99% |
+| meisjes | sokken & panty's | 1,99 | 1,00 | 0,88 | 84% |
+| dames | ondergoed | 3,99 | 2,99 | 2,99 | 43% |
+
+Het weekrapport is opnieuw gegenereerd met `alleen_rapport` (run
+33854006939 (10:33 NL)).
