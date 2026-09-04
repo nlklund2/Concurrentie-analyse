@@ -125,10 +125,11 @@ gone 52, promo_start 9, promo_end 55, price_up 0, price_down 0.
 De hermeting van 09:20 committeerde een rapport mét de 840 herdraai-events
 (6df1913). Een tweede KiK-run om het rapport na de schoning te
 regenereren (run 33849661542, 09:38–09:53) logde zelf weer 6
-variatie-events (1 new, 2 back, 3 gone; ook geschoond, zie tabel). Het
-definitieve rapport komt daarom uit een run met `retailers: zeeman`: die
-haalt de kwaliteitspoort nooit (15 < 25), schrijft niets in de weektabellen
-en genereert alleen het rapport — run 33851032536 (09:56 NL).
+variatie-events (1 new, 2 back, 3 gone; ook geschoond, zie tabel). Een
+poging met `retailers: zeeman` (run 33851032536) bewees dat een meting die
+alléén mislukt de hele job laat falen, inclusief de rapportstap. Daarom
+heeft de weekworkflow nu een invoer `alleen_rapport`: geen meting, alleen
+het rapport opnieuw uit de database — run RAPPORT_RUN_ID.
 
 ## Wat dit níet onderscheidt
 
