@@ -59,53 +59,47 @@ retailers:
   # ---- kern: het gevraagde concurrentieveld ondergoedmode ----
   zeeman:
     name: Zeeman
-    base: https://www.zeeman.com/nl
+    base: https://www.zeeman.com/nl-nl
     segment: kern
-    # EINDOORDEEL 18-08 (na hermeting op de júiste sitemap): Zeeman serveert
-    # ons op elke laag uitgeklede pagina's. De canonieke /nl-nl/product/-
-    # pagina's (24.833 stuks, via robots.txt → /sitemap/index.xml) dragen in
-    # de kale HTML alleen een klein gedeeld productsetje — 34 van 40
-    # proefpagina's vielen op dezelfde 5 sleutels samen — en ook gerenderd
-    # toont de pagina de eigen prijs niet (0 euro-tekens). /api/* is per
-    # robots.txt verboden. Bron blijft rood met de poort dicht; folder en
-    # winkelbezoek blijven het kanaal. Deze config is wél de juiste basis
-    # (nl-nl in plaats van ook nl-be, echte artikelen in plaats van
-    # badge-widgets) en draait als gratis wekelijkse hertest: zet Zeeman
-    # ooit echte servering aan, dan pakt de route het vanzelf op.
-    # Meting 19-08: ook ?page=-paginering getoetst (dames/ondergoed?page=2,
-    # heren/ondergoed?page=1) — zelfde uitgeklede serving, 0 producten in
-    # kale én gerenderde HTML, geen product-API's onderweg. Bewijsdossier:
-    # docs/validaties/.
-    url_filter: "/nl-nl/product/"
     color_slot: 2
-    strategy: sitemap_pages
-    sitemap_page_cap: 400
-    enrich: false
+    strategy: listing
+    url_filter: "/nl-nl/"
+    # Zeeman draait Next.js (App Router): elke categoriepagina draagt haar
+    # producten in de flight-payload (self.__next_f.push), mét prijs in
+    # centen, pakgrootte, categoriepad, maten, EAN en voorraad — zie
+    # jsonscan.products_from_flight. Vaste seeds: de hoofdcategorieën
+    # bevatten hun subcategorieën al (dames/ondergoed 296 waarvan slips 214),
+    # dus alleen ouders. Meting 04-09-2026: 1.202 unieke artikelen in 49
+    # verzoeken. De teller in de payload (total/totalPages) stuurt de
+    # paginering en de tellercontrole in de kwaliteitspoort.
+    seeds:
+      - https://www.zeeman.com/nl-nl/dames/ondergoed
+      - https://www.zeeman.com/nl-nl/dames/lingerie
+      - https://www.zeeman.com/nl-nl/dames/nachtkleding
+      - https://www.zeeman.com/nl-nl/dames/beenmode
+      - https://www.zeeman.com/nl-nl/dames/dameskleding/thermokleding
+      - https://www.zeeman.com/nl-nl/heren/ondergoed
+      - https://www.zeeman.com/nl-nl/heren/nachtkleding
+      - https://www.zeeman.com/nl-nl/heren/sokken
+      - https://www.zeeman.com/nl-nl/kind/ondergoed
+      - https://www.zeeman.com/nl-nl/kind/nachtkleding
+      - https://www.zeeman.com/nl-nl/kind/sokken
+      - https://www.zeeman.com/nl-nl/baby/babykleding/rompertjes
+      - https://www.zeeman.com/nl-nl/baby/babykleding/sokken-maillots
+      - https://www.zeeman.com/nl-nl/baby/babykleding/pyjamas
+    max_pages_per_category: 12      # grootste categorie telt 10 pagina's van 30
+    min_products_expected: 600      # 04-09: 1.202; daaronder is de bron gewijzigd
+    enrich: false                   # kleur zit in de naam, maten in de payload
     notes: >-
-      Maatstaf waardetextiel; sterk in basics-ondergoed en sokken.
-      OMGEZET 09-08 naar de render-strategie. Zeeman is een client-side app:
-      de lijstpagina's leverden via HTTP nul producten, en op de productpagina's
-      staat in de HTML alleen een aanraderblok — 60 verschillende pagina's,
-      gelijkmatig over 9.672 URL's bemonsterd, leverden 6 artikelen op (dezelfde
-      zes). De prijzen en doelgroepen daarvan klopten, dus de bron zelf is prima;
-      alleen komt de data pas na het renderen beschikbaar. Caps krap gehouden
-      (30 categorieën x 10 pagina's) zodat de weekrun onder ±25 min blijft.
-      OORZAAK GEVONDEN 09-08 (paginadiagnose): de Cookiebot-muur staat er wel
-      degelijk, maar rendert asynchroon — ná onze klikpoging — en de knop heet
-      'Alles toestaan', een tekst die de consent-routine niet kende. Daardoor
-      bleef de muur staan en laadde het Algolia-productraster nooit (0 prijzen
-      in de tekst; de 'prijsachtige getallen' bleken versienummers in de
-      cookiedialoog). Fix: consent-herkansing ná networkidle + 'Alles
-      toestaan' in de tekstenlijst. Algolia-calls worden al onderschept door
-      de API-sink, dus na de klik kan de data via die route binnenkomen.
-      HERVALIDATIE 09-08 (run 14): NIET opgelost — 6 'artikelen', en de titels
-      ontmaskeren ze: 'Cookiebot Usercentrics' en 4x 'Trusted Shops' met prijs
-      €4.44 / was €5.00 — dat is de shopwaardering 4,44 van 5, gelezen als
-      afprijzing. De muur of het raster blokkeert dus nog steeds, en de
-      getal-eerst-prijsscan maakt van badges nepproducten. BRON BLIJFT ROOD;
-      de weekpoort (minimaal 25) houdt deze rommel uit de database. Geen
-      derde poging zonder nieuwe diagnose-informatie; alternatief is Firecrawl
-      (zelfde route als Wibra/HEMA) of accepteren dat Zeeman ontbreekt.
+      Maatstaf waardetextiel; sterk in basics-ondergoed en sokken. Vaste
+      prijspunten (€ 3,99 / 5,99 / 4,99 dragen een derde van het assortiment)
+      en géén online afprijzingen: promotie loopt via de folder — het
+      'Uit onze folder'-label komt mee als promo_text.
+      GESCHIEDENIS: 09-08 t/m 19-08 rood verklaard ("uitgeklede serving op
+      elke laag"); 04-09 weerlegd — GitHub Actions kreeg byte voor byte
+      dezelfde pagina als een gewone browser, de scraper las alleen het
+      flight-formaat niet en telde eurotekens die Zeeman nooit rendert.
+      Dossier: docs/validaties/2026-09-04-zeeman-flight-payload.md.
   wibra:
     name: Wibra
     base: https://www.wibra.nl

@@ -1,5 +1,12 @@
 # Zeeman — `?page=`-paginering getoetst en verworpen
 
+> **HERROEPEN 04-09-2026.** Het oordeel hieronder was onjuist: Zeeman serveerde de
+> pagina's wél compleet, ook aan GitHub Actions. De producten staan in de Next.js-
+> flight-payload (`self.__next_f.push`), een formaat dat de extractie tot 04-09 niet
+> las; de gemeten '0 €-tekens' zijn echt, Zeeman rendert prijzen zonder euroteken.
+> Zie `2026-09-04-zeeman-flight-payload.md`. De tekst hieronder blijft staan als
+> verslag van wat er gemeten is.
+
 **Datum:** 19-08-2026 · **Run:** [32237551323](https://github.com/nlklund2/Concurrentie-analyse/actions/runs/32237551323) (11:27 NL, diagnose op main; een eerdere poging, run 32235948614, is geannuleerd wegens een hangende Playwright-download)
 **Besluit:** paginering via `?page=` is géén route om Zeeman-data binnen te halen; het eindoordeel van 18-08 blijft staan.
 

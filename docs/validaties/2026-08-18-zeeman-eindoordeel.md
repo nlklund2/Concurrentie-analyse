@@ -1,5 +1,12 @@
 # Zeeman — eindoordeel rood: uitgeklede serving op elke laag
 
+> **HERROEPEN 04-09-2026.** Het oordeel hieronder was onjuist: Zeeman serveerde de
+> pagina's wél compleet, ook aan GitHub Actions. De producten staan in de Next.js-
+> flight-payload (`self.__next_f.push`), een formaat dat de extractie tot 04-09 niet
+> las; de gemeten '0 €-tekens' zijn echt, Zeeman rendert prijzen zonder euroteken.
+> Zie `2026-09-04-zeeman-flight-payload.md`. De tekst hieronder blijft staan als
+> verslag van wat er gemeten is.
+
 **Datum:** 18-08-2026 · **Runs:** [32154461637](https://github.com/nlklund2/Concurrentie-analyse/actions/runs/32154461637) (17:27 NL, sitemap-diagnose + bewijsprobe limiet 40) en [32155622653](https://github.com/nlklund2/Concurrentie-analyse/actions/runs/32155622653) (17:38 NL, render-diagnose productpagina's)
 **Besluit:** Zeeman blijft rood; de sitemap_pages-route draait door als gratis wekelijkse hertest met de kwaliteitspoort dicht.
 

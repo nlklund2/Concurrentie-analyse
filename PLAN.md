@@ -183,32 +183,12 @@ Sommige retailers blokkeren niet de scraper-*techniek* maar het *IP-adres*: verk
 
 **Creditprognose per week (stand 10-08):** Wibra ±9 (Store-API) + HEMA ±24 (20 categorieën met rendertijd) ≈ **±33 credits per week**. Het resterende gratis tegoed (±175 na het onderzoek van dit weekend) dekt zo'n **vijf weken**; daarna is de afweging voor de eigenaar: het betaalde Firecrawl-tier (±€16/mnd) voor twee volwaardig meelopende kernconcurrenten, of HEMA terugschroeven naar minder categorieën. Die keuze hoeft pas rond half september.
 
-**Zeeman (definitief eindoordeel 18-08, na hermeting op de juiste sitemap):** langs álle lagen gemeten en op alle lagen serveert Zeeman ons uitgeklede pagina's. De juiste productsitemap is gevonden (robots.txt → `/sitemap/index.xml` → `nl-nl/sitemap/products.xml`, 24.833 canonieke `/product/`-pagina's; de eerdere meting liep half door de Belgische sitemap omdat url_filter `/nl` ook `nl-be` matchte). Maar ook op die juiste pagina's staat in de kale HTML alleen een klein gedeeld productsetje (34 van 40 proefpagina's vielen samen op 5 sleutels), gerenderd toont de pagina de eigen prijs evenmin (0 euro-tekens), en `/api/*` is per robots.txt verboden. Ook de in externe review (19-08) aangedragen `?page=`-paginering is daarna live gemeten: `dames/ondergoed?page=2` en `heren/ondergoed?page=1` krijgen exact dezelfde uitgeklede serving — 0 producten in de kale én de gerenderde HTML, geen product-API's onderweg. Paginering omzeilt de serving dus niet; de enige realistische structurele route is de officiële TradeTracker-productfeed, en die vergt een affiliateaanvraag plus schriftelijke toestemming (eigenaarsactie). Zeeman blijft wekelijks meelopen als gratis hertest op de nu-juiste route — zet Zeeman ooit echte servering aan, dan zien we het vanzelf — met de kwaliteitspoort dicht; de weekfolder en het winkelbezoek (§7) zijn het kanaal voor prijspeiling. Dit is de enige bron van de acht zonder machineleesbare route, en dat ligt aantoonbaar aan de serving van de site, niet aan de scraper. De beslissende metingen achter dit oordeel (en de doorbraken van Wibra/HEMA) staan reproduceerbaar in `docs/validaties/`, mét de groencriteria waaraan een eventuele nieuwe Zeeman-route moet voldoen vóór de bron weer groen mag.
+**Zeeman (herzien 04-09, eindoordeel van 18-08 herroepen): loopt volledig mee.** Van 09-08 tot 19-08 stond Zeeman rood met de conclusie dat de site geautomatiseerde bezoekers op elke laag uitgeklede pagina's serveert. Die conclusie was onjuist. Een hermeting op 04-09 liet zien dat GitHub Actions voor `dames/ondergoed` byte voor byte dezelfde 710.037 tekens HTML kreeg als een gewone browser, inclusief de teller «296 artikelen». De producten staan alleen niet in JSON-LD of `__NEXT_DATA__`, maar in de Next.js App Router-*flight*-payload (`self.__next_f.push`), en Zeeman rendert prijzen zonder euroteken — precies de drie signalen waar de diagnose op keek. De nieuwe flight-extractor (`jsonscan.products_from_flight`) leest per categoriepagina 30 producten mét prijs in centen, pakgrootte, Zeeman's eigen ondergroep, maten, EAN en voorraadstatus; veertien vaste categorie-seeds leveren ±1.200 unieke bodywear-artikelen in ±50 verzoeken. De payload draagt ook de eigen teller van de bron (`total`), waarmee de kwaliteitspoort nu per week controleert of de oogst compleet is (groencriterium 3 uit het dossier van 19-08). Zeeman prijst online niets af; promotie loopt via de folder, en het label 'Uit onze folder' komt mee als promotekst. De weekhistorie van W32–W36 is niet te reconstrueren; Zeeman start met W37. Bewijs en meting: `docs/validaties/2026-09-04-zeeman-flight-payload.md`.
 
 **Besluit van de eigenaar (09-08): beide bronnen blijven wekelijks meelopen als hertest.** Sites veranderen, en de dag dat het raster wél rendert wil je het diezelfde maandag zien. Om te voorkomen dat die hertest het gratis tegoed opmaakt, kent de firecrawl-strategie een **kanarie** (`firecrawl_canary` in `retailers.yml`): levert de eerste handvol opvragingen niets leesbaars op, dan stopt de run daar. Dat drukt het weekverbruik van ±66 naar ±14 credits — genoeg voor maanden hertesten in plaats van vier weken. Geeft de kanarie wél data, dan loopt dezelfde run gewoon door tot de volle cap; er gaat dus geen week verloren. Bij HEMA kijkt de kanarie bewust naar de JSON-route en niet naar de kaartoogst: die leest bij een niet-renderend raster alleen de promoblokken (koffie, koekjes) en zou de bron ten onrechte groen praten.
 
-### Zeeman: laadt wel, toont geen prijzen (stand 09-08)
-Zeeman is een ander geval dan Wibra/HEMA — er is géén blokkade. De pagina's laden
-volledig, ook zonder browser, maar bevatten geen prijzen. Drie gemeten voorbeelden:
-
-| Pagina | Links | €-tekens in de tekst |
-|---|---:|---:|
-| `/nl-nl/dames/ondergoed` | 120 | **0** |
-| `/nl-nl/heren/sokken` | 120 | **0** |
-| `/nl-nl/collecties/sokken` | 116 | **0** |
-
-De paginatitel van de tweede luidt letterlijk *"Herensokken, enkelsokken, en meer.
-Vanaf €1,99 | Zeeman"* — de prijzen bestáán dus, maar komen pas in beeld na een
-stap die de scraper niet zet. Meest waarschijnlijke oorzaak: een cookie- of
-regiokeuze die het productraster vrijgeeft en die de consent-routine niet herkent.
-Via de productpagina's lukt het evenmin: die dragen in de HTML alleen een
-aanraderblok, waardoor 60 verschillende pagina's steeds dezelfde zes artikelen
-opleverden.
-
-**Besluit: Zeeman blijft rood tot dit gericht is uitgezocht.** Zes aanrader-
-artikelen als "het Zeeman-assortiment" presenteren is schadelijker dan een lege
-regel — juist omdat Zeeman de maatstaf van het waardesegment is. Dit is de
-belangrijkste openstaande technische taak; begin bij de consent-/regiostap.
+### Zeeman: de les van vijf rode weken (04-09)
+Zeeman laadde vanaf dag één volledig, ook zonder browser — dat stond hier al op 09-08. Wat ontbrak was niet de data maar de lezer: de diagnose telde eurotekens (Zeeman zet die nooit in de tekst), JSON-LD-blokken (alleen WebPage/Organization) en `__NEXT_DATA__` (bestaat niet in de App Router). Drie keer nul werd gelezen als "de server stuurt ons niets", terwijl de HTML-omvang (690.115 tekens voor een lijstpagina tegen 130.212 voor een echte lege pagina) het tegendeel liet zien. Lessen voor volgende bronnen: (1) vergelijk de kale HTML-omvang van de scraper met die van een gewone browser vóór je een blokkade concludeert; (2) een pagina zonder euroteken kan vol prijzen staan; (3) zoek bij een Next.js-site naar `self.__next_f.push` — de diagnose meldt dat sinds 04-09 als apart signaal.
 
 ## 9. Beperkingen & risico's — eerlijk benoemd
 
@@ -258,7 +238,7 @@ extra opvraging bij een bron.
 | 11.10 | Winkelnetwerk-monitor | M | nee (nieuwe bron) | – |
 | 11.11 | Nieuwsbrieven en folders binnenhalen | S–M | nee (eigenaarsactie) | – |
 | 11.12 | Affiliate-productfeeds als legitieme route | L | nee (eigenaarsactie) | – |
-| 11.13 | Zeeman: geen machineleesbare route (stand van zaken) | – | n.v.t. | – |
+| 11.13 | Zeeman: flight-payload-route | S | ja | ✅ gebouwd 04-09 |
 | 11.14 | Koppelen aan eigen verkoop- en margedata | L | nee (eigenaarsactie) | – |
 | §11E | Actieteller vastleggen in de repo | S | n.v.t. | – |
 
@@ -344,7 +324,7 @@ huidige assortimentsscope, maar is technisch het goedkoopste wat er is.
 mailadres inschrijven op de nieuwsbrieven van alle acht bronnen: dan komt hun
 promotiekalender vanzelf binnen, zonder scrapen en zonder discussie. Gecombineerd met het
 folderarchief (fase 3) dekt dat precies het gat dat online monitoring structureel laat
-vallen — en het is de enige serieuze route naar Zeeman en de folder-vechters. Gebruik een
+vallen — en het is de serieuze route naar de folderacties van Zeeman en de andere folder-vechters. Gebruik een
 adres dat niet naar terStal herleidbaar is, of accepteer bewust dat de concurrent ziet dat
 je meekijkt (§8).
 
@@ -359,9 +339,7 @@ eigenaarsbesluit, geen techniek. Aandachtspunt: een affiliatefeed is een commerc
 met de concurrent, inclusief voorwaarden over gebruik — laat dat meelopen in de toetsing van
 §8. Lukt er één, dan is dat structureel beter dan de huidige route.
 
-**11.13 Zeeman blijft het gat.** Het eindoordeel van 18-08 (§8) staat: verder sleutelen aan
-de scraper is zonde van de tijd. De reële routes zijn de affiliate-feed (11.12), de folder
-(11.11) en het gerichte winkelbezoek (§7).
+**11.13 Zeeman loopt mee (04-09).** Het eindoordeel van 18-08 is herroepen: de producten stonden al die tijd in de Next.js-flight-payload. De affiliate-feed (11.12) blijft interessant voor EAN-koppeling, maar is voor Zeeman niet meer de enige route. Vervolgstap voor Zeeman: de folder- en multibuy-acties onder `/nl-nl/aanbiedingen/` (contentsitemap) als promotieregels inlezen (11.11).
 
 ### D. De grootste sprong: koppelen aan eigen cijfers
 

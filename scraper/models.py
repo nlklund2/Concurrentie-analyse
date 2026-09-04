@@ -41,6 +41,12 @@ class ScrapeResult:
     credits_used: int = 0
     notes: list[str] = field(default_factory=list)
     error: str = ""
+    # Tellercontrole: per gecrawlde categorie (geoogste sleutels, aantal
+    # volgens de teller van de bron zelf). Alleen gevuld als de bron die
+    # teller meestuurt (Next.js-flight: "total"). De kwaliteitspoort keurt
+    # een week af als de oogst meer dan 5% onder de eigen telling blijft —
+    # groencriterium 3 uit docs/validaties/2026-08-19-zeeman-paginering.md.
+    coverage: dict[str, tuple[int, int]] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
