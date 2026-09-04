@@ -451,6 +451,184 @@ def products_from_escaped_attrs(html: str, base_url: str = "") -> list[Product]:
     return products
 
 
+# ---- Next.js App Router: de "flight"-payload -----------------------------
+# Sinds de App Router zet Next.js de serverdata niet meer in één
+# <script id="__NEXT_DATA__"> maar in een reeks
+#   <script>self.__next_f.push([1,"…"])</script>
+# blokken. Elk blok is een JS-stringliteral (aanhalingstekens en regeleinden
+# ge-escaped); aaneengeplakt vormen ze de React-serverstroom, met daarin de
+# lijstdata als gewone JSON. Zeeman (meting 04-09-2026) draagt zo per
+# categoriepagina 30 producten mét prijs in centen, pakgrootte, categoriepad,
+# maten, EAN en voorraad — terwijl JSON-LD, __NEXT_DATA__ en de tekst
+# (prijzen zonder €-teken) allemaal leeg bleven. Het rode eindoordeel van
+# 18-08 kwam daaruit voort; zie docs/validaties/2026-09-04-zeeman-flight-payload.md.
+_NEXT_FLIGHT_RE = re.compile(
+    r'self\.__next_f\.push\(\[\d+,"((?:[^"\\]|\\.)*)"\]\)', re.S)
+_FLIGHT_LINE_RE = re.compile(r"^[0-9a-f]{1,4}:(.*)$", re.M)
+_FLIGHT_RESULTS_RE = re.compile(r'"results"\s*:\s*(?=\[)')
+_FLIGHT_META_RE = re.compile(r'"total"\s*:\s*(\d+)\s*,\s*"totalPages"\s*:\s*(\d+)')
+
+
+def flight_payload(html: str) -> str:
+    """De aaneengeplakte serverstroom uit alle self.__next_f.push-blokken;
+    leeg als de pagina er geen heeft."""
+    delen: list[str] = []
+    for m in _NEXT_FLIGHT_RE.finditer(html):
+        try:
+            delen.append(json.loads('"' + m.group(1) + '"'))
+        except ValueError:
+            try:
+                delen.append(m.group(1).encode("utf-8").decode("unicode_escape"))
+            except UnicodeDecodeError:
+                continue
+    return "".join(delen)
+
+
+def flight_listings(payload: str, cap: int = 5) -> list[tuple[list, dict]]:
+    """Alle "results":[…]-lijsten in de stroom, elk met de teller van de bron
+    ({total, totalPages}) als die direct achter de lijst staat."""
+    uit: list[tuple[list, dict]] = []
+    start = 0
+    while len(uit) < cap:
+        m0 = _FLIGHT_RESULTS_RE.search(payload, start)
+        if m0 is None:
+            break
+        blob = _balanced_blob(payload, m0.end())
+        if blob is None:
+            break
+        data = _json_loads_lenient(blob)
+        einde = m0.end() + len(blob)
+        meta: dict = {}
+        m = _FLIGHT_META_RE.search(payload, einde, min(len(payload), einde + 300))
+        if m:
+            meta = {"total": int(m.group(1)), "totalPages": int(m.group(2))}
+        if isinstance(data, list) and data:
+            uit.append((data, meta))
+        start = einde
+    return uit
+
+
+def flight_meta(html: str) -> dict:
+    """{total, totalPages} van de eerste productlijst op de pagina — de
+    eigen teller van de bron, voor de tellercontrole in de kwaliteitspoort."""
+    for _, meta in flight_listings(flight_payload(html)):
+        if meta:
+            return meta
+    return {}
+
+
+def _centen(d) -> float | None:
+    """{"gross": {"centAmount": 999}} of {"centAmount": 999} → 9.99."""
+    if not isinstance(d, dict):
+        return None
+    g = d.get("gross") if isinstance(d.get("gross"), dict) else d
+    bedrag = g.get("centAmount")
+    if isinstance(bedrag, (int, float)) and not isinstance(bedrag, bool) and bedrag > 0:
+        return round(bedrag / 100, 2)
+    return None
+
+
+def _attributen(variant) -> dict:
+    """[{"name": "size", "value": "M"}, …] → {"size": "M"}."""
+    uit: dict = {}
+    for a in (variant or {}).get("attributes") or []:
+        if isinstance(a, dict) and isinstance(a.get("name"), str):
+            uit[a["name"]] = a.get("value")
+    return uit
+
+
+def _product_url(base_url: str, slug: str) -> str:
+    """Zeeman zet de productpagina onder /<locale>/product/<slug>; het
+    locale-segment komt van de categorie-URL (nl-nl), zodat de link naar de
+    Nederlandse pagina wijst en niet naar nl-be."""
+    if not slug:
+        return ""
+    p = urlsplit(base_url)
+    segs = [s for s in p.path.split("/") if s]
+    locale = segs[0] if segs and re.fullmatch(r"[a-z]{2}(?:-[a-z]{2})?", segs[0]) else ""
+    pad = f"/{locale}/product/{slug}" if locale else f"/product/{slug}"
+    return f"{p.scheme}://{p.netloc}{pad}"
+
+
+def _flight_product(obj: dict, base_url: str) -> Product | None:
+    """Eén lijstitem van het commercetools-achtige type dat Zeeman gebruikt:
+    naam + primaryVariant met prijs in centen. Anders None."""
+    naam = obj.get("name")
+    pv = obj.get("primaryVariant")
+    if not isinstance(naam, str) or not naam.strip() or not isinstance(pv, dict):
+        return None
+    attrs = _attributen(pv)
+    prijs = _centen(pv.get("price")) or _centen(obj.get("startingPrice"))
+    if prijs is None:
+        return None
+    was = _centen(pv.get("regularPrice"))
+    # variantId = artikelnummer + kleurnummer ('124200-1'): stabiel over weken
+    # en gedeeld door alle maten. De SKU ('124200-1-1') is per maat.
+    sleutel = attrs.get("variantId") or pv.get("sku") or obj.get("id") or ""
+    cat = obj.get("primaryCategory") if isinstance(obj.get("primaryCategory"), dict) else {}
+    pad = [a.get("name") for a in reversed(cat.get("ancestors") or []) if isinstance(a, dict)]
+    pad.append(cat.get("name") or "")
+    categorie = " > ".join(str(x) for x in pad if x)
+    maten: list[str] = []
+    for var in obj.get("variants") or []:
+        maat = _attributen(var).get("size")
+        if maat and str(maat) not in maten:
+            maten.append(str(maat))
+    pak = obj.get("packSize") or attrs.get("packSize")
+    try:
+        pak = int(pak) if pak is not None else 0
+    except (TypeError, ValueError):
+        pak = 0
+    beschikbaar = str(obj.get("availability") or pv.get("availability") or "").upper()
+    voorraad = True if beschikbaar == "IN_STOCK" else False if beschikbaar == "OUT_OF_STOCK" else None
+    # Zeeman prijst online niet af (0 van 1.202 artikelen op 04-09); acties
+    # lopen via de folder. Het folderlabel is daarom hét promotiesignaal;
+    # 'Web-Only' en 'Nieuw' zijn dat niet.
+    labels: list[str] = []
+    for lint in obj.get("promotionRibbons") or []:
+        if isinstance(lint, dict) and lint.get("label"):
+            labels.append(str(lint["label"]))
+    for lint in obj.get("marketingRibbons") or []:
+        if isinstance(lint, dict) and lint.get("label") and \
+           str(lint.get("kind") or "").lower() in ("from-folder", "folder", "promotion", "promo"):
+            labels.append(str(lint["label"]))
+    promo = promo_fragmenten(" · ".join(labels)) or " · ".join(dict.fromkeys(labels))
+    # 'Boxer - Blauw': de kleur staat achter het streepje, er is geen apart veld
+    kleur = naam.rsplit(" - ", 1)[1].strip() if " - " in naam else ""
+    return Product(key=str(sleutel), title=naam.strip(), url=_product_url(base_url, str(obj.get("slug") or "")),
+                   category_raw=categorie, color=kleur, sizes=", ".join(maten),
+                   price=prijs, was_price=was if (was and was > prijs) else None,
+                   in_stock=voorraad, promo_text=promo[:120], pack_hint=pak)
+
+
+def products_from_flight(html: str, base_url: str = "") -> list[Product]:
+    """Producten uit de Next.js-flightstroom. Eerst het lijsttype met
+    primaryVariant (Zeeman); staat dat er niet, dan de generieke zoeker over
+    alle JSON-regels van de stroom (andere App Router-shops)."""
+    payload = flight_payload(html)
+    if not payload:
+        return []
+    products: list[Product] = []
+    for results, _ in flight_listings(payload):
+        for obj in results:
+            if isinstance(obj, dict):
+                p = _flight_product(obj, base_url)
+                if p is not None and p.key:
+                    products.append(p)
+    if products:
+        return products
+    for n, m in enumerate(_FLIGHT_LINE_RE.finditer(payload)):
+        if n >= 400:
+            break
+        regel = m.group(1)
+        if not regel.startswith(("[", "{")):
+            continue
+        data = _json_loads_lenient(regel)
+        if data is not None:
+            products.extend(deep_find_products(data, base_url))
+    return products
+
+
 def products_from_html(html: str, base_url: str = "") -> list[Product]:
     """Alle beschikbare extractiemethoden op één pagina, ontdubbeld op sleutel."""
     products: list[Product] = []
@@ -461,6 +639,7 @@ def products_from_html(html: str, base_url: str = "") -> list[Product]:
             data = _json_loads_lenient(m.group(1))
             if data is not None:
                 products.extend(deep_find_products(data, base_url))
+    products.extend(products_from_flight(html, base_url))
     products.extend(products_from_js_state(html, base_url))
     products.extend(products_from_escaped_attrs(html, base_url))
 

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
-from ..jsonscan import products_from_html
+from ..jsonscan import flight_meta, products_from_html
 from ..models import Product, ScrapeResult
 
 PAGINATION_PATTERNS = ("?page={n}", "?p={n}", "?pagina={n}")
@@ -67,34 +67,61 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         _absorb(seen, page_products, cat_path)
         if not page_products:
             continue
+        # De eigen teller van de bron (Next.js-flight: total/totalPages).
+        # Daarmee weten we vooraf hoeveel pagina's er zijn én achteraf of de
+        # oogst compleet was — zonder die teller is 'geen nieuwe sleutels
+        # meer' het enige stopsignaal.
+        teller = flight_meta(first.text)
+        bekend_pages = teller.get("totalPages") or 0
+        cat_keys = {p.key for p in page_products}
 
-        # paginering: probeer patronen tot er één nieuwe producten oplevert
+        # paginering: probeer patronen tot er één nieuwe producten oplevert.
+        # 'Nieuw' is zonder teller: nog niet in de hele oogst gezien. Mét
+        # teller: nog niet in déze categorie gezien — Zeeman's lingerie- en
+        # ondergoedcategorieën overlappen, en 'alles al gezien bij de vorige
+        # categorie' zou de rest van de pagina's onterecht overslaan (eerste
+        # proef 04-09: 1.230 van 1.265 vermeldingen).
         pattern = None
-        for pat in PAGINATION_PATTERNS:
-            candidate = cat_url + pat.format(n=2)
-            resp = http.get(candidate)
-            if resp is None:
-                continue
-            prods2 = products_from_html(resp.text, candidate)
-            if prods2 and {p.key for p in prods2} - set(seen):
-                pattern = pat
-                _absorb(seen, prods2, cat_path)
-                break
+        if bekend_pages != 1:
+            for pat in PAGINATION_PATTERNS:
+                candidate = cat_url + pat.format(n=2)
+                resp = http.get(candidate)
+                if resp is None:
+                    continue
+                prods2 = products_from_html(resp.text, candidate)
+                nieuw = {p.key for p in prods2} - (cat_keys if bekend_pages else set(seen))
+                if prods2 and nieuw:
+                    pattern = pat
+                    _absorb(seen, prods2, cat_path)
+                    cat_keys.update(p.key for p in prods2)
+                    break
         if pattern:
             for n in range(3, cfg.max_pages_per_category + 1):
+                if bekend_pages and n > bekend_pages:
+                    break
                 resp = http.get(cat_url + pattern.format(n=n))
                 if resp is None:
                     break
                 prods_n = products_from_html(resp.text, cat_url)
-                new_keys = {p.key for p in prods_n} - set(seen)
+                new_keys = {p.key for p in prods_n} - (cat_keys if bekend_pages else set(seen))
                 _absorb(seen, prods_n, cat_path)
+                cat_keys.update(p.key for p in prods_n)
                 if not new_keys:
                     break
                 if limit and len(seen) >= limit:
                     break
+        if teller.get("total"):
+            res.coverage[cat_path] = (len(cat_keys), int(teller["total"]))
         if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
             break
 
+    if res.coverage:
+        geoogst = sum(h for h, _ in res.coverage.values())
+        verwacht = sum(t for _, t in res.coverage.values())
+        res.notes.append(
+            f"tellercontrole: {geoogst} van {verwacht} vermeldingen die de bron zelf "
+            f"telt over {len(res.coverage)} categorieën "
+            f"({geoogst / verwacht:.0%})" if verwacht else "tellercontrole: bron telt 0")
     res.products = list(seen.values())[: limit or cfg.max_products]
     return res
 

@@ -23,7 +23,8 @@ import re
 from urllib.parse import urlsplit
 
 from .http import Http
-from .jsonscan import deep_find_products, products_from_html
+from .jsonscan import (deep_find_products, flight_meta, flight_payload,
+                       products_from_flight, products_from_html)
 from .promo import promo_fragmenten
 
 _LDJSON_RE = re.compile(
@@ -337,6 +338,18 @@ def diagnose(url: str, render: bool = True) -> str:
         # assortiment werd 'jongens/nachtmode' zonder dat de code wijzigde).
         for i, blok in enumerate(_LDJSON_RE.findall(html)[:3], 1):
             regels.append(f"- ld+json {i}: `" + " ".join(blok.split())[:1400] + "`")
+        # Next.js App Router zet de serverdata in self.__next_f.push-blokken,
+        # niet in __NEXT_DATA__. Zeeman stond vijf weken rood omdat dit
+        # signaal ontbrak: 0 €-tekens + 0 JSON-LD-producten las als 'lege
+        # serving', terwijl de flight-payload 30 producten per pagina droeg.
+        stroom = flight_payload(html)
+        if stroom:
+            teller = flight_meta(html)
+            regels.append(
+                f"- Next.js-flight-payload: {len(stroom)} tekens, "
+                f"{len(products_from_flight(html, url))} producten"
+                + (f", teller van de bron: {teller['total']} artikelen op "
+                   f"{teller['totalPages']} pagina's" if teller else ", geen lijstteller"))
         eerste = next((p for p in prods if p.title), None)
         if eerste is not None:
             regels.append(f"- eerste extractieproduct: {eerste.title[:60]!r} à "

@@ -70,7 +70,9 @@ def cmd_scrape(args) -> int:
             continue
 
         try:
-            status, note = _beoordeel(db, cfg, rows, res.error)
+            # Met --limit is de oogst bewust onvolledig; dan zegt de teller niets.
+            status, note = _beoordeel(db, cfg, rows, res.error,
+                                      coverage=None if args.limit else res.coverage)
             if status == "ok":
                 db.replace_staging(cfg.id, rows)
                 stats = db.process_week(cfg.id, week)
@@ -106,13 +108,28 @@ def cmd_scrape(args) -> int:
     return 0
 
 
-def _beoordeel(db, cfg, rows, error: str) -> tuple[str, str]:
+# Tellercontrole: de oogst mag hoogstens zoveel onder de eigen telling van
+# de bron blijven (groencriterium 3, docs/validaties/2026-08-19-zeeman-paginering.md).
+TELLER_MARGE = 0.05
+
+
+def _beoordeel(db, cfg, rows, error: str,
+               coverage: dict[str, tuple[int, int]] | None = None) -> tuple[str, str]:
     """Kwaliteitspoort: vervuil de trenddata niet met een halve scrape."""
     if error and not rows:
         return "fout", error
     if len(rows) < cfg.min_products_expected:
         return "fout", (f"slechts {len(rows)} artikelen "
                         f"(minimum {cfg.min_products_expected}); {error or 'bron gewijzigd?'}")
+    if coverage:
+        geoogst = sum(h for h, _ in coverage.values())
+        verwacht = sum(t for _, t in coverage.values())
+        if verwacht and geoogst < (1 - TELLER_MARGE) * verwacht:
+            tekort = [f"{pad} {h}/{t}" for pad, (h, t) in coverage.items()
+                      if t and h < (1 - TELLER_MARGE) * t]
+            return "afwijkend", (f"tellercontrole: {geoogst} van {verwacht} vermeldingen "
+                                 f"volgens de bron zelf (<{1 - TELLER_MARGE:.0%}); week niet "
+                                 f"verwerkt — tekort in: {', '.join(tekort[:5])}")
     prev = db.last_ok_count(cfg.id)
     if prev > 0 and len(rows) < 0.5 * prev:
         return "afwijkend", (f"{len(rows)} artikelen is <50% van de laatste "
