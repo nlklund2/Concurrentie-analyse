@@ -291,6 +291,9 @@ retailers:
       W37: prijssprong t.o.v. W36 voor multipacks (0,66 → 1,99 is een
       leescorrectie, geen prijsverhoging). De omnibusregel '30 dagen
       beste prijs: € 3,99 (-25%)' telt niet als promotekst.
+      PAKGROOTTE 04-09: KiK zet de pack-grootte niet in de artikelnaam
+      maar wél als stukprijs op de kaart ('(0,66 € / Stuk)'); pakprijs ÷
+      stukprijs levert nu pack_size, zodat de per-stuk-index klopt.
   scapino:
     name: Scapino
     base: https://www.scapino.nl

@@ -22,6 +22,11 @@ class Product:
     # '-30%'), zoals gevangen door promo.promo_fragmenten — stap A van het
     # promotievormen-onderzoek: vangen en meten, nog niet interpreteren.
     promo_text: str = ""
+    # Verpakkingsgrootte zoals de kaart hem verraadt via de stukprijs
+    # ("€ 4,95 € 2,48/st" → 2; KiK "(2,50 € / Stuk)"), voor bronnen die de
+    # pack-grootte niet in de artikelnaam zetten. 0 = geen aanwijzing;
+    # normalize.to_staging_rows laat de artikelnaam voorgaan.
+    pack_hint: int = 0
 
 
 @dataclass

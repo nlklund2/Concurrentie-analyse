@@ -29,7 +29,7 @@ from ..config import RetailerCfg
 from ..http import Http
 from ..jsonscan import deep_find_products, products_from_html, url_key
 from ..models import Product, ScrapeResult
-from ..normalize import parse_price
+from ..normalize import PACK_MAX, parse_price
 from ..promo import PROMO_RE, promo_fragmenten
 
 # API-endpoints die productlijsten teruggeven, herkenbaar aan de URL.
@@ -95,6 +95,13 @@ UNIT_NA_PRIJS_RE = re.compile(r"^\s*/\s*(?:st(?:uk|k)?|paar|pr)\b\.?", re.I)
 # deze stap las de scraper €199 als prijs en €899 helemaal niet (>200-filter),
 # en viel hij terug op de stukprijs uit '(0,66 € / Stuk)'.
 CENTEN_AANEEN_RE = re.compile(r"€(\d{1,2})(\d{2})(?![\d,.])")
+# De stukprijs op de kaart, in beide schrijfwijzen: Action '€ 2,48/st', KiK
+# '(2,50 € / Stuk)' en ook zonder centen '(3 € / Stuk)' — het '/ Stuk' maakt
+# het getal ondubbelzinnig, dus hier geldt de decimalen-eis van de gewone
+# prijsmatch niet.
+STUKPRIJS_RE = re.compile(
+    r"(?<![\d,.])(\d{1,3}(?:[.,]\d{2})?)\s*€\s*/\s*(?:st(?:uk|k)?|paar|pr)\b"
+    r"|€\s*(\d{1,3}(?:[.,]\d{2})?)\s*/\s*(?:st(?:uk|k)?|paar|pr)\b", re.I)
 
 
 def _zonder_promo(text: str) -> str:
@@ -125,6 +132,27 @@ def _prijzen(text: str, prijs_los: bool = False) -> list[float]:
     # Staat er alléén een /st-prijs (los verkocht artikel), dan is dat gewoon
     # de verkoopprijs.
     return gewoon or per_stuk
+def _pak_uit_stukprijs(price: float | None, text: str) -> int:
+    """Verpakkingsgrootte = pakprijs ÷ stukprijs op de kaart, als dat netjes
+    op een geheel getal (2–PACK_MAX) uitkomt. KiK zet de pack-grootte niet in
+    de artikelnaam maar wél als '(0,66 € / Stuk)' op de kaart; zonder deze
+    afleiding stond een 3-pack slips voor €1,99 als één stuk in de
+    per-stuk-index. 0 als de kaart geen (passende) stukprijs draagt."""
+    if not price or not text:
+        return 0
+    for m in STUKPRIJS_RE.finditer(CENTEN_AANEEN_RE.sub(r"€\1,\2", text)):
+        stuk = parse_price(m.group(1) or m.group(2))
+        if not stuk or stuk >= price:
+            continue
+        verhouding = price / stuk
+        n = round(verhouding)
+        # de stukprijs is op de cent afgerond (1,99/3 = 0,663 → '0,66'), dus
+        # een kleine afwijking hoort erbij; een grote is geen pack
+        if 2 <= n <= PACK_MAX and abs(verhouding - n) <= 0.15:
+            return n
+    return 0
+
+
 # prijsdelen uit de kaarttekst knippen om de titel over te houden — titel en
 # prijs staan lang niet altijd op een eigen regel
 PRICE_STRIP_RE = re.compile(r"€\s*\d+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?\s*€|"
@@ -685,7 +713,8 @@ def cards_from_html(html: str, base_url: str) -> list[Product]:
                 producten[key] = Product(
                     key=key, title=titel, url=vol, price=min(prijzen),
                     was_price=max(prijzen) if max(prijzen) > min(prijzen) else None,
-                    promo_text=promo_fragmenten(a["kaart"]))
+                    promo_text=promo_fragmenten(a["kaart"]),
+                    pack_hint=_pak_uit_stukprijs(min(prijzen), a["kaart"]))
         if len(producten) > len(beste):
             beste = list(producten.values())
     return beste
@@ -799,7 +828,8 @@ def _dom_ronde(page, streng: bool, prijs_los: bool = False) -> list[Product]:
             continue
         products.append(Product(key=url_key(href), title=title, url=href,
                                 price=price, was_price=was,
-                                promo_text=promo_fragmenten(text)))
+                                promo_text=promo_fragmenten(text),
+                                pack_hint=_pak_uit_stukprijs(price, text)))
     return products
 
 

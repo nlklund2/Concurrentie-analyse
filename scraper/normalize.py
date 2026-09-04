@@ -178,7 +178,10 @@ def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
             "sizes": (p.sizes or "")[:200],
             "price": p.price,
             "was_price": plausibele_was_prijs(p.price, p.was_price),
-            "pack_size": pack_size(p.title),
+            # artikelnaam eerst ("3-pack"); zegt die niets, dan de stukprijs op
+            # de kaart (KiK "(0,66 € / Stuk)", Action "€ 2,48/st")
+            "pack_size": pack_size(p.title) if pack_size(p.title) > 1
+                         else (p.pack_hint if p.pack_hint and p.pack_hint > 1 else 1),
             # ruwe promotekst (stap A promotievormen): best effort, leeg is eerlijk leeg
             "promo_text": (p.promo_text or "")[:120],
         }
@@ -196,6 +199,8 @@ def to_staging_rows(retailer_id: str, products: list[Product]) -> list[dict]:
                       "promo_text"):
             if not best.get(field):
                 best[field] = rest.get(field) or best.get(field)
+        if best["pack_size"] == 1 and rest["pack_size"] > 1:
+            best["pack_size"] = rest["pack_size"]
         seen[row["product_key"]] = best
     return list(seen.values())
 
