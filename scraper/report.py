@@ -248,7 +248,8 @@ def build(week: date) -> str:
                 if waarden:
                     aandelen.append(f"{name(rid)} {sum(waarden) / len(waarden) * 100:.0f}%")
             md.append("\n> Prijs per stuk = prijs ÷ aantal in de verpakking, afgeleid uit de "
-                      "artikelnaam (3-pack, 5 paar). Alleen groepen waarin minstens één bron "
+                      "artikelnaam (3-pack, 5 paar) of uit de stukprijs op de kaart "
+                      "(KiK '0,66 € / Stuk', Action '€ 2,48/st'). Alleen groepen waarin minstens één bron "
                       f"≥{MULTIPACK_MIN:.0%} multipacks voert. Aandeel multipacks in die groepen: "
                       + ", ".join(aandelen) + ".\n"
                       "> Wijkt deze index sterk af van §5, dan zit het prijsverschil in de "

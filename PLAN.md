@@ -271,7 +271,8 @@ boxer; dat is appels met peren. De pack-grootte staat al in de artikeltitel (`5 
 er een tweede prijsindex op **prijs per stuk** — en pas dán zijn Action, KiK en Wibra
 eerlijk te vergelijken met terStal. Kleine ingreep, groot effect op de geloofwaardigheid
 van §2. **Gebouwd:** `pack_size()` in `scraper/normalize.py` leest de pack-grootte uit
-de artikelnaam, de weekverwerking rekent mediaan en instapniveau per stuk uit
+de artikelnaam (en sinds 4-09 uit de stukprijs op de kaart als de naam zwijgt — KiK
+"(0,66 € / Stuk)", Action "€ 2,48/st"), de weekverwerking rekent mediaan en instapniveau per stuk uit
 (`unit_price_median`, `unit_price_p25`, `multipack_share` in `weekly_stats`), het
 weekrapport toont §5b naast de gewone index en het dashboard heeft een schakelaar
 *per stuk*. Eenmalig te draaien: `sql/migratie_prijs_per_stuk.sql`. Kanttekening: de titel liegt soms (een "3-pack" van 2 stuks bestaat); toon daarom
