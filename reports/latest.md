@@ -11,7 +11,7 @@
 | Action | render | 222 | 222 | +825% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 222, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | C&A | render | 607 | 607 | +7% | 🟢 ok — {"new": 1, "back": 6, "gone": 5, "price_up": 0, "products": 607, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | HEMA | firecrawl | 137 | 137 | +2% | 🟢 ok — {"new": 0, "back": 0, "gone": 1, "price_up": 0, "products": 137, "promo_end": 0, "price_down": 0, "promo_start": 0} · 24 Firecrawl-credits |
-| KiK | render | 646 | 646 | +17% | 🟢 ok — {"new": 1, "back": 2, "gone": 3, "price_up": 0, "products": 646, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| KiK | render | 643 | 643 | +17% | 🟢 ok — {"new": 0, "back": 1, "gone": 4, "price_up": 0, "products": 643, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | Primark | listing | 1111 | 1111 | +8% | 🟢 ok — {"new": 57, "back": 16, "gone": 48, "price_up": 0, "products": 1111, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | terStal familiemode | sitemap_pages | 443 | 443 | -7% | 🟢 ok — {"new": 0, "back": 0, "gone": 324, "price_up": 0, "products": 443, "promo_end": 0, "price_down": 16, "promo_start": 0} |
 | Wibra | firecrawl | 125 | 125 | -1% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 125, "promo_end": 0, "price_down": 0, "promo_start": 0} · 12 Firecrawl-credits |
@@ -59,14 +59,14 @@
 
 | Groep | terStal familiemode | Action | C&A | HEMA | KiK | Primark | Wibra |
 |---|---|---|---|---|---|---|---|
-| dames / ondergoed | 133 (-14) | 3 | 110 (+10) | 20 (+3) | 257 (+71) | 544 (+22) | 41 (+2) |
+| dames / ondergoed | 133 (-14) | 3 | 110 (+10) | 20 (+3) | 256 (+70) | 544 (+22) | 41 (+2) |
 | dames / nachtmode | 29 (-8) | – | 2 | – | 19 (+2) | 281 (+25) | 2 |
 | onbekend / ondergoed | 1 (-1) | 103 | 87 (-6) | – | 88 (+29) | – | – |
 | heren / ondergoed | 41 | 2 | 14 (+2) | – | 59 | 55 | 8 (+1) |
 | dames / sokken & panty's | 30 | 1 | – | 8 (+2) | – | 123 (+16) | 7 (-1) |
 | heren / sokken & panty's | 31 (-1) | 2 | 26 (+5) | – | 45 (-4) | 35 (+1) | 1 |
 | heren / nachtmode | 14 | 1 | 38 (+6) | 8 | 5 (+2) | 73 (+14) | – |
-| meisjes / ondergoed | 31 (-3) | – | 11 | 11 | 77 (-2) | – | 9 (+1) |
+| meisjes / ondergoed | 31 (-3) | – | 11 | 11 | 76 (-3) | – | 9 (+1) |
 | onbekend / sokken & panty's | 14 | 74 | 35 (+2) | – | 1 | – | – |
 | baby / nachtmode | – | – | 92 (+6) | 12 (-2) | 9 | – | 3 (-2) |
 | jongens / ondergoed | 41 (-1) | – | 2 (+1) | 18 | 28 (-2) | – | 13 |
@@ -95,17 +95,17 @@
 
 | Groep | Action | C&A | HEMA | KiK | Primark | Wibra |
 |---|---|---|---|---|---|---|
-| dames / ondergoed | – | 173 | 142 | 53 | 50 | 47 |
-| heren / ondergoed | – | 162 | – | 150 | 90 | 81 |
+| dames / ondergoed | – | 173 | 142 | 40 | 50 | 47 |
+| heren / ondergoed | – | 162 | – | 62 | 90 | 81 |
 | dames / sokken & panty's | – | – | 487 | – | 100 | – |
-| heren / sokken & panty's | – | 218 | – | 249 | 117 | – |
+| heren / sokken & panty's | – | 218 | – | 67 | 117 | – |
 | heren / nachtmode | – | 82 | 71 | – | 114 | – |
-| meisjes / ondergoed | – | 125 | 100 | 100 | – | 50 |
+| meisjes / ondergoed | – | 125 | 100 | 40 | – | 50 |
 | onbekend / sokken & panty's | 120 | 239 | – | – | – | – |
-| jongens / ondergoed | – | – | 103 | 75 | – | 87 |
+| jongens / ondergoed | – | – | 103 | 38 | – | 87 |
 | baby / sokken & panty's | – | 83 | 125 | – | – | 187 |
 
-> Prijs per stuk = prijs ÷ aantal in de verpakking, afgeleid uit de artikelnaam (3-pack, 5 paar). Alleen groepen waarin minstens één bron ≥10% multipacks voert. Aandeel multipacks in die groepen: terStal familiemode 52%, Action 0%, C&A 57%, HEMA 37%, KiK 0%, Primark 68%, Wibra 36%.
+> Prijs per stuk = prijs ÷ aantal in de verpakking, afgeleid uit de artikelnaam (3-pack, 5 paar) of uit de stukprijs op de kaart (KiK '0,66 € / Stuk', Action '€ 2,48/st'). Alleen groepen waarin minstens één bron ≥10% multipacks voert. Aandeel multipacks in die groepen: terStal familiemode 47%, Action 0%, C&A 53%, HEMA 37%, KiK 62%, Primark 68%, Wibra 36%.
 > Wijkt deze index sterk af van §5, dan zit het prijsverschil in de verpakkingsgrootte en niet in de prijs per stuk.
 
 ## 6. Sale-druk per bron
@@ -128,7 +128,7 @@
 | Action | 222 | 177 (80%) | 9 (4%) |
 | C&A | 607 | 39 (6%) | 46 (8%) |
 | HEMA | 137 | 10 (7%) | 11 (8%) |
-| KiK | 646 | 25 (4%) | 52 (8%) |
+| KiK | 643 | 152 (24%) | 56 (9%) |
 | Primark | 1111 | 287 (26%) | 275 (25%) |
 | Wibra | 125 | 9 (7%) | 10 (8%) |
 
