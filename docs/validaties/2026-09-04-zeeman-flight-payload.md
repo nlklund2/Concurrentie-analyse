@@ -1,6 +1,6 @@
 # Zeeman — groen: de producten zaten al die tijd in de Next.js-flight-payload
 
-**Datum:** 04-09-2026 · **Runs:** [33883093620](https://github.com/nlklund2/Concurrentie-analyse/actions/runs/33883093620) (16:19 NL, diagnose op `main`, vóór de fix: bewijs dat GitHub Actions de volledige pagina krijgt) en [GH_RUN_PROBE](https://github.com/nlklund2/Concurrentie-analyse/actions/runs/GH_RUN_PROBE) (bewijsprobe mét de flight-extractor, limiet 1.500)
+**Datum:** 04-09-2026 · **Runs:** [33883093620](https://github.com/nlklund2/Concurrentie-analyse/actions/runs/33883093620) (16:19 NL, diagnose op `main`, vóór de fix: bewijs dat GitHub Actions de volledige pagina krijgt) en [33884808717](https://github.com/nlklund2/Concurrentie-analyse/actions/runs/33884808717) (bewijsprobe mét de flight-extractor, limiet 1.500)
 **Besluit:** Zeeman gaat op de listing-route met flight-extractor mee in de weekrun. Het eindoordeel van 18-08 en de pagineringsmeting van 19-08 zijn herroepen; de groencriteria uit dat laatste dossier blijven de acceptatie-eis.
 
 ## Aanleiding
@@ -67,7 +67,7 @@ op de nieuwe configuratie (14 vaste seeds, `strategy: listing`):
 - Tellercontrole: 1.261 van 1.264 vermeldingen die de bron zelf telt (100%).
 - Doelgroepen: dames 470, kinderen 299, heren 146, baby 68, meisjes 53, jongens 47.
 - Promoteksten: 'Uit onze folder' ×46. Geen enkel artikel met een van-prijs boven de prijs.
-- Dezelfde probe op GitHub Actions: run GH_RUN_PROBE — GH_RUN_RESULTAAT.
+- Dezelfde probe op GitHub Actions: run 33884808717 (18:00 NL, branch `zeeman-flight-extractor`) — 1.177 artikelen, 1.059 binnen focus, 100% prijs, 100% kleur en maten, 49 verzoeken, tellercontrole 1.238 van 1.264 (98%), advies 'klaar voor de wekelijkse run'. Het verschil met de lokale meting (23 vermeldingen) komt door Zeeman's standaardsortering op populariteit: die verschuift tussen twee opvragingen, waardoor een artikel soms op twee pagina's en soms op geen enkele staat. `?sort=` is per robots.txt uitgesloten, dus dit blijft een bekende variatie van ±2%; de poort laat tot 5% toe.
 
 Een eerste proef leverde 1.230 van 1.265 vermeldingen (97%): de listing-crawl stopte bij een
 pagina zonder *globaal* nieuwe sleutels, en Zeeman's lingerie- en ondergoedcategorieën
