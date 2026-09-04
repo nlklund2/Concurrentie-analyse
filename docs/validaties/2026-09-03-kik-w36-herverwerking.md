@@ -76,9 +76,9 @@ dierenmotieven" 1,25 → 4,99 (stukprijs → pakprijs), "Slips" 1,66 → 3,99,
 gold als actieprijs). Mediane factor van de price_up-events: 2,0 — het
 pak van twee.
 
-## Schoning (4-09, ±09:45 NL)
+## Schoning (4-09, 09:45–10:00 NL)
 
-Verwijderd uit `price_events` (832 regels, integraal in
+Verwijderd uit `price_events` (870 regels, integraal in
 [`2026-09-04-kik-w36-verwijderde-events.csv`](2026-09-04-kik-w36-verwijderde-events.csv)):
 
 | event | aantal | waarom |
@@ -89,18 +89,22 @@ Verwijderd uit `price_events` (832 regels, integraal in
 | new (herdraai) | 126 | artikelen die al op kik.nl stonden maar tot 4-09 onleesbaar waren |
 | back (herdraai) | 66 | nooit weg geweest: maandag onleesbaar, vrijdag leesbaar |
 | gone (maandag, run 97/106) | 66 | de tegenhangers van die 66 'back' |
+| gone (herdraai 09:34) | 32 | maandag wél, vrijdag níet op de gecrawlde pagina's: een waarneming bínnen de week, geen W35→W36-mutatie |
+| gone / back / new (tweede hermeting 09:53, zie onder) | 3 / 2 / 1 | scrapevariatie tussen twee metingen twintig minuten na elkaar |
 
-Blijven staan: de 32 `gone` van de herdraai (maandag wél, vrijdag níet meer
-op de gecrawlde pagina's — de nieuwe lezer leest een superset, dus dat is
-geen leeseffect) en 8 `back` waarvan de 'gone' in W35 ligt (die historie
-laat ik intact). Alle maandag-events blijven verder staan (new 30, back 15,
-promo_start 9, promo_end 55, gone 118 − 66 = 52).
+Regel: de W36-mutaties van KiK zijn "maandag t.o.v. W35"; de weekfoto en
+de statistieken zijn "de stand van vrijdag". Alles wat de hermetingen
+onderling of tegen de oude lezing logden valt daarbuiten. Eén uitzondering
+blijft staan: 8 `back` van 09:34 waarvan de 'gone' in W35 ligt — die
+historie laat ik intact. Alle overige maandag-events blijven staan (new 30,
+back 15, promo_start 9, promo_end 55, gone 118 − 66 = 52). De 35
+artikelen die tussen maandag en vrijdag van de gecrawlde pagina's
+verdwenen staan wél op status 'gone' in `products`, zonder event.
 
 `weekly_stats` KiK 2026-08-31 herberekend: `new_count` = actieve artikelen
-met first_seen in deze week mínus de 126 nieuw-leesbare (28 → 24; vier
-maandag-nieuwe artikelen zijn inmiddels weer weg), `gone_count` uit de
-resterende gone-events (118 → 84). Prijsstatistieken komen uit de
-hermeting zelf:
+met first_seen in deze week mínus de 127 nieuw-leesbare (28 → 25),
+`gone_count` uit de resterende gone-events (118 → 52). Prijsstatistieken
+komen uit de hermeting zelf:
 
 | doelgroep | producttype | actief vóór → ná | mediaan vóór → ná | sale-aandeel vóór → ná |
 |---|---|---:|---:|---:|
@@ -114,7 +118,17 @@ hermeting zelf:
 | onbekend | ondergoed | 0 → 88 | – → 5,99 | – → 51% |
 
 Stand `price_events` KiK 2026-08-31 ná de schoning: new 30, back 23,
-gone 84, promo_start 9, promo_end 55, price_up 0, price_down 0.
+gone 52, promo_start 9, promo_end 55, price_up 0, price_down 0.
+
+## Weekrapport opnieuw gegenereerd
+
+De hermeting van 09:20 committeerde een rapport mét de 840 herdraai-events
+(6df1913). Een tweede KiK-run om het rapport na de schoning te
+regenereren (run 33849661542, 09:38–09:53) logde zelf weer 6
+variatie-events (1 new, 2 back, 3 gone; ook geschoond, zie tabel). Het
+definitieve rapport komt daarom uit een run met `retailers: zeeman`: die
+haalt de kwaliteitspoort nooit (15 < 25), schrijft niets in de weektabellen
+en genereert alleen het rapport — run 33851032536 (09:56 NL).
 
 ## Wat dit níet onderscheidt
 
