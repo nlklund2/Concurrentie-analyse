@@ -15,7 +15,7 @@
 | Primark | listing | 1111 | 1111 | +8% | 🟢 ok — {"new": 57, "back": 16, "gone": 48, "price_up": 0, "products": 1111, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | terStal familiemode | sitemap_pages | 443 | 443 | -7% | 🟢 ok — {"new": 0, "back": 0, "gone": 324, "price_up": 0, "products": 443, "promo_end": 0, "price_down": 16, "promo_start": 0} |
 | Wibra | firecrawl | 125 | 125 | -1% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 125, "promo_end": 0, "price_down": 0, "promo_start": 0} · 12 Firecrawl-credits |
-| Zeeman | sitemap_pages | 15 | – | – | 🔴 fout — slechts 15 artikelen (minimum 25); bron gewijzigd? |
+| Zeeman | sitemap_pages | 13 | – | – | 🔴 fout — slechts 13 artikelen (minimum 25); bron gewijzigd? |
 
 > 🟠/🔴: cijfers van die bron deze week niet gebruiken voor besluiten.
 > *Deze run* is wat de scraper deze week ophaalde, *in database* de laatst verwerkte stand. Lopen die uiteen, dan heeft de kwaliteitspoort deze week tegengehouden en staat er nog oudere data.
@@ -128,7 +128,7 @@
 | Action | 222 | 177 (80%) | 9 (4%) |
 | C&A | 607 | 39 (6%) | 46 (8%) |
 | HEMA | 137 | 10 (7%) | 11 (8%) |
-| KiK | 646 | 152 (24%) | 87 (13%) |
+| KiK | 646 | 25 (4%) | 52 (8%) |
 | Primark | 1111 | 287 (26%) | 275 (25%) |
 | Wibra | 125 | 9 (7%) | 10 (8%) |
 

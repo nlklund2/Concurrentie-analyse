@@ -20,6 +20,11 @@ on:
         description: "Alleen deze bronnen (gescheiden door spaties; leeg = alle)"
         required: false
         default: ""
+      alleen_rapport:
+        description: "Niets meten, alleen het weekrapport opnieuw uit de database genereren (na een schoning)"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: wekelijkse-scrape
@@ -51,12 +56,18 @@ jobs:
       - name: Afhankelijkheden installeren
         run: pip install -r requirements.txt
 
+      # alleen_rapport: na een schoning van de database (zie docs/validaties/)
+      # het rapport opnieuw genereren zonder een meting te draaien — een
+      # meting die enkel mislukt (Zeeman) laat de job falen en slaat het
+      # rapport óók over. Bij de cron-run is de invoer leeg en meet hij gewoon.
       - name: Headless browser voor render-bronnen
+        if: ${{ !inputs.alleen_rapport }}
         run: |
           pip install playwright
           playwright install --with-deps chromium
 
       - name: Scrapen en verwerken
+        if: ${{ !inputs.alleen_rapport }}
         run: |
           EXTRA=""
           for r in $INPUT_RETAILERS; do EXTRA="$EXTRA --retailer $r"; done
