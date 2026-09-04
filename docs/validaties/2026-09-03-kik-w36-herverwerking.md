@@ -129,7 +129,26 @@ variatie-events (1 new, 2 back, 3 gone; ook geschoond, zie tabel). Een
 poging met `retailers: zeeman` (run 33851032536) bewees dat een meting die
 alléén mislukt de hele job laat falen, inclusief de rapportstap. Daarom
 heeft de weekworkflow nu een invoer `alleen_rapport`: geen meting, alleen
-het rapport opnieuw uit de database — run RAPPORT_RUN_ID.
+het rapport opnieuw uit de database — run 33851695953 (10:05 NL), rapport
+gecommit als `reports/2026-W36.md` in deze PR.
+
+Het regenereerde rapport (en het dashboard) vergelijkt W36 met W35 — en W35
+is nog met de oude lezer gemeten. Voor KiK staan er daardoor in
+"signalen van de week" sprongen als "heren / sokken & panty's: mediaan van
+€0,80 naar €2,99 (+274%)" en "meisjes / ondergoed: instap van €1,50 naar
+€2,99". Dat zijn leescorrecties (stukprijs → pakprijs), geen
+prijsbewegingen bij KiK. Eerdere weken zijn niet te herverwerken (er zijn
+geen ruwe pagina's bewaard); vanaf W37 vergelijkt de monitor twee weken
+met dezelfde lezer en verdwijnen deze signalen vanzelf.
+
+Gevolg voor de presentaties van 3-09: het inzicht "KiK saneert: kwart van
+het rek eruit in vier weken" (648 → 478, sale-druk 45% → 30%) berustte op
+dezelfde leesfout — naarmate de zomeruitverkoop afliep werden steeds meer
+kaarten onleesbaar. Met de herstelde lezer staat KiK in W36 op 646
+artikelen met 53% sale. Ook de KiK-prijsindex per stuk verandert: de oude
+lezer gaf per ongeluk de stukprijs, de nieuwe de pakprijs zónder
+verpakkingsgrootte (KiK zet die niet in de artikelnaam; wel op de kaart
+als "(2,50 € / Stuk)" — een verbetering voor een vervolg).
 
 ## Wat dit níet onderscheidt
 
