@@ -11,11 +11,11 @@
 | Action | render | 222 | 222 | +825% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 222, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | C&A | render | 607 | 607 | +7% | 🟢 ok — {"new": 1, "back": 6, "gone": 5, "price_up": 0, "products": 607, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | HEMA | firecrawl | 137 | 137 | +2% | 🟢 ok — {"new": 0, "back": 0, "gone": 1, "price_up": 0, "products": 137, "promo_end": 0, "price_down": 0, "promo_start": 0} · 24 Firecrawl-credits |
-| KiK | render | 646 | 646 | +17% | 🟢 ok — {"new": 126, "back": 74, "gone": 32, "price_up": 327, "products": 646, "promo_end": 0, "price_down": 117, "promo_start": 130} |
+| KiK | render | 646 | 646 | +17% | 🟢 ok — {"new": 1, "back": 2, "gone": 3, "price_up": 0, "products": 646, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | Primark | listing | 1111 | 1111 | +8% | 🟢 ok — {"new": 57, "back": 16, "gone": 48, "price_up": 0, "products": 1111, "promo_end": 0, "price_down": 0, "promo_start": 0} |
 | terStal familiemode | sitemap_pages | 443 | 443 | -7% | 🟢 ok — {"new": 0, "back": 0, "gone": 324, "price_up": 0, "products": 443, "promo_end": 0, "price_down": 16, "promo_start": 0} |
 | Wibra | firecrawl | 125 | 125 | -1% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 125, "promo_end": 0, "price_down": 0, "promo_start": 0} · 12 Firecrawl-credits |
-| Zeeman | sitemap_pages | 15 | – | – | 🔴 fout — slechts 15 artikelen (minimum 25); bron gewijzigd? |
+| Zeeman | sitemap_pages | 13 | – | – | 🔴 fout — slechts 13 artikelen (minimum 25); bron gewijzigd? |
 
 > 🟠/🔴: cijfers van die bron deze week niet gebruiken voor besluiten.
 > *Deze run* is wat de scraper deze week ophaalde, *in database* de laatst verwerkte stand. Lopen die uiteen, dan heeft de kwaliteitspoort deze week tegengehouden en staat er nog oudere data.
@@ -42,11 +42,6 @@
 
 | Bron | Artikel | Van | Naar | Verschil |
 |---|---|---:|---:|---:|
-| KiK | Fietsbroek | €3,49 | €1,00 | -71% |
-| KiK | Bustier met V-hals | €5,99 | €1,99 | -67% |
-| KiK | String met kant | €2,99 | €1,00 | -67% |
-| KiK | Slip met stippen | €2,99 | €1,00 | -67% |
-| KiK | Koord met bloemenpatroon | €2,99 | €1,00 | -67% |
 | terStal familiemode | pyjama set rib | €24,99 | €7,49 | -70% |
 | terStal familiemode | pyjama set print + uni | €19,99 | €9,99 | -50% |
 | terStal familiemode | pyjama set met print | €24,99 | €12,49 | -50% |
@@ -57,6 +52,8 @@
 | HEMA | heren pyjamabroek Pepijn regular fit poplin strepen gebroken | €21,99 | €10,00 | -55% |
 | HEMA | heren pyjamabroek regular fit ruit donkerblauw | €21,99 | €10,00 | -55% |
 | HEMA | heren pyjamabroek Pepijn regular fit poplin middenblauw | €21,99 | €10,00 | -55% |
+| Wibra | Jongens sokken 3 paar maat 19/22 – 35/38 | €3,49 | €2,25 | -36% |
+| Wibra | Jog jeans grijs maat 74 t/m 86 | €11,99 | €8,00 | -33% |
 
 ## 4. Assortimentsomvang per groep (verschil t.o.v. vorige week)
 
@@ -131,7 +128,7 @@
 | Action | 222 | 177 (80%) | 9 (4%) |
 | C&A | 607 | 39 (6%) | 46 (8%) |
 | HEMA | 137 | 10 (7%) | 11 (8%) |
-| KiK | 646 | 150 (23%) | 150 (23%) |
+| KiK | 646 | 25 (4%) | 52 (8%) |
 | Primark | 1111 | 287 (26%) | 275 (25%) |
 | Wibra | 125 | 9 (7%) | 10 (8%) |
 
