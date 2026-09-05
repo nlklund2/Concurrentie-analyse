@@ -158,7 +158,7 @@ Het reële kostenrisico is niet geld maar **stilte**: een scraper die stuk gaat 
 - **Nieuwheid als trendradar.** De instroomlijst per week is een gratis trendbureau: als drie concurrenten tegelijk "seamless", "bralette" of "thermo" instromen, weet inkoop wat het volgende seizoen doet. Suggestie voor fase 2: automatische woordfrequentie-analyse op titels van nieuwe artikelen.
 - **Sale-druk als margesignaal.** Stijgende sale-druk bij een concurrent betekent voorraadpijn. Dat is hét moment om juist níet mee te zakken maar vol prijs vast te houden — of gericht de artikelen te verlagen waar de concurrent al doorheen is.
 - **Seizoensklok.** Na 52 weken data ontstaat het echte goud: week-op-week-vergelijking met vorig jaar. "Wibra start nachtmode-opbouw dit jaar in week 33, vorig jaar week 35" — dat soort signalen stuurt de inkoopkalender. Begin dáárom nu: de waarde van dit instrument groeit met elke week historie en is met geen geld achteraf te koop.
-- **Folder-flankering.** Zeeman en Wibra vechten via de weekfolder. De online monitor vangt dat deels; wie het compleet wil, laat de eigenaar wekelijks 10 minuten de digitale folders doorbladeren met het weekrapport ernaast. Fase-3-kandidaat: folder-PDF's automatisch archiveren.
+- **Folder-flankering.** Zeeman en Wibra vechten via de weekfolder. De online monitor vangt dat deels; wie het compleet wil, laat de eigenaar wekelijks 10 minuten de digitale folders doorbladeren met het weekrapport ernaast. Fase-3-kandidaat: folder-PDF's automatisch archiveren — **uitgewerkt tot een reviewbaar plan in [docs/foldermonitor-plan.md](docs/foldermonitor-plan.md)** (add-on: mailbox als trigger, viewer als bron, archief + bodywear-extractie, retailkalender).
 - **Winkelbezoek met richting.** De tool vervangt het winkelbezoek niet — hij maakt het scherp. Ga niet "rondkijken bij Zeeman", maar "check of de nieuwe €2,99-kinderlijn in de winkel ligt en hoe de kwaliteit voelt".
 
 ## 8. Juridisch & fair use
@@ -209,7 +209,7 @@ Zeeman laadde vanaf dag één volledig, ook zonder browser — dat stond hier al
 | **0. Setup** | Week 1 | Supabase + Netlify aansluiten (zie README), Validatie-workflow draaien, bronnen kalibreren |
 | **1. Ritueel** | Week 2–5 | Wekelijkse run + maandagoverleg; mapping aanscherpen; drempels afstellen |
 | **2. Verdieping** | Week 6–12 | KVI-koppeltabel (§6.3), fase-2-bronnen aanzetten waar gevalideerd, trendwoorden op instroom |
-| **3. Volwassen** | Kwartaal 2+ | Jaar-op-jaar-seizoensklok, folder-archief, evt. maatdiepte op vechtartikelen |
+| **3. Volwassen** | Kwartaal 2+ | Jaar-op-jaar-seizoensklok, folderarchief (plan: [docs/foldermonitor-plan.md](docs/foldermonitor-plan.md)), evt. maatdiepte op vechtartikelen |
 
 De kandidaten voor fase 2 en 3 staan uitgewerkt in §11, met moeite-inschatting per punt.
 
@@ -236,7 +236,7 @@ extra opvraging bij een bron.
 | 11.8 | KVI-dagmonitor | M | nee (nieuwe run) | – |
 | 11.9 | Historie terughalen via het Internet Archive | L | nee (eenmalig) | – |
 | 11.10 | Winkelnetwerk-monitor | M | nee (nieuwe bron) | – |
-| 11.11 | Nieuwsbrieven en folders binnenhalen | S–M | nee (eigenaarsactie) | – |
+| 11.11 | Nieuwsbrieven en folders binnenhalen | S–M | nee (eigenaarsactie) | 📄 plan ter review 05-09: [docs/foldermonitor-plan.md](docs/foldermonitor-plan.md) |
 | 11.12 | Affiliate-productfeeds als legitieme route | L | nee (eigenaarsactie) | – |
 | 11.13 | Zeeman: flight-payload-route | S | ja | ✅ gebouwd 04-09 |
 | 11.14 | Koppelen aan eigen verkoop- en margedata | L | nee (eigenaarsactie) | – |

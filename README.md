@@ -13,6 +13,8 @@ maandagochtend liggen er automatisch klaar:
 
 **Lees eerst [PLAN.md](PLAN.md)** — het strategische plan met de KPI-definities, de
 kritische vragen aan de business en het maandagritueel. Dit README is de technische kant.
+De geplande **folder-add-on** (weekfolders archiveren en uitlezen tot een retailkalender)
+staat als reviewbaar voorstel in [docs/foldermonitor-plan.md](docs/foldermonitor-plan.md).
 
 Kosten: **€0/maand** (GitHub Actions + Supabase free tier + Netlify free tier).
 
@@ -150,4 +152,6 @@ sql/schema.sql              Supabase-schema incl. verwerkingsfunctie en RLS
 dashboard/                  statisch dashboard (Netlify), login via Supabase Auth
 .github/workflows/          wekelijkse scrape · validatie bronnen · CI
 reports/                    gegenereerde weekrapporten (gecommit door de bot)
+docs/foldermonitor-plan.md  plan (ter review) voor de folder-add-on: archief + retailkalender
+docs/validaties/            beslissende metingen per bron, met run-id's
 ```
