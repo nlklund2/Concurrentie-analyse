@@ -1,6 +1,6 @@
 # Foldermonitor — add-on op de concurrentiemonitor (plan ter review)
 
-*Status: voorstel, 5 september 2026. Er is nog niets van gebouwd. Reviewer: de eigenaar (inkoopmanager) en de opdrachtgever. Beslissingen die het plan nodig heeft staan in §14.*
+*Status: 5 september 2026 — plan goedgekeurd (de drie besluiten uit §14 zijn genomen, zie [foldermonitor-fase0.md](foldermonitor-fase0.md)); fase 0 is gestart. Reviewer: de eigenaar (inkoopmanager) en de opdrachtgever.*
 
 **In één zin:** de concurrentiemonitor ziet wat concurrenten *online* voeren; de foldermonitor legt vast wat zij *pushen* — de weekfolder — en bewaart die als bewijsstuk én als data, zodat samen de complete **retailkalender** van het concurrentieveld ontstaat. Scope start, net als de monitor, bij **ondergoedmode** (ondergoed, nachtmode, sokken & panty's).
 
@@ -347,7 +347,7 @@ Rekensom (aannames §0): ±8 MB per folder (PDF ≤ 5 MB + 24 WebP's ≈ 3 MB) �
 |---|---|---|---|
 | **Code** | `main` | integratiebranch `foldermonitor`; feature-PR's gaan dáárheen; één go-live-PR naar `main` | CI draait al op elke branch; `main` ziet niets tot de go-live-PR |
 | **Database + opslag** | project `concurrentiemonitor-terstal` | tweede gratis Supabase-project `concurrentiemonitor-preview` (eigen 500 MB db, eigen 1 GB storage, eigen auth) | de foldercode leest alleen `FOLDERS_SUPABASE_URL` / `FOLDERS_SUPABASE_SERVICE_ROLE_KEY`; productiesleutels bereiken hem niet |
-| **Dashboard** | `concurrentiemonitor-terstal.netlify.app` | branch deploy `foldermonitor--concurrentiemonitor-terstal.netlify.app`, met omgevingsvariabelen *scoped op die branch* (en op deploy previews) naar het preview-project | zelfde Netlify-site, eigen URL, eigen config; productiecontext blijft op productie |
+| **Dashboard** | `concurrentiemonitor-terstal.netlify.app` | branch deploy `foldermonitor--concurrentiemonitor-terstal.netlify.app` en deploy previews: `dashboard/build.sh` kiest buiten de productiecontext het preview-project (`PREVIEW_SUPABASE_URL`/`_ANON_KEY`) | zelfde Netlify-site, eigen URL, eigen config; productievariabelen onaangeraakt |
 | **Planning (cron)** | `wekelijkse-scrape.yml` | `foldermonitor-preview.yml` op `main`: cron + `actions/checkout` van `ref: vars.FOLDERS_REF` (= `foldermonitor`), draait tegen GitHub Environment `preview` | GitHub voert cron alleen uit op de default branch; dit ene workflowbestand is het enige dat `main` raakt en wijzigt niets aan de scraper of het rapport |
 
 **Waarom een tweede project en geen apart schema of tabelprefix in het productieproject:** de service-rolsleutel omzeilt RLS; dev-code mét die sleutel kán productietabellen raken. Geen sleutel = geen risico. Bijvangst: 1 GB extra opslag tijdens de bouw en een schone meting van de opslaggroei. Supabase Branching is de officiële variant, maar vereist het Pro-plan (€25/mnd) — nu niet nodig. Free tier staat 2 actieve projecten toe; de monitor is er één, de overige projecten in de organisatie zijn gepauzeerd.
@@ -358,7 +358,7 @@ Rekensom (aannames §0): ±8 MB per folder (PDF ≤ 5 MB + 24 WebP's ≈ 3 MB) �
 
 **Secrets en variabelen:**
 - GitHub Environment `preview`: `FOLDERS_SUPABASE_URL`, `FOLDERS_SUPABASE_SERVICE_ROLE_KEY`, `FOLDER_IMAP_USER`, `FOLDER_IMAP_PASSWORD`, `ANTHROPIC_API_KEY`; repository-variabele `FOLDERS_REF=foldermonitor`.
-- Netlify: `SUPABASE_URL` en `SUPABASE_ANON_KEY` met een aparte waarde voor de contexten *branch: foldermonitor* en *deploy preview* (preview-project); de productiewaarde blijft staan.
+- Netlify: `PREVIEW_SUPABASE_URL` en `PREVIEW_SUPABASE_ANON_KEY`; `build.sh` schakelt erop zodra Netlify's `CONTEXT` ≠ `production`. De productiewaarden blijven staan en worden niet aangeraakt (gebouwd 05-09, zie `foldermonitor-fase0.md`).
 - Supabase preview-project: Auth → Site URL en redirect op de branch-URL; gebruikers uitnodigen.
 
 **Feature-vlag `FOLDERS_ENABLED`:** rapport §8 en de folderpagina in het dashboard bestaan alleen mét de vlag. Ook ná de merge naar `main` blijft productie dus ongewijzigd tot de vlag aan staat — de go-live is een bewuste handeling, geen bijeffect van een merge.

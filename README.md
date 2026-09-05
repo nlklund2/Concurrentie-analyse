@@ -118,6 +118,9 @@ python -m scraper probe --retailer zeeman --limit 40   # bron valideren, zonder 
 python -m scraper scrape --dry-run --limit 100         # scrapen zonder te schrijven
 python -m scraper scrape                               # volledige weekrun (secrets nodig)
 python -m scraper report                               # weekrapport uit de database
+
+python -m folders validate --bron zeeman               # foldermonitor: folderbron valideren (fase 0)
+python -m folders bronnen                              # foldermonitor: bronconfiguratie tonen
 ```
 
 Omgevingsvariabelen voor database/rapport: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
@@ -150,8 +153,10 @@ scraper/                    Python-pakket (scrapen, normaliseren, rapporteren)
   strategies/               shopify / listing_crawl / sitemap_pages (+ autodetectie)
 sql/schema.sql              Supabase-schema incl. verwerkingsfunctie en RLS
 dashboard/                  statisch dashboard (Netlify), login via Supabase Auth
-.github/workflows/          wekelijkse scrape · validatie bronnen · CI
+.github/workflows/          wekelijkse scrape · validatie bronnen · CI · validatie folders · foldermonitor (preview)
 reports/                    gegenereerde weekrapporten (gecommit door de bot)
-docs/foldermonitor-plan.md  plan (ter review) voor de folder-add-on: archief + retailkalender
+folders/                    foldermonitor (add-on, in preview): bronnen.yml, viewerdetectie, validatie
+docs/foldermonitor-plan.md  plan voor de folder-add-on: archief + retailkalender (goedgekeurd 05-09)
+docs/foldermonitor-fase0.md fase 0: wat er staat, eigenaarschecklist (mailbox, secrets, preview)
 docs/validaties/            beslissende metingen per bron, met run-id's
 ```

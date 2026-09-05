@@ -1,0 +1,118 @@
+# =====================================================================
+# Bronconfiguratie foldermonitor — gespiegeld aan scraper/retailers.yml.
+# De id's zijn gelijk aan die van de monitor, zodat folder- en onlinedata
+# per retailer naast elkaar staan (tabel retailers).
+#
+# mail_from:    afzenderdomeinen van de nieuwsbrief (bron bepalen als de
+#               plus-alias ontbreekt); de sweep matcht op het einde van het
+#               afzenderadres.
+# mail_alias:   plus-alias in het neutrale mailadres (<adres>+<alias>@…);
+#               leeg = de id.
+# folder_url:   folderpagina voor de web-fallback; leeg = mail-only bron.
+# viewer:       auto | pdf | publitas | ipaper | pages | render — 'auto'
+#               laat de validatie het uitzoeken.
+# cadence_days: verwacht folderritme (voor het 'geen folder ontvangen'-signaal).
+#
+# Validatiestatus: draai de workflow "Validatie folders" (GitHub > Actions);
+# vanuit de ontwikkelomgeving is het netwerk naar de retailers dicht. Alle
+# folder_url's hieronder zijn STARTAANNAMES tot de eerste validatierun ze
+# bevestigt (docs/validaties/).
+# =====================================================================
+
+defaults:
+  enabled: true
+  viewer: auto
+  cadence_days: 7
+  min_delay: 1.0
+  respect_robots: true
+
+bronnen:
+  terstal:
+    name: terStal familiemode
+    segment: referentie
+    mail_from: [terstal.nl]
+    folder_url: https://www.terstal.nl/folder
+    cadence_days: 14
+    notes: >-
+      Eigen folder = referentie voor de folderindex. De nieuwsbrief
+      ("De nieuwe folder is uit!", newsletter@m.terstal.nl via Bloomreach)
+      bevat geen PDF, alleen een klik-link naar de online folder — de reden
+      dat mail hier trigger is en niet drager (plan §4).
+
+  zeeman:
+    name: Zeeman
+    segment: kern
+    mail_from: [zeeman.com, zeeman.nl]
+    folder_url: https://www.zeeman.com/nl-nl/folder
+    notes: >-
+      Prijst online niets af; promotie loopt volledig via de folder ('Uit
+      onze folder'-label in de monitor). Hoogste prioriteit voor bodywear.
+
+  wibra:
+    name: Wibra
+    segment: kern
+    mail_from: [wibra.nl]
+    folder_url: https://www.wibra.nl/folder
+    cadence_days: 14
+    notes: >-
+      Tweewekelijkse folder (bv. 31-08 t/m 13-09), nieuwe folder in het
+      weekend. wibra.nl weert datacenter-IP's (monitor, 07-08); de viewer
+      draait mogelijk op een ander domein — validatie wijst het uit.
+
+  primark:
+    name: Primark
+    segment: kern
+    mail_from: [primark.com]
+    folder_url: ""
+    cadence_days: 30
+    notes: Geen folder en geen webshop; nieuwsbrief met collecties — mail-only, alleen kalendersignaal.
+
+  action:
+    name: Action
+    segment: kern
+    mail_from: [action.com, action.nl]
+    folder_url: https://www.action.com/nl-nl/folder/
+    notes: >-
+      Nieuwe folder elke woensdag, geldig wo–di; ook een pagina 'folder
+      volgende week' (/nl-nl/app/folder-volgende-week/). Multipacks
+      sokken/boxers.
+
+  hema:
+    name: HEMA
+    segment: kern
+    mail_from: [hema.nl, hema.com]
+    folder_url: https://www.hema.nl/folder
+    notes: >-
+      Aanbiedingen wisselen op maandag. hema.nl weert datacenter-IP's
+      (monitor, 07-08) — zelfde voorbehoud als Wibra.
+
+  c-and-a:
+    name: C&A
+    segment: kern
+    mail_from: [c-and-a.com, c-a.com]
+    folder_url: ""
+    cadence_days: 14
+    notes: Geen klassieke weekfolder; wel aanbiedingen-mailings — mail-only.
+
+  kik:
+    name: KiK
+    segment: breed
+    mail_from: [kik.nl, kik-textilien.com]
+    folder_url: https://www.kik.nl/Online-folder
+    notes: Wekelijkse online folder; laagste prijspunten van de markt.
+
+  # ---- fase 2: folder-only bronnen (bodywear zit daar alleen in folderacties) ----
+  lidl:
+    name: Lidl
+    segment: breed
+    enabled: false
+    mail_from: [lidl.nl]
+    folder_url: ""
+    notes: Folder-only bron (PLAN.md §3); folderpagina opzoeken en valideren bij activering.
+  aldi:
+    name: Aldi
+    segment: breed
+    enabled: false
+    mail_from: [aldi.nl]
+    folder_url: ""
+    notes: Folder-only bron; idem.
