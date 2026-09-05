@@ -1,0 +1,83 @@
+# Dagelijkse foldersweep van de foldermonitor — PREVIEW (docs/foldermonitor-plan.md §9.5).
+#
+# Waarom dit bestand op main staat terwijl de code op een branch leeft:
+# GitHub voert geplande workflows alleen uit vanaf de default branch. Deze
+# workflow doet daarom maar één ding op main: de branch uit de variabele
+# FOLDERS_REF uitchecken en dáár de sweep draaien, tegen het preview-project
+# (GitHub Environment 'preview' met FOLDERS_SUPABASE_*-secrets). Zonder
+# FOLDERS_REF wordt de job overgeslagen — inert tot de eigenaar hem aanzet.
+#
+# Cron in UTC, buiten het hele uur (best effort, zie CLAUDE.md):
+# 03:23 UTC = 05:23 NL-zomertijd / 04:23 NL-wintertijd, ma t/m za.
+# Folders verschijnen op wisselende dagen (Action woensdag, Wibra weekend,
+# HEMA maandag); een dagelijkse sweep vangt ze op en laat maillinks niet
+# verlopen. Het maandagrapport leest de database.
+name: Foldermonitor (preview)
+
+on:
+  schedule:
+    - cron: "23 3 * * 1-6"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Alleen tonen wat de sweep zou doen, niets schrijven"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: foldermonitor-preview
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    if: ${{ vars.FOLDERS_REF != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: preview
+    env:
+      FOLDERS_SUPABASE_URL: ${{ secrets.FOLDERS_SUPABASE_URL }}
+      FOLDERS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.FOLDERS_SUPABASE_SERVICE_ROLE_KEY }}
+      FOLDER_IMAP_USER: ${{ secrets.FOLDER_IMAP_USER }}
+      FOLDER_IMAP_PASSWORD: ${{ secrets.FOLDER_IMAP_PASSWORD }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+      FOLDERS_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ vars.FOLDERS_REF }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Afhankelijkheden installeren
+        run: pip install -r requirements.txt
+
+      - name: Headless browser voor render-capture
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Sweep, capture en verwerking
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA="--dry-run"; fi
+          python -m folders sweep $EXTRA
+
+      - name: Folderrapport in job-samenvatting tonen
+        if: always()
+        run: |
+          [ -f folderrapport.md ] && cat folderrapport.md >> "$GITHUB_STEP_SUMMARY"
+          true
+
+      - name: Ruwe data bewaren (60 dagen)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: folders-ruw-${{ github.run_id }}
+          path: out/folders/
+          retention-days: 60
+          if-no-files-found: ignore

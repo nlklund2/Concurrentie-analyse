@@ -1,0 +1,62 @@
+# Folderbronnen valideren zonder database: per bron de folderpagina ophalen,
+# de viewer herkennen (pdf / Publitas / iPaper / eigen viewer) en de
+# capture-route adviseren. Rapport in de job-samenvatting.
+#
+# Hoort bij de foldermonitor (docs/foldermonitor-plan.md §4.4, §9.5). Dit
+# bestand staat op main omdat GitHub een workflow_dispatch alleen aanbiedt
+# voor workflows op de default branch; de CODE komt van de branch in 'ref'
+# (standaard de integratiebranch uit de variabele FOLDERS_REF). Raakt de
+# scraper en het weekrapport niet.
+name: Validatie folders
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch met de foldermonitor-code (leeg = FOLDERS_REF, anders deze branch)"
+        required: false
+        default: ""
+      bronnen:
+        description: "Alleen deze bronnen (id's uit folders/bronnen.yml, gescheiden door spaties; leeg = alle)"
+        required: false
+        default: ""
+
+jobs:
+  valideren:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: preview
+    env:
+      INPUT_BRONNEN: ${{ inputs.bronnen }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || vars.FOLDERS_REF || github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Afhankelijkheden installeren
+        run: pip install -r requirements.txt
+
+      - name: Folderbronnen valideren
+        run: |
+          EXTRA=""
+          for b in $INPUT_BRONNEN; do EXTRA="$EXTRA --bron $b"; done
+          python -m folders validate $EXTRA
+
+      - name: Rapport in job-samenvatting tonen
+        if: always()
+        run: |
+          [ -f validatie-folders.md ] && cat validatie-folders.md >> "$GITHUB_STEP_SUMMARY"
+          true
+
+      - name: Rapport als artifact bewaren
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validatierapport-folders
+          path: validatie-folders.md
+          if-no-files-found: ignore
