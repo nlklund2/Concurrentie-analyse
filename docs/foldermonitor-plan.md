@@ -8,7 +8,7 @@
 
 ## 0. Samenvatting voor de reviewer (1-pager)
 
-**Besluit dat voorligt:** de foldermonitor bouwen als add-on ín de bestaande repo, het bestaande Supabase-project en de bestaande Netlify-site — geen aparte repo, geen tweede database (onderbouwing in §9).
+**Besluit dat voorligt:** de foldermonitor bouwen als add-on ín de bestaande repo, het bestaande Supabase-project en de bestaande Netlify-site — geen aparte repo, geen tweede database (onderbouwing in §9). **Eis van de eigenaar (05-09):** eerst apart draaien en zichtbaar zijn náást productie, niet erin — ingevuld met een preview-omgeving (integratiebranch, tweede gratis Supabase-project, branch deploy op Netlify, feature-vlag) en een expliciete go-live (§9.5).
 
 **Wat het oplevert, elke maandag naast het weekrapport:**
 - per concurrent de folder van die week als PDF in het archief, doorbladerbaar in het dashboard;
@@ -339,6 +339,39 @@ Rekensom (aannames §0): ±8 MB per folder (PDF ≤ 5 MB + 24 WebP's ≈ 3 MB) �
 
 **Advies:** start op Supabase Storage (nul nieuwe accounts, beste integratie), met `folders/storage.py` als enige laag die weet wáár bestanden staan. Retentie vanaf dag 1: pagina-WebP's 52 weken, PDF's 5 jaar. Rond **maand 3** het besluit: R2 (€0) of Supabase Pro (€25/mnd, en dan is meteen de Firecrawl-vraag uit PLAN.md §11E in hetzelfde budgetgesprek). De verhuizing is dan één configuratiewijziging plus één kopieerscript.
 
+### 9.5 Parallel draaien: preview naast productie (eis eigenaar, 05-09)
+
+**Eis:** de foldermonitor draait en is zichtbaar vóórdat hij in productie komt. Weekrapport, dashboard en database van de monitor blijven ongewijzigd tot een expliciete go-live.
+
+| Laag | Productie (blijft zoals nu) | Preview (nieuw, ernaast) | Hoe gescheiden |
+|---|---|---|---|
+| **Code** | `main` | integratiebranch `foldermonitor`; feature-PR's gaan dáárheen; één go-live-PR naar `main` | CI draait al op elke branch; `main` ziet niets tot de go-live-PR |
+| **Database + opslag** | project `concurrentiemonitor-terstal` | tweede gratis Supabase-project `concurrentiemonitor-preview` (eigen 500 MB db, eigen 1 GB storage, eigen auth) | de foldercode leest alleen `FOLDERS_SUPABASE_URL` / `FOLDERS_SUPABASE_SERVICE_ROLE_KEY`; productiesleutels bereiken hem niet |
+| **Dashboard** | `concurrentiemonitor-terstal.netlify.app` | branch deploy `foldermonitor--concurrentiemonitor-terstal.netlify.app`, met omgevingsvariabelen *scoped op die branch* (en op deploy previews) naar het preview-project | zelfde Netlify-site, eigen URL, eigen config; productiecontext blijft op productie |
+| **Planning (cron)** | `wekelijkse-scrape.yml` | `foldermonitor-preview.yml` op `main`: cron + `actions/checkout` van `ref: vars.FOLDERS_REF` (= `foldermonitor`), draait tegen GitHub Environment `preview` | GitHub voert cron alleen uit op de default branch; dit ene workflowbestand is het enige dat `main` raakt en wijzigt niets aan de scraper of het rapport |
+
+**Waarom een tweede project en geen apart schema of tabelprefix in het productieproject:** de service-rolsleutel omzeilt RLS; dev-code mét die sleutel kán productietabellen raken. Geen sleutel = geen risico. Bijvangst: 1 GB extra opslag tijdens de bouw en een schone meting van de opslaggroei. Supabase Branching is de officiële variant, maar vereist het Pro-plan (€25/mnd) — nu niet nodig. Free tier staat 2 actieve projecten toe; de monitor is er één, de overige projecten in de organisatie zijn gepauzeerd.
+
+**Wat de preview uit productie nodig heeft:** alleen `retailers` (upsert uit `folders/bronnen.yml`, zoals `ensure_retailers` dat nu doet). De koppeling aan `products` (fase 3) volgt na de go-live, of tijdens de preview met een wekelijkse read-only kopie uit de ruwe dumps van de scraper.
+
+**Zichtbaar voor de eigenaar tijdens de bouw:** het preview-dashboard (magic-link-login via het preview-project, dezelfde genodigden), de job-samenvatting van elke preview-run met het folderrapport, en de PR's naar `foldermonitor`.
+
+**Secrets en variabelen:**
+- GitHub Environment `preview`: `FOLDERS_SUPABASE_URL`, `FOLDERS_SUPABASE_SERVICE_ROLE_KEY`, `FOLDER_IMAP_USER`, `FOLDER_IMAP_PASSWORD`, `ANTHROPIC_API_KEY`; repository-variabele `FOLDERS_REF=foldermonitor`.
+- Netlify: `SUPABASE_URL` en `SUPABASE_ANON_KEY` met een aparte waarde voor de contexten *branch: foldermonitor* en *deploy preview* (preview-project); de productiewaarde blijft staan.
+- Supabase preview-project: Auth → Site URL en redirect op de branch-URL; gebruikers uitnodigen.
+
+**Feature-vlag `FOLDERS_ENABLED`:** rapport §8 en de folderpagina in het dashboard bestaan alleen mét de vlag. Ook ná de merge naar `main` blijft productie dus ongewijzigd tot de vlag aan staat — de go-live is een bewuste handeling, geen bijeffect van een merge.
+
+**Go-live (na review, één middag):**
+1. go-live-PR `foldermonitor` → `main` (code-review; validatiedossier per bron compleet; eval §5.4 gehaald);
+2. `sql/migratie_folders.sql` op het productieproject;
+3. data: de mailbox is de bron van waarheid — de sweep opnieuw draaien tegen productie haalt alle folders terug (alleen de extractie kost opnieuw, ±€1 per week historie); alternatief `python -m folders promote` dat rijen en bestanden kopieert;
+4. Environment `production` met de productiewaarden van `FOLDERS_SUPABASE_*`; `FOLDERS_REF=main`; `FOLDERS_ENABLED=true` in Actions én Netlify;
+5. preview-project pauzeren; het blijft staging voor volgende wijzigingen.
+
+**Kosten:** €0 extra. **Tijd:** +0,5 dagdeel inrichting in fase 0.
+
 ## 10. Kosten
 
 | Post | Verbruik | Kosten/maand |
@@ -377,10 +410,10 @@ De €0-opzet van de monitor breekt hier dus voor het eerst structureel, met een
 
 | Fase | Wanneer | Wat | Klaar als |
 |---|---|---|---|
-| **0. Besluiten & instap** | deze week | §14 beslissen; mailbox + aliassen; inschrijven bij 8 bronnen (eigenaar, 30 min); workflow "Validatie folders"; eerste 3 folder-PDF's handmatig verzamelen | per bron staat de route (mail/web/upload) met run-id in `docs/validaties/` |
-| **1. Archief** | week 1–2 | migratie + buckets; sweep + capture; upload; rapport §8 (metadata); dashboardpagina met viewer en aanwezigheidskalender | maandag ligt van elke kernbron de folder van die week in het archief |
+| **0. Besluiten & instap** | deze week | §14 beslissen; mailbox + aliassen; inschrijven bij 8 bronnen (eigenaar, 30 min); preview-omgeving inrichten (§9.5: branch, preview-project, Netlify-context, Environment `preview`, scheduler); workflow "Validatie folders"; eerste 3 folder-PDF's handmatig verzamelen | per bron staat de route (mail/web/upload) met run-id in `docs/validaties/`; preview-dashboard bereikbaar |
+| **1. Archief** | week 1–2 | migratie + buckets (preview-project); sweep + capture; upload; folderrapport in de job-samenvatting; dashboardpagina met viewer en aanwezigheidskalender (branch deploy) | maandag ligt van elke kernbron de folder van die week in het preview-archief |
 | **2. Extractie** | week 3–4 | classificatie + bodywear-extractie; poort; `folder_offers`/weekstats; controlelijst; eval op 3 folders; signalen in §8 | eval ≥ 90% prijzen correct; §8 toont aanbiedingen en signalen |
-| **3. Kalender & advies** | week 5–6 | koppeling folder ↔ online; folder-only-aandeel; adviesregels; retailkalender op aanbiedingen; Lidl/Aldi als folder-only bronnen | maandagoverleg neemt ≥ 1 besluit per 2 weken op een foldersignaal |
+| **3. Go-live, kalender & advies** | week 5–6 | go-live volgens §9.5 (merge, migratie productie, vlag aan); koppeling folder ↔ online; folder-only-aandeel; adviesregels; retailkalender op aanbiedingen; Lidl/Aldi als folder-only bronnen | §8 staat in het productie-weekrapport; maandagoverleg neemt ≥ 1 besluit per 2 weken op een foldersignaal |
 | **4. Volwassen** | kwartaal 2+ | seizoensklok jaar-op-jaar; opslagbesluit uitgevoerd; eventueel historie uit folderarchieven (gelabeld *gereconstrueerd*) | kalender voorspelt de eerstvolgende actieweek per bron |
 
 Bouwinspanning totaal ±4–5 dagen, verspreid over 6 weken; eigenaarstijd ±1 uur per week (controlelijst + maandagoverleg).
