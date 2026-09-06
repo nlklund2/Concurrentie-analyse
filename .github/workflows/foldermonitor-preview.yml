@@ -36,8 +36,12 @@ jobs:
     timeout-minutes: 45
     environment: preview
     env:
-      FOLDERS_SUPABASE_URL: ${{ secrets.FOLDERS_SUPABASE_URL }}
+      # De preview-URL is openbaar (staat in de docs en in elke deploy preview);
+      # zonder secret valt de workflow erop terug. Productie krijgt bij go-live
+      # een eigen environment met een expliciete URL (plan §9.5).
+      FOLDERS_SUPABASE_URL: ${{ secrets.FOLDERS_SUPABASE_URL || 'https://kptmymvxqhrfmnzmurbk.supabase.co' }}
       FOLDERS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.FOLDERS_SUPABASE_SERVICE_ROLE_KEY }}
+      FOLDER_IMAP_HOST: ${{ vars.FOLDER_IMAP_HOST || 'imap.gmail.com' }}
       FOLDER_IMAP_USER: ${{ secrets.FOLDER_IMAP_USER }}
       FOLDER_IMAP_PASSWORD: ${{ secrets.FOLDER_IMAP_PASSWORD }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

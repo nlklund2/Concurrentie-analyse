@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -9,6 +10,13 @@ import yaml
 
 PKG_DIR = Path(__file__).parent
 BRONNEN_FILE = PKG_DIR / "bronnen.yml"
+
+# Mailbox (besluit 06-09): een neutraal adres op een eigen Google
+# Workspace-domein. Technisch gelijk aan Gmail: IMAP op imap.gmail.com,
+# app-wachtwoord (2-staps-verificatie verplicht), plus-aliassen per bron.
+# Het adres zelf staat nergens in deze (publieke) repo — alleen in het
+# GitHub-secret FOLDER_IMAP_USER.
+IMAP_HOST_STANDAARD = "imap.gmail.com"
 
 
 @dataclass
@@ -69,3 +77,34 @@ def db_env() -> tuple[str, str]:
         raise SystemExit("FOLDERS_SUPABASE_URL en/of FOLDERS_SUPABASE_SERVICE_ROLE_KEY ontbreken "
                          "(GitHub Environment 'preview', zie docs/foldermonitor-fase0.md).")
     return url.rstrip("/"), key
+
+
+def imap_env() -> tuple[str, str, str]:
+    """Host, gebruiker en wachtwoord van de foldermailbox (GitHub Environment
+    'preview'). De host is een gewone variabele met Google als standaard; het
+    adres en het app-wachtwoord zijn secrets en komen nooit in logs of repo."""
+    host = os.environ.get("FOLDER_IMAP_HOST", "").strip() or IMAP_HOST_STANDAARD
+    user = os.environ.get("FOLDER_IMAP_USER", "").strip()
+    password = os.environ.get("FOLDER_IMAP_PASSWORD", "")
+    if not user or not password:
+        raise SystemExit("FOLDER_IMAP_USER en/of FOLDER_IMAP_PASSWORD ontbreken "
+                         "(GitHub Environment 'preview', zie docs/foldermonitor-fase0.md).")
+    return host, user, password
+
+
+_ALIAS_RE = re.compile(r"^([^+@\s]+)\+([^@\s]+)@(\S+)$")
+
+
+def alias_adres(adres: str, alias: str) -> str:
+    """Inschrijfadres per bron: <lokaal>+<alias>@<domein> (plus-adressering,
+    Gmail/Google Workspace). Wordt nergens opgeslagen; alleen getoond."""
+    lokaal, at, domein = adres.strip().partition("@")
+    if not at or not lokaal or not domein:
+        raise ValueError(f"geen mailadres: {adres!r}")
+    return f"{lokaal}+{alias}@{domein}"
+
+
+def alias_uit_adres(adres: str) -> str:
+    """Het plus-alias uit een ontvangstadres (To/Delivered-To), of '' zonder alias."""
+    m = _ALIAS_RE.match(adres.strip().lower())
+    return m.group(2) if m else ""

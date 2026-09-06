@@ -90,9 +90,9 @@ Bronnen komen in `folders/bronnen.yml`, gespiegeld aan `retailers.yml`: per bron
 Kern van het ontwerp: **de mail is de trigger, de viewer is de bron, de upload is het vangnet.** De terStal-mail bewijst waarom: hij bevat geen PDF, alleen "onze folder is uit!" met een link. De folder zelf moet dus altijd nog worden opgehaald.
 
 ### 4.1 Mailbox (primaire trigger) — PLAN.md §11.11
-- **Eén neutraal, nieuw mailadres** (Gmail), uitsluitend voor dit doel. Aanbevolen boven een terStal-adres: inschrijven met een @terstal-adres maakt zichtbaar dát en wát er gemonitord wordt (PLAN.md §8). Besluit §14.1.
-- **Plus-aliassen per bron**: `<adres>+zeeman@gmail.com`, `<adres>+wibra@gmail.com`, … De retailer stuurt vaak via een derde partij (terStal via Bloomreach); het alias maakt de koppeling afzender → bron deterministisch, ongeacht het verzenddomein.
-- **Ophalen vanuit GitHub Actions via IMAP** (`imaplib`, standaardbibliotheek, geen extra afhankelijkheid) met een Google app-wachtwoord (2-staps-verificatie verplicht). Secrets: `FOLDER_IMAP_USER`, `FOLDER_IMAP_PASSWORD` — alleen in GitHub Secrets, nooit in repo of dashboard. Alternatief bij bezwaar tegen IMAP: Gmail API met OAuth-refreshtoken (meer inrichting, zelfde resultaat).
+- **Eén neutraal mailadres**, uitsluitend voor dit doel. Aanbevolen boven een terStal-adres: inschrijven met een @terstal-adres maakt zichtbaar dát en wát er gemonitord wordt (PLAN.md §8). **Besluit 06-09 (§14.1): een neutraal adres op een eigen Google Workspace-domein van de eigenaar** — technisch gelijk aan Gmail. Het adres staat niet in deze publieke repo, niet in Actions-logs en niet in het dashboard; alleen in het secret `FOLDER_IMAP_USER`.
+- **Plus-aliassen per bron**: `<lokaal>+zeeman@<domein>`, `<lokaal>+wibra@<domein>`, … (Google levert ze zonder inrichting af). De retailer stuurt vaak via een derde partij (terStal via Bloomreach); het alias maakt de koppeling afzender → bron deterministisch, ongeacht het verzenddomein. Weigert een formulier de `+`, dan valt de sweep terug op het afzenderdomein (`mail_from`).
+- **Ophalen vanuit GitHub Actions via IMAP** (`imaplib`, standaardbibliotheek, geen extra afhankelijkheid) op `imap.gmail.com` met een Google app-wachtwoord (2-staps-verificatie verplicht). Secrets: `FOLDER_IMAP_USER`, `FOLDER_IMAP_PASSWORD` — alleen in GitHub Secrets, nooit in repo of dashboard; variabele `FOLDER_IMAP_HOST` alleen als de host ooit afwijkt. Fase 0 levert `python -m folders mailbox` (alleen-lezen controle: login, aantal, bronherkenning); de sweep zelf is fase 1. Alternatief bij bezwaar tegen IMAP: Gmail API met OAuth-refreshtoken (meer inrichting, zelfde resultaat).
 - **Wat de sweep doet:** ongelezen mails lezen → bron bepalen (alias, anders afzenderdomein) → folderlinks en PDF-bijlagen herkennen → registreren in `folders` (status `nieuw`) → mail markeren als verwerkt. Geen mail wordt verwijderd; de mailbox is het tweede archief.
 - **Privacy/AVG:** de mailbox ontvangt alleen marketingmail van bedrijven; geen persoonsgegevens van derden. Trackingpixels en -links in die mails melden de afzender dat er geopend/geklikt wordt — accepteren, of de sweep laat links onaangeroerd en haalt de folder via de folderpagina (§4.2).
 
@@ -357,9 +357,9 @@ Rekensom (aannames §0): ±8 MB per folder (PDF ≤ 5 MB + 24 WebP's ≈ 3 MB) �
 **Zichtbaar voor de eigenaar tijdens de bouw:** het preview-dashboard (magic-link-login via het preview-project, dezelfde genodigden), de job-samenvatting van elke preview-run met het folderrapport, en de PR's naar `foldermonitor`.
 
 **Secrets en variabelen:**
-- GitHub Environment `preview`: `FOLDERS_SUPABASE_URL`, `FOLDERS_SUPABASE_SERVICE_ROLE_KEY`, `FOLDER_IMAP_USER`, `FOLDER_IMAP_PASSWORD`, `ANTHROPIC_API_KEY`; repository-variabele `FOLDERS_REF=foldermonitor`.
+- GitHub Environment `preview`: `FOLDERS_SUPABASE_SERVICE_ROLE_KEY`, `FOLDER_IMAP_USER`, `FOLDER_IMAP_PASSWORD`, `ANTHROPIC_API_KEY` (fase 2); optioneel `FOLDERS_SUPABASE_URL` (de workflow valt terug op de preview-URL) en variabele `FOLDER_IMAP_HOST` (standaard `imap.gmail.com`); repository-variabele `FOLDERS_REF=foldermonitor`.
 - Netlify: `PREVIEW_SUPABASE_URL` en `PREVIEW_SUPABASE_ANON_KEY`; `build.sh` schakelt erop zodra Netlify's `CONTEXT` ≠ `production`. De productiewaarden blijven staan en worden niet aangeraakt (gebouwd 05-09, zie `foldermonitor-fase0.md`).
-- Supabase preview-project: Auth → Site URL en redirect op de branch-URL; gebruikers uitnodigen.
+- Supabase preview-project: Auth → Site URL op de preview-URL en één redirect-patroon `https://*--concurrentiemonitor-terstal.netlify.app/**` (dekt deploy previews én branch deploys); signups uit; gebruikers uitnodigen.
 
 **Feature-vlag `FOLDERS_ENABLED`:** rapport §8 en de folderpagina in het dashboard bestaan alleen mét de vlag. Ook ná de merge naar `main` blijft productie dus ongewijzigd tot de vlag aan staat — de go-live is een bewuste handeling, geen bijeffect van een merge.
 
@@ -420,7 +420,7 @@ Bouwinspanning totaal ±4–5 dagen, verspreid over 6 weken; eigenaarstijd ±1 u
 
 ## 14. Besluiten aan de eigenaar (max. 3)
 
-1. **Mailbox:** nieuw neutraal Gmail-adres (aanbevolen) of een terStal-/M365-mailbox (IT-inrichting, zichtbaar meekijken)?
+1. **Mailbox:** nieuw neutraal Gmail-adres (aanbevolen) of een terStal-/M365-mailbox (IT-inrichting, zichtbaar meekijken)? — **Besloten 06-09: neutraal adres op een eigen Google Workspace-domein van de eigenaar** (zelfde mechaniek als Gmail; zie `foldermonitor-fase0.md`).
 2. **Opslagpad:** starten op Supabase Storage met het besluit R2/Pro in maand 3 (aanbevolen), of R2 vanaf dag 1?
 3. **Extractie:** akkoord met een vision-model (Claude API, ≈ €3–6/maand) voor folderpagina's zonder tekstlaag, of eerst alleen scenario A (archief) draaien?
 

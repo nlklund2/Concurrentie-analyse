@@ -6,8 +6,9 @@
 # mail_from:    afzenderdomeinen van de nieuwsbrief (bron bepalen als de
 #               plus-alias ontbreekt); de sweep matcht op het einde van het
 #               afzenderadres.
-# mail_alias:   plus-alias in het neutrale mailadres (<adres>+<alias>@…);
-#               leeg = de id.
+# mail_alias:   plus-alias in het neutrale mailadres (<lokaal>+<alias>@<domein>,
+#               Google Workspace); leeg = de id. Het adres zelf staat alleen in
+#               het GitHub-secret FOLDER_IMAP_USER — niet in deze publieke repo.
 # folder_url:   folderpagina voor de web-fallback; leeg = mail-only bron.
 # viewer:       auto | pdf | publitas | ipaper | pages | render — 'auto'
 #               laat de validatie het uitzoeken.

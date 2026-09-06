@@ -2,6 +2,10 @@
 # de viewer herkennen (pdf / Publitas / iPaper / eigen viewer) en de
 # capture-route adviseren. Rapport in de job-samenvatting.
 #
+# Zijn de IMAP-secrets van het Environment 'preview' gezet, dan controleert
+# de run ook de mailbox (alleen-lezen: login, aantal, bronherkenning). Het
+# mailadres komt niet in de uitvoer — Actions-logs van deze repo zijn openbaar.
+#
 # Hoort bij de foldermonitor (docs/foldermonitor-plan.md §4.4, §9.5). Dit
 # bestand staat op main omdat GitHub een workflow_dispatch alleen aanbiedt
 # voor workflows op de default branch; de CODE komt van de branch in 'ref'
@@ -28,6 +32,9 @@ jobs:
     environment: preview
     env:
       INPUT_BRONNEN: ${{ inputs.bronnen }}
+      FOLDER_IMAP_HOST: ${{ vars.FOLDER_IMAP_HOST || 'imap.gmail.com' }}
+      FOLDER_IMAP_USER: ${{ secrets.FOLDER_IMAP_USER }}
+      FOLDER_IMAP_PASSWORD: ${{ secrets.FOLDER_IMAP_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,10 +54,15 @@ jobs:
           for b in $INPUT_BRONNEN; do EXTRA="$EXTRA --bron $b"; done
           python -m folders validate $EXTRA
 
+      - name: Mailbox controleren (alleen-lezen; overgeslagen zonder IMAP-secrets)
+        if: env.FOLDER_IMAP_USER != ''
+        run: python -m folders mailbox --out mailbox-check.md
+
       - name: Rapport in job-samenvatting tonen
         if: always()
         run: |
           [ -f validatie-folders.md ] && cat validatie-folders.md >> "$GITHUB_STEP_SUMMARY"
+          [ -f mailbox-check.md ] && cat mailbox-check.md >> "$GITHUB_STEP_SUMMARY"
           true
 
       - name: Rapport als artifact bewaren

@@ -2,6 +2,7 @@
 
   python -m folders validate [--bron id ...] [--out validatie-folders.md]
   python -m folders bronnen
+  python -m folders mailbox [--out mailbox-check.md]   # alleen-lezen IMAP-controle
 """
 from __future__ import annotations
 
@@ -25,6 +26,18 @@ def cmd_validate(args) -> int:
     return 0
 
 
+def cmd_mailbox(args) -> int:
+    from .config import imap_env
+    from .mail import mailbox_check, mailbox_report
+    host, user, password = imap_env()
+    bronnen = load_bronnen()
+    st = mailbox_check(host, user, password, bronnen, limit=args.limit)
+    md = mailbox_report(st, bronnen)
+    Path(args.out).write_text(md, encoding="utf-8")
+    print(md)
+    return 0
+
+
 def cmd_bronnen(args) -> int:
     for b in load_bronnen(include_disabled=True):
         aan = "aan " if b.enabled else "uit "
@@ -44,6 +57,11 @@ def main() -> int:
 
     b = sub.add_parser("bronnen", help="bronconfiguratie tonen")
     b.set_defaults(fn=cmd_bronnen)
+
+    m = sub.add_parser("mailbox", help="mailbox controleren (alleen-lezen; secrets uit Environment 'preview')")
+    m.add_argument("--out", default="mailbox-check.md")
+    m.add_argument("--limit", type=int, default=10, help="aantal recente mails om te bekijken")
+    m.set_defaults(fn=cmd_mailbox)
 
     args = ap.parse_args()
     return args.fn(args)

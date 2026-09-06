@@ -37,3 +37,29 @@ def test_onbekende_bron_faalt():
 def test_bestand_is_geldige_yaml_met_defaults():
     raw = yaml.safe_load(BRONNEN_FILE.read_text(encoding="utf-8"))
     assert raw["defaults"]["viewer"] == "auto"
+
+
+def test_imap_env_standaardhost_en_ontbrekend(monkeypatch):
+    import pytest
+    from folders.config import IMAP_HOST_STANDAARD, imap_env
+    for k in ("FOLDER_IMAP_HOST", "FOLDER_IMAP_USER", "FOLDER_IMAP_PASSWORD"):
+        monkeypatch.delenv(k, raising=False)
+    with pytest.raises(SystemExit):
+        imap_env()
+    monkeypatch.setenv("FOLDER_IMAP_USER", "x@voorbeeld.nl")
+    monkeypatch.setenv("FOLDER_IMAP_PASSWORD", "geheim")
+    assert imap_env() == (IMAP_HOST_STANDAARD, "x@voorbeeld.nl", "geheim")
+    monkeypatch.setenv("FOLDER_IMAP_HOST", "imap.anders.nl")
+    assert imap_env()[0] == "imap.anders.nl"
+
+
+def test_plus_alias_heen_en_terug():
+    import pytest
+    from folders.config import alias_adres, alias_uit_adres
+    assert alias_adres("folders@voorbeeld.nl", "zeeman") == "folders+zeeman@voorbeeld.nl"
+    assert alias_uit_adres("Folders+Zeeman@Voorbeeld.nl") == "zeeman"
+    assert alias_uit_adres("folders+c-and-a@voorbeeld.nl") == "c-and-a"
+    assert alias_uit_adres("folders@voorbeeld.nl") == ""
+    assert alias_uit_adres("") == ""
+    with pytest.raises(ValueError):
+        alias_adres("geen-adres", "x")
