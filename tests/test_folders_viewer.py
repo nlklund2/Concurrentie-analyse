@@ -104,3 +104,24 @@ def test_embed_script_is_geen_folderlink():
     assert any("embed-script" in e for e in info.evidence)
     html2 = html + '<a href="https://view.publitas.com/kik-nl/week-37/">folder</a>'
     assert detect(html2, "https://www.kik.nl/Online-folder").url == "https://view.publitas.com/kik-nl/week-37/"
+
+
+def test_pdf_zonder_folderkenmerk_wordt_genegeerd():
+    from folders.viewer import detect
+    html = '<a href="https://a.storyblok.com/f/1/x/kwaliteitsrapport-nl.pdf">rapport</a>'
+    info = detect(html, "https://www.zeeman.com/nl-nl/aanbiedingen")
+    assert info.kind == "render" and any("zonder folderkenmerk" in e for e in info.evidence)
+    html2 = html + '<a href="/media/weekfolder-37.pdf">folder</a>'
+    info2 = detect(html2, "https://www.zeeman.com/nl-nl/aanbiedingen")
+    assert info2.kind == "pdf" and info2.url.endswith("/media/weekfolder-37.pdf")
+
+
+def test_folder_links_intern_en_een_stap():
+    from folders.viewer import folder_links
+    html = ('<a href="/nl-nl/aanbiedingen/folder">Bekijk de <b>folder</b></a>'
+            '<a href="/nl-nl/acties">Bekijk onze folder</a>'
+            '<a href="https://ander.nl/folder">extern</a>'
+            '<a href="/nl-nl/aanbiedingen">deze pagina</a>'
+            '<a href="/nl-nl/klantenservice">service</a>')
+    links = folder_links(html, "https://www.zeeman.com/nl-nl/aanbiedingen")
+    assert links == ["https://www.zeeman.com/nl-nl/aanbiedingen/folder", "https://www.zeeman.com/nl-nl/acties"]

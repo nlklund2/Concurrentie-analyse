@@ -36,6 +36,10 @@ PDF_RE = re.compile(r"\.pdf(?:[?#][^\s\"']*)?$", re.I)
 # viewer- en pdf-URL's worden daaruit meegenomen; de rest is ruis.
 BARE_URL_RE = re.compile(r"https?://[^\s\"'<>\\)]+")
 SCRIPT_URL_RE = re.compile(r"\.(?:m?js|css)(?:[?#].*)?$", re.I)
+# Een pdf op een folderpagina is niet per se de folder (Zeeman: een
+# kwaliteitsrapport). Alleen pdf's met een folderkenmerk in het pad tellen.
+FOLDER_PDF_RE = re.compile(r"folder|brochure|magazine|krant|week|aanbieding|actie|deal|catalog", re.I)
+ANCHOR_RE = re.compile(r"""<a\b[^>]*?href\s*=\s*["']([^"'#\s>]+)["'][^>]*>(.*?)</a>""", re.I | re.S)
 PAGE_IMG_RE = re.compile(r"(?:page|pagina|folder|spread)[-_/]?\d{1,3}\b[^\"'\s]*\.(?:jpe?g|png|webp)", re.I)
 PAGE_NR_RE = re.compile(r"(?:page|pagina)(?:[-_ ]|\s*=\s*[\"']?)?(\d{1,3})\b", re.I)
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
@@ -80,12 +84,32 @@ def _host(u: str) -> str:
     return urlsplit(u).netloc.lower()
 
 
+def folder_links(html: str, base_url: str, limit: int = 3) -> list[str]:
+    """Interne links die naar een folderpagina wijzen: 'folder' in het pad of in de
+    linktekst, zelfde host, niet de pagina zelf. Eén stap diep is genoeg: een
+    aanbiedingenpagina linkt naar de folder, een folderpagina naar de viewer."""
+    html = (html or "").replace("\\/", "/")
+    host, eigen = _host(base_url), base_url.rstrip("/")
+    out: list[str] = []
+    for href, tekst in ANCHOR_RE.findall(html):
+        u = urljoin(base_url, html_mod.unescape(href).strip())
+        if _host(u) != host or u.rstrip("/") == eigen or u in out:
+            continue
+        if "folder" in urlsplit(u).path.lower() or "folder" in re.sub(r"<[^>]+>", " ", tekst).lower():
+            out.append(u)
+            if len(out) >= limit:
+                break
+    return out
+
+
 def detect(html: str, base_url: str) -> ViewerInfo:
     """Welke capture-route past bij deze folderpagina?"""
     urls = urls_in(html, base_url)
     pdfs = [u for u in urls if PDF_RE.search(u)]
-    if pdfs:
-        return ViewerInfo("pdf", pdfs[0], evidence=[f"{len(pdfs)} pdf-link(s)"], page_hints=0)
+    folder_pdfs = [u for u in pdfs if FOLDER_PDF_RE.search(urlsplit(u).path)]
+    if folder_pdfs:
+        return ViewerInfo("pdf", folder_pdfs[0], evidence=[f"{len(folder_pdfs)} folder-pdf-link(s)"], page_hints=0)
+    extra = [f"{len(pdfs)} pdf-link(s) zonder folderkenmerk genegeerd"] if pdfs else []
     for platform, hosts in VIEWER_HOSTS.items():
         hits = [u for u in urls if any(h in _host(u) or h in u.lower() for h in hosts)]
         if hits:
@@ -107,8 +131,8 @@ def detect(html: str, base_url: str) -> ViewerInfo:
         if platform in low or any(h in low for h in hosts):
             kind = platform if platform in EIGEN_ROUTE else "extern"
             return ViewerInfo(kind, "", platform=platform,
-                              evidence=[f"{platform} genoemd in de pagina, maar geen link gevonden"])
-    return ViewerInfo("render", "", evidence=["geen pdf, viewer of paginabeelden herkend"])
+                              evidence=[f"{platform} genoemd in de pagina, maar geen link gevonden"] + extra)
+    return ViewerInfo("render", "", evidence=["geen pdf, viewer of paginabeelden herkend"] + extra)
 
 
 def tel_paginas(html: str) -> int:

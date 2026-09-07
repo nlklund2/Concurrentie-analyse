@@ -6,12 +6,26 @@ from __future__ import annotations
 from scraper.http import BlockedError, Http
 
 from .config import BronCfg
-from .viewer import ViewerInfo, detect, geldigheid, tekst, tel_paginas, titel
+from .viewer import ViewerInfo, detect, folder_links, geldigheid, tekst, tel_paginas, titel
 
 STATUS = {"groen": "🟢", "oranje": "🟠", "rood": "🔴", "wit": "⚪"}
 
 
-def validate_one(cfg: BronCfg, http: Http | None = None) -> dict:
+def _score(info: ViewerInfo) -> int:
+    """Hoe bruikbaar is deze pagina als startpunt voor de capture? 4 = klaar
+    voor fase 1, 1 = alleen een headless browser kan er iets mee."""
+    if info.kind == "pdf":
+        return 4
+    if info.kind in ("publitas", "ipaper"):
+        return 4 if info.url else 2
+    if info.kind == "extern":
+        return 3 if info.url else 2
+    if info.kind == "pages":
+        return 3
+    return 1
+
+
+def validate_one(cfg: BronCfg, http: Http | None = None, max_ontdekt: int = 3) -> dict:
     out: dict = {"cfg": cfg, "http_status": None, "html_len": 0, "titel": "", "viewer": None,
                  "geldig": None, "geblokkeerd": False, "fout": "", "viewer_http": None,
                  "viewer_len": 0, "viewer_pages": 0, "viewer_fout": "", "requests": 0,
@@ -19,44 +33,63 @@ def validate_one(cfg: BronCfg, http: Http | None = None) -> dict:
     if cfg.mail_only:
         return out
     http = http or Http(min_delay=cfg.min_delay, respect_robots=cfg.respect_robots)
-    try:
-        resp = http.get(cfg.folder_url)
-    except BlockedError as e:
-        out["geblokkeerd"] = True
-        out["fout"] = str(e)
-        out["requests"] = http.requests_done
-        return out
-    if resp is None and http.robots_skipped:
-        out["fout"] = "robots.txt verbiedt de folderpagina"
-        out["requests"] = http.requests_done
-        return out
-    if resp is None:
-        # De folder_url is een startaanname; probeer de kandidaten uit bronnen.yml
-        # tot er één antwoordt. Het rapport zegt dan welke folder_url moet worden.
-        out["kandidaten"].append(f"{cfg.folder_url}: geen antwoord")
-        for kand in cfg.folder_url_kandidaten:
-            try:
-                r = http.get(kand)
-            except BlockedError as e:
-                out["kandidaten"].append(f"{kand}: {e}")
-                continue
-            if r is None:
-                out["kandidaten"].append(f"{kand}: geen antwoord")
-                continue
-            resp, out["gebruikte_url"] = r, kand
-            out["kandidaten"].append(f"{kand}: antwoordt ({r.status_code})")
+
+    # De folder_url is een startaanname. Probeer daarna de kandidaten uit
+    # bronnen.yml én de folderlinks die de pagina's zelf noemen (één stap
+    # diep), en kies de pagina met de beste capture-route. Stop zodra een
+    # pagina 'klaar voor fase 1' is (score 4) — geen verzoek te veel.
+    wachtrij = [cfg.folder_url] + [k for k in cfg.folder_url_kandidaten if k != cfg.folder_url]
+    geprobeerd: set[str] = set()
+    ontdekt = 0
+    beste: tuple[int, str, object, ViewerInfo] | None = None   # (score, url, resp, info)
+    primair_geblokkeerd = ""
+    while wachtrij:
+        url = wachtrij.pop(0)
+        if url in geprobeerd:
+            continue
+        geprobeerd.add(url)
+        try:
+            resp = http.get(url)
+        except BlockedError as e:
+            out["kandidaten"].append(f"{url}: {e}")
+            if url == cfg.folder_url:
+                primair_geblokkeerd = str(e)
+            continue
+        if resp is None:
+            out["kandidaten"].append(f"{url}: " + ("robots.txt verbiedt de pagina" if http.robots_skipped
+                                                   else "geen antwoord"))
+            continue
+        info = detect(resp.text, resp.url)
+        score = _score(info)
+        out["kandidaten"].append(f"{url}: antwoordt ({resp.status_code}) → {info.kind}"
+                                 + (f" ({info.platform})" if info.platform and info.kind == "extern" else ""))
+        if beste is None or score > beste[0]:
+            beste = (score, url, resp, info)
+        if score >= 4:
             break
-    if resp is None:
-        out["fout"] = "geen antwoord (404, timeout of verbindingsfout)"
-        if cfg.folder_url_kandidaten:
-            out["fout"] += f"; {len(cfg.folder_url_kandidaten)} kandidaat-URL(s) ook niet"
+        for link in folder_links(resp.text, resp.url):
+            if link not in geprobeerd and link not in wachtrij and ontdekt < max_ontdekt:
+                wachtrij.append(link)
+                ontdekt += 1
+                out["kandidaten"].append(f"{link}: ontdekt via de pagina, wordt geprobeerd")
+
+    if beste is None:
+        if primair_geblokkeerd:
+            out["geblokkeerd"] = True
+            out["fout"] = primair_geblokkeerd
+        else:
+            out["fout"] = "geen antwoord (404, timeout of verbindingsfout)"
+        if len(geprobeerd) > 1:
+            out["fout"] += f"; {len(geprobeerd) - 1} kandidaat-URL(s) ook niet"
         out["requests"] = http.requests_done
         return out
+
+    _, url, resp, info = beste
     html = resp.text
+    out["gebruikte_url"] = url
     out["http_status"] = resp.status_code
     out["html_len"] = len(html)
     out["titel"] = titel(html)
-    info: ViewerInfo = detect(html, resp.url)
     out["viewer"] = info
     out["geldig"] = geldigheid(tekst(html))
     # Tweede stap: de viewer zelf aanraken — dát is het domein waar de
