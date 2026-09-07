@@ -152,7 +152,7 @@
 <body>
 
 <div id="login" class="card hidden">
-  <h2>Concurrentiemonitor terStal</h2>
+  <h2>Concurrentiemonitor terStal <span class="omgeving-badge" hidden style="display:inline-block;margin-left:.5em;padding:.1em .5em;border-radius:4px;background:#b45309;color:#fff;font-size:.6em;vertical-align:middle;letter-spacing:.05em" title="Dit dashboard leest het preview-project, niet productie">PREVIEW</span></h2>
   <p class="sub">Log in met je werk-e-mailadres; je ontvangt een eenmalige inloglink.
      Toegang wordt beheerd in Supabase (uitnodigingen).</p>
   <input type="email" id="email" placeholder="naam@bedrijf.nl" autocomplete="email">
@@ -171,7 +171,7 @@
 <div id="app" class="hidden">
 <div id="vast">
 <header>
-  <h1>Concurrentiemonitor terStal</h1>
+  <h1>Concurrentiemonitor terStal <span class="omgeving-badge" hidden style="display:inline-block;margin-left:.5em;padding:.1em .5em;border-radius:4px;background:#b45309;color:#fff;font-size:.6em;vertical-align:middle;letter-spacing:.05em" title="Dit dashboard leest het preview-project, niet productie">PREVIEW</span></h1>
   <a href="/mockup.html" style="font-size:12.5px;color:var(--ink-2)"
      title="Waar het dashboard naartoe groeit — alles daar is demodata">concept-cockpit (demo) →</a>
   <label>Week <select id="weekSel"></select></label>
@@ -1042,6 +1042,15 @@ async function renderHealth() {
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   if (state.weeks.length) render();
 });
+</script>
+<script>
+// Preview naast productie (docs/foldermonitor-plan.md §9.5): build.sh zet
+// omgeving op 'preview' buiten de productiecontext; de badge maakt dat zichtbaar.
+(function () {
+  if (!window.MONITOR_CONFIG || window.MONITOR_CONFIG.omgeving !== 'preview') return;
+  document.querySelectorAll('.omgeving-badge').forEach(function (el) { el.hidden = false; });
+  document.title = 'PREVIEW · ' + document.title;
+})();
 </script>
 </body>
 </html>
