@@ -14,7 +14,8 @@ STATUS = {"groen": "🟢", "oranje": "🟠", "rood": "🔴", "wit": "⚪"}
 def validate_one(cfg: BronCfg, http: Http | None = None) -> dict:
     out: dict = {"cfg": cfg, "http_status": None, "html_len": 0, "titel": "", "viewer": None,
                  "geldig": None, "geblokkeerd": False, "fout": "", "viewer_http": None,
-                 "viewer_len": 0, "viewer_pages": 0, "viewer_fout": "", "requests": 0}
+                 "viewer_len": 0, "viewer_pages": 0, "viewer_fout": "", "requests": 0,
+                 "gebruikte_url": cfg.folder_url, "kandidaten": []}
     if cfg.mail_only:
         return out
     http = http or Http(min_delay=cfg.min_delay, respect_robots=cfg.respect_robots)
@@ -25,9 +26,30 @@ def validate_one(cfg: BronCfg, http: Http | None = None) -> dict:
         out["fout"] = str(e)
         out["requests"] = http.requests_done
         return out
+    if resp is None and http.robots_skipped:
+        out["fout"] = "robots.txt verbiedt de folderpagina"
+        out["requests"] = http.requests_done
+        return out
     if resp is None:
-        out["fout"] = ("robots.txt verbiedt de folderpagina" if http.robots_skipped
-                       else "geen antwoord (404, timeout of verbindingsfout)")
+        # De folder_url is een startaanname; probeer de kandidaten uit bronnen.yml
+        # tot er één antwoordt. Het rapport zegt dan welke folder_url moet worden.
+        out["kandidaten"].append(f"{cfg.folder_url}: geen antwoord")
+        for kand in cfg.folder_url_kandidaten:
+            try:
+                r = http.get(kand)
+            except BlockedError as e:
+                out["kandidaten"].append(f"{kand}: {e}")
+                continue
+            if r is None:
+                out["kandidaten"].append(f"{kand}: geen antwoord")
+                continue
+            resp, out["gebruikte_url"] = r, kand
+            out["kandidaten"].append(f"{kand}: antwoordt ({r.status_code})")
+            break
+    if resp is None:
+        out["fout"] = "geen antwoord (404, timeout of verbindingsfout)"
+        if cfg.folder_url_kandidaten:
+            out["fout"] += f"; {len(cfg.folder_url_kandidaten)} kandidaat-URL(s) ook niet"
         out["requests"] = http.requests_done
         return out
     html = resp.text
@@ -69,17 +91,23 @@ def route_advies(out: dict) -> str:
     if out["fout"]:
         return "folderpagina niet bereikbaar — folder_url in bronnen.yml controleren of de link uit de nieuwsbrief seeden"
     info: ViewerInfo = out["viewer"]
+    prefix = ""
+    if out.get("gebruikte_url") and out["gebruikte_url"] != cfg.folder_url:
+        prefix = f"zet folder_url op {out['gebruikte_url']} (kandidaat antwoordde, de folder_url niet); "
     if out["viewer_fout"]:
-        return f"viewer herkend ({info.kind}) maar niet bereikbaar: {out['viewer_fout'][:80]} — upload als vangnet"
+        return prefix + f"viewer herkend ({info.kind}) maar niet bereikbaar: {out['viewer_fout'][:80]} — upload als vangnet"
     if info.kind == "pdf":
-        return "route pdf — directe download, beste kwaliteit"
+        return prefix + "route pdf — directe download, beste kwaliteit"
+    if info.kind in ("publitas", "ipaper") and not info.url:
+        return prefix + (f"{info.kind} herkend zonder folderlink — route render (headless browser) "
+                         f"die de viewer-URL uit de pagina-JS haalt, of seed uit de nieuwsbrief")
     if info.kind in ("publitas", "ipaper"):
-        return f"route pages via {info.kind} — capture bouwen in fase 1"
+        return prefix + f"route pages via {info.kind} — capture bouwen in fase 1"
     if info.kind == "extern":
-        return f"route pages via {info.platform} — capture bouwen in fase 1 (nog geen eigen route)"
+        return prefix + f"route pages via {info.platform} — capture bouwen in fase 1 (nog geen eigen route)"
     if info.kind == "pages":
-        return "route pages — paginabeelden staan op de folderpagina zelf"
-    return "route render (headless browser) — of de viewer-URL uit de nieuwsbrief seeden"
+        return prefix + "route pages — paginabeelden staan op de folderpagina zelf"
+    return prefix + "route render (headless browser) — of de viewer-URL uit de nieuwsbrief seeden"
 
 
 def status(out: dict) -> str:
@@ -91,6 +119,8 @@ def status(out: dict) -> str:
     info: ViewerInfo = out["viewer"]
     if out["viewer_fout"] or info.kind == "render":
         return "oranje"
+    if info.kind in ("publitas", "ipaper", "extern") and not info.url:
+        return "oranje"          # platform herkend, maar de folder zelf nog niet gevonden
     return "groen"
 
 
@@ -115,7 +145,9 @@ def validate_report(results: list[dict]) -> str:
         if r["geldig"]:
             van, tot = r["geldig"]
             geldig = f"{van:%d-%m} t/m {tot:%d-%m-%Y}"
-        pagina = cfg.folder_url or "mail-only"
+        pagina = r.get("gebruikte_url") or cfg.folder_url or "mail-only"
+        if cfg.folder_url and pagina != cfg.folder_url:
+            pagina += " (kandidaat)"
         md.append(f"| {cfg.name} | {pagina} | {r['http_status'] or '–'} | {viewer} | {bereikbaar} "
                   f"| {r['viewer_pages'] or '–'} | {geldig} | {r['requests']} | {icon} |")
     md.append("")
@@ -125,6 +157,8 @@ def validate_report(results: list[dict]) -> str:
         md.append(f"- **Advies:** {route_advies(r)}")
         if r["fout"]:
             md.append(f"- Fout: {r['fout']}")
+        for k in r.get("kandidaten", []):
+            md.append(f"- Geprobeerd: {k}")
         if r["titel"]:
             md.append(f"- Paginatitel: {r['titel']}")
         if r["viewer"]:

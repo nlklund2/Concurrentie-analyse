@@ -10,6 +10,8 @@
 #               Google Workspace); leeg = de id. Het adres zelf staat alleen in
 #               het GitHub-secret FOLDER_IMAP_USER — niet in deze publieke repo.
 # folder_url:   folderpagina voor de web-fallback; leeg = mail-only bron.
+# folder_url_kandidaten: alternatieve folderpagina's, geprobeerd zodra
+#               folder_url niet antwoordt; het validatierapport zegt welke werkt.
 # viewer:       auto | pdf | publitas | ipaper | pages | render — 'auto'
 #               laat de validatie het uitzoeken.
 # cadence_days: verwacht folderritme (voor het 'geen folder ontvangen'-signaal).
@@ -45,6 +47,15 @@ bronnen:
     segment: kern
     mail_from: [zeeman.com, zeeman.nl]
     folder_url: https://www.zeeman.com/nl-nl/folder
+    # Validatie 07-09 (run 34100477338): /nl-nl/folder antwoordt niet (404?).
+    # De contentsitemap kent /nl-nl/aanbiedingen/…; kandidaten in volgorde.
+    folder_url_kandidaten:
+      - https://www.zeeman.com/nl-nl/aanbiedingen
+      - https://www.zeeman.com/nl-nl/folder/
+      - https://www.zeeman.com/nl-nl/aanbiedingen/folder
+      - https://www.zeeman.com/nl-nl/acties
+      - https://www.zeeman.com/nl/folder
+      - https://www.zeeman.com/folder
     notes: >-
       Prijst online niets af; promotie loopt volledig via de folder ('Uit
       onze folder'-label in de monitor). Hoogste prioriteit voor bodywear.

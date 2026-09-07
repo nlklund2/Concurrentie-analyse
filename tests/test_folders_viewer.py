@@ -84,3 +84,23 @@ def test_geldigheid_verwerpt_seizoen_en_ruis():
     assert geldigheid("1 maart t/m 31 augustus", VANDAAG) is None
     assert geldigheid("maten 92 t/m 164", VANDAAG) is None
     assert geldigheid("", VANDAAG) is None
+
+
+def test_json_escaped_publitas_url_in_script():
+    from folders.viewer import detect, urls_in
+    html = ('<script>self.__next_f.push(["{\\"folderUrl\\":\\"https:\\/\\/view.publitas.com\\/action-nl\\/folder-37\\/\\"}"])'
+            '</script><a href="/nl-nl/">home</a>')
+    urls = urls_in(html, "https://www.action.com/nl-nl/folder/")
+    assert "https://view.publitas.com/action-nl/folder-37/" in urls
+    info = detect(html, "https://www.action.com/nl-nl/folder/")
+    assert info.kind == "publitas" and info.url == "https://view.publitas.com/action-nl/folder-37/"
+
+
+def test_embed_script_is_geen_folderlink():
+    from folders.viewer import detect
+    html = '<script src="https://view.publitas.com/embed.js"></script><div id="folder"></div>'
+    info = detect(html, "https://www.kik.nl/Online-folder")
+    assert info.kind == "publitas" and info.url == ""
+    assert any("embed-script" in e for e in info.evidence)
+    html2 = html + '<a href="https://view.publitas.com/kik-nl/week-37/">folder</a>'
+    assert detect(html2, "https://www.kik.nl/Online-folder").url == "https://view.publitas.com/kik-nl/week-37/"

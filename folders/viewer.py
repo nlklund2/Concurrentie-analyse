@@ -32,6 +32,10 @@ EIGEN_ROUTE = ("publitas", "ipaper")
 ATTR_URL_RE = re.compile(
     r"""(?:href|src|data-src|data-href|data-url|data-pdf|content)\s*=\s*["']([^"'\s>]+)["']""", re.I)
 PDF_RE = re.compile(r"\.pdf(?:[?#][^\s\"']*)?$", re.I)
+# Kale URL's in script-/JSON-blokken (Next.js-flight, embed-configs). Alleen
+# viewer- en pdf-URL's worden daaruit meegenomen; de rest is ruis.
+BARE_URL_RE = re.compile(r"https?://[^\s\"'<>\\)]+")
+SCRIPT_URL_RE = re.compile(r"\.(?:m?js|css)(?:[?#].*)?$", re.I)
 PAGE_IMG_RE = re.compile(r"(?:page|pagina|folder|spread)[-_/]?\d{1,3}\b[^\"'\s]*\.(?:jpe?g|png|webp)", re.I)
 PAGE_NR_RE = re.compile(r"(?:page|pagina)(?:[-_ ]|\s*=\s*[\"']?)?(\d{1,3})\b", re.I)
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
@@ -46,16 +50,29 @@ class ViewerInfo:
     page_hints: int = 0             # aantal paginabeelden/-verwijzingen gezien
 
 
+def _viewer_of_pdf(u: str) -> bool:
+    low = u.lower()
+    return bool(PDF_RE.search(u)) or any(h in low for hosts in VIEWER_HOSTS.values() for h in hosts)
+
+
 def urls_in(html: str, base_url: str) -> list[str]:
-    """Alle absolute URL's uit href/src/data-*-attributen, in documentvolgorde, ontdubbeld."""
+    """Alle absolute URL's uit href/src/data-*-attributen, in documentvolgorde,
+    ontdubbeld. Daarna de viewer- en pdf-URL's die kaal in script-/JSON-blokken
+    staan (JSON-escaped `https:\\/\\/…` wordt eerst hersteld) — Action en KiK
+    zetten hun Publitas-link in de pagina-JS, niet in een href."""
+    html = (html or "").replace("\\/", "/")
     seen: list[str] = []
-    for raw in ATTR_URL_RE.findall(html or ""):
+    for raw in ATTR_URL_RE.findall(html):
         u = html_mod.unescape(raw).strip()
         if not u or u.startswith(("#", "javascript:", "mailto:", "tel:", "data:")):
             continue
         absu = urljoin(base_url, u)
         if absu not in seen:
             seen.append(absu)
+    for raw in BARE_URL_RE.findall(html):
+        u = html_mod.unescape(raw).rstrip(".,;")
+        if _viewer_of_pdf(u) and u not in seen:
+            seen.append(u)
     return seen
 
 
@@ -73,8 +90,14 @@ def detect(html: str, base_url: str) -> ViewerInfo:
         hits = [u for u in urls if any(h in _host(u) or h in u.lower() for h in hosts)]
         if hits:
             kind = platform if platform in EIGEN_ROUTE else "extern"
-            return ViewerInfo(kind, hits[0], platform=platform,
-                              evidence=[f"{platform}: {len(hits)} verwijzing(en)"])
+            # embed.js e.d. is het script van het platform, niet de folder zelf.
+            folders = [u for u in hits if not SCRIPT_URL_RE.search(urlsplit(u).path)]
+            if folders:
+                return ViewerInfo(kind, folders[0], platform=platform,
+                                  evidence=[f"{platform}: {len(hits)} verwijzing(en)"])
+            return ViewerInfo(kind, "", platform=platform,
+                              evidence=[f"{platform}: alleen het embed-script gevonden; de folder-URL "
+                                        f"wordt door de pagina-JS opgebouwd (render-route of seed uit de nieuwsbrief)"])
     page_imgs = [u for u in urls if PAGE_IMG_RE.search(u)]
     if len(page_imgs) >= 3:
         return ViewerInfo("pages", page_imgs[0], evidence=[f"{len(page_imgs)} paginabeelden op de pagina"],
