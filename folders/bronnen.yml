@@ -46,16 +46,12 @@ bronnen:
     name: Zeeman
     segment: kern
     mail_from: [zeeman.com, zeeman.nl]
-    folder_url: https://www.zeeman.com/nl-nl/folder
-    # Validatie 07-09 (run 34100477338): /nl-nl/folder antwoordt niet (404?).
-    # De contentsitemap kent /nl-nl/aanbiedingen/…; kandidaten in volgorde.
+    # Validatie 07-09 (runs 34100477338/34100906220/34101189860): /nl-nl/folder
+    # bestaat niet; /nl-nl/over-zeeman/folder is via de aanbiedingenpagina
+    # ontdekt en antwoordt. Beide zonder herkenbare viewer → render-route.
+    folder_url: https://www.zeeman.com/nl-nl/over-zeeman/folder
     folder_url_kandidaten:
       - https://www.zeeman.com/nl-nl/aanbiedingen
-      - https://www.zeeman.com/nl-nl/folder/
-      - https://www.zeeman.com/nl-nl/aanbiedingen/folder
-      - https://www.zeeman.com/nl-nl/acties
-      - https://www.zeeman.com/nl/folder
-      - https://www.zeeman.com/folder
     notes: >-
       Prijst online niets af; promotie loopt volledig via de folder ('Uit
       onze folder'-label in de monitor). Hoogste prioriteit voor bodywear.
