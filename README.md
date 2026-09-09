@@ -158,6 +158,6 @@ dashboard/                  statisch dashboard (Netlify), login via Supabase Aut
 reports/                    gegenereerde weekrapporten (gecommit door de bot)
 folders/                    foldermonitor (add-on, in preview): bronnen.yml, viewerdetectie, validatie, mailboxcontrole
 docs/foldermonitor-plan.md  plan voor de folder-add-on: archief + retailkalender (goedgekeurd 05-09)
-docs/foldermonitor-fase0.md fase 0: wat er staat, eigenaarschecklist (mailbox, secrets, preview)
+docs/foldermonitor-fase0.md fase 0: wat er staat, eigenaarschecklist — ON HOLD sinds 08-09-2026, weekscrape loopt door
 docs/validaties/            beslissende metingen per bron, met run-id's
 ```

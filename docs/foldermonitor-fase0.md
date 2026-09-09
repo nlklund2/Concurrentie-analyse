@@ -1,5 +1,7 @@
 # Foldermonitor — fase 0: logboek en eigenaarschecklist
 
+> **ON HOLD sinds 08-09-2026 (besluit eigenaar).** De e-mailverzameling staat stil: de dagelijkse sweep heeft geen cron meer, de mailboxcontrole in "Validatie folders" draait alleen op verzoek (invoer `mailbox`), er wordt niets uit de mailbox gelezen of opgeslagen. De **weekscrape loopt gewoon door** en is nooit aan de foldermonitor gekoppeld geweest. Hervatten: cron in `foldermonitor-preview.yml` terugzetten, `FOLDERS_REF` vullen, checklist A.4/C afmaken. Alles wat hieronder staat blijft gelden als naslag.
+
 *Stand: 7 september 2026 (logboek 06-09 en 07-09 hieronder). Hoort bij [foldermonitor-plan.md](foldermonitor-plan.md) (§9.5 preview naast productie, §13 roadmap).*
 
 ## Besluiten van de eigenaar (05-09)
