@@ -1,6 +1,8 @@
 # Foldermonitor — fase 0: logboek en eigenaarschecklist
 
-*Stand: 6 september 2026 (logboek 06-09 hieronder). Hoort bij [foldermonitor-plan.md](foldermonitor-plan.md) (§9.5 preview naast productie, §13 roadmap).*
+> **ON HOLD sinds 08-09-2026 (besluit eigenaar).** De e-mailverzameling staat stil: de dagelijkse sweep heeft geen cron meer, de mailboxcontrole in "Validatie folders" draait alleen op verzoek (invoer `mailbox`), er wordt niets uit de mailbox gelezen of opgeslagen. De **weekscrape loopt gewoon door** en is nooit aan de foldermonitor gekoppeld geweest. Hervatten: cron in `foldermonitor-preview.yml` terugzetten, `FOLDERS_REF` vullen, checklist A.4/C afmaken. Alles wat hieronder staat blijft gelden als naslag.
+
+*Stand: 7 september 2026 (logboek 06-09 en 07-09 hieronder). Hoort bij [foldermonitor-plan.md](foldermonitor-plan.md) (§9.5 preview naast productie, §13 roadmap).*
 
 ## Besluiten van de eigenaar (05-09)
 
@@ -22,6 +24,14 @@
 | Weekrapport / scraper | **ongewijzigd** | — |
 
 Mechanismekeuze Netlify: geen branch-scoped waarden op de bestaande `SUPABASE_*`-variabelen (risico op een productiebuild zonder waarde), maar een expliciete schakeling in `build.sh` op de deploy-context. Gevolg: **geen enkele deploy preview leest nog productie**; tot fase 1 toont een preview dus een leeg dashboard achter de login van het preview-project.
+
+## Logboek 07-09 — PR #37 gemerged, mailbox en secrets bewezen, bronnen gevalideerd
+
+- **Eigenaar:** mailbox ingericht (2-staps-verificatie, app-wachtwoord; IMAP staat in Gmail tegenwoordig altijd aan) en Environment `preview` met de drie secrets gevuld. Checklist A.1–A.3 en B zijn daarmee af.
+- **PR #37** gemerged naar `main` (b5a9c8a, 10:24 NL-tijd). Productie ongewijzigd; de weekscrape van die ochtend was door GitHub overgeslagen en is om 10:24 handmatig gestart (zelfde route en poort als op 04-09).
+- **Validatie folders**: drie runs, eindoordeel per bron in [docs/validaties/2026-09-07-folders-fase0-validatie.md](validaties/2026-09-07-folders-fase0-validatie.md). Kort: KiK 🟢 (Publitas), terStal/Zeeman/Action 🟠 (render-route), Wibra/HEMA 🔴 (403, viewer-URL uit de nieuwsbrief), vier bronnen mail-only. De render-route wordt daarmee de hoofdroute van fase 1.
+- **Mailboxcontrole** in elke run: login geslaagd, 9 Google-systeemmails, nog geen retailer. Open: inschrijven per bron (A.4) en de Auth-instellingen op het preview-project (C).
+- **Detectie verbeterd** (PR #38): JSON-URL's, embed-scripts, folder-pdf-kenmerk, kandidaat-URL's en folderlinks één stap diep; Zeeman's `folder_url` staat nu op `/nl-nl/over-zeeman/folder`.
 
 ## Logboek 06-09 — mailbox gekozen; B en C blijven eigenaarsklikken
 
@@ -75,7 +85,7 @@ Repository-variabele `FOLDERS_REF`: **nog niet zetten** — pas bij fase 1, als 
 ### D. Netlify (±2 min, pas bij fase 1)
 Site configuration → Build & deploy → Branches and deploy contexts → branch deploys: branch `foldermonitor` toevoegen zodra die bestaat. Deploy previews staan al aan.
 
-### E. Validatie draaien (zodra PR #37 op `main` staat)
+### E. Validatie draaien — **gedaan 07-09** (drie runs; opnieuw draaien na het inschrijven, dan toont de mailboxcontrole de bronnen)
 Actions → **"Validatie folders"** → Run workflow (velden leeg laten). Het rapport in de job-samenvatting geeft per bron de viewer en de capture-route, en — zodra de IMAP-secrets uit B bestaan — de mailboxcontrole (login geslaagd, aantal mails, herkende bronnen); leg het eindoordeel per bron vast in `docs/validaties/` met het run-id. Verzamel daarnaast handmatig **drie folder-PDF's** (om het even welke bron) in één map — de eerste testset voor fase 2.
 
 ## Volgende stap: fase 1 (archief)

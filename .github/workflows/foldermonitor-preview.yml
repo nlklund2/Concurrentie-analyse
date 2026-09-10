@@ -12,11 +12,15 @@
 # Folders verschijnen op wisselende dagen (Action woensdag, Wibra weekend,
 # HEMA maandag); een dagelijkse sweep vangt ze op en laat maillinks niet
 # verlopen. Het maandagrapport leest de database.
+#
+# ON HOLD (besluit eigenaar 08-09-2026): de e-mailverzameling staat stil. De
+# cron is uitgeschakeld; alleen handmatig starten kan nog, en ook dan blijft
+# de job overgeslagen zolang FOLDERS_REF leeg is. Hervatten: cron hieronder
+# terugzetten ("23 3 * * 1-6") en FOLDERS_REF vullen. De weekscrape
+# (wekelijkse-scrape.yml) staat hier volledig los van en loopt gewoon door.
 name: Foldermonitor (preview)
 
 on:
-  schedule:
-    - cron: "23 3 * * 1-6"
   workflow_dispatch:
     inputs:
       dry_run:

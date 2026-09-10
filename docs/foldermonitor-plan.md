@@ -28,7 +28,7 @@
 
 **Quick wins (deze week, zonder code):** één neutraal mailadres aanmaken en inschrijven op de nieuwsbrieven van alle acht bronnen (30 min, eigenaar) — vanaf dan komt de folderkalender vanzelf binnen, ook als de bouw nog loopt. Plus: de eigenaar bewaart vanaf nu elke folder-PDF die hij toch al doorbladert in één map; dat wordt de eerste testset.
 
-**Next step:** de drie besluiten uit §14 nemen → fase 0 (mailbox + validatieworkflow) start dezelfde week.
+**Next step:** de drie besluiten uit §14 nemen → fase 0 (mailbox + validatieworkflow) start dezelfde week. *Stand 08-09-2026: fase 0 afgerond, daarna **on hold** gezet door de eigenaar (zie `foldermonitor-fase0.md`); de weekscrape van de monitor loopt onafhankelijk door.*
 
 **Aannames:** (1) nieuwsbrieven kondigen elke folder aan (te bewijzen in fase 0; anders web-fallback §4.2); (2) folder-viewers (Publitas/iPaper/eigen) zijn vanaf GitHub Actions bereikbaar (Wibra/HEMA weren datacenter-IP's op hun eigen domein — de viewer draait meestal op een ander domein); (3) ±6 folders per week, ±24 pagina's per folder, ±20% bodywear-pagina's.
 

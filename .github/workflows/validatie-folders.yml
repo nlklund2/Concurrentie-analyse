@@ -2,9 +2,11 @@
 # de viewer herkennen (pdf / Publitas / iPaper / eigen viewer) en de
 # capture-route adviseren. Rapport in de job-samenvatting.
 #
-# Zijn de IMAP-secrets van het Environment 'preview' gezet, dan controleert
-# de run ook de mailbox (alleen-lezen: login, aantal, bronherkenning). Het
-# mailadres komt niet in de uitvoer — Actions-logs van deze repo zijn openbaar.
+# De mailboxcontrole (alleen-lezen: login, aantal, bronherkenning) draait
+# alleen als de invoer 'mailbox' op true staat én de IMAP-secrets bestaan.
+# Sinds 08-09-2026 staat de e-mailverzameling ON HOLD; standaard raakt deze
+# workflow de mailbox dus niet aan. Het mailadres komt nooit in de uitvoer —
+# Actions-logs van deze repo zijn openbaar.
 #
 # Hoort bij de foldermonitor (docs/foldermonitor-plan.md §4.4, §9.5). Dit
 # bestand staat op main omdat GitHub een workflow_dispatch alleen aanbiedt
@@ -24,6 +26,11 @@ on:
         description: "Alleen deze bronnen (id's uit folders/bronnen.yml, gescheiden door spaties; leeg = alle)"
         required: false
         default: ""
+      mailbox:
+        description: "Ook de mailbox controleren (alleen-lezen; e-mailverzameling staat on hold, standaard uit)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   valideren:
@@ -54,8 +61,8 @@ jobs:
           for b in $INPUT_BRONNEN; do EXTRA="$EXTRA --bron $b"; done
           python -m folders validate $EXTRA
 
-      - name: Mailbox controleren (alleen-lezen; overgeslagen zonder IMAP-secrets)
-        if: env.FOLDER_IMAP_USER != ''
+      - name: Mailbox controleren (alleen op verzoek; overgeslagen zonder IMAP-secrets)
+        if: ${{ inputs.mailbox && env.FOLDER_IMAP_USER != '' }}
         run: python -m folders mailbox --out mailbox-check.md
 
       - name: Rapport in job-samenvatting tonen

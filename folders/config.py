@@ -28,6 +28,7 @@ class BronCfg:
     mail_from: list[str] = field(default_factory=list)  # afzenderdomeinen
     mail_alias: str = ""                                 # plus-alias; leeg = id
     folder_url: str = ""                                 # web-fallback; leeg = mail-only
+    folder_url_kandidaten: list[str] = field(default_factory=list)  # geprobeerd als folder_url niet antwoordt
     viewer: str = "auto"                                 # auto | pdf | publitas | ipaper | pages | render
     cadence_days: int = 7
     min_delay: float = 1.0
