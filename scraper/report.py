@@ -296,26 +296,38 @@ def build(week: date) -> str:
     return "\n".join(md)
 
 
-def send_email(subject: str, markdown_body: str) -> str:
-    """Optioneel: via Resend (gratis tier). Stil overslaan zonder API-sleutel."""
+def send_email(subject: str, markdown_body: str | None = None, *, html: str | None = None,
+               text: str | None = None, to: str | None = None,
+               reply_to: str | None = None) -> str:
+    """Via Resend (gratis tier). Stil overslaan zonder API-sleutel.
+
+    De weekmail geeft `html` en `text` (beide gaan mee in één bericht); het
+    oude rapport geeft `markdown_body` en wordt als monospace-tekst verpakt.
+    `to` overschrijft REPORT_EMAIL_TO (proefmail); `reply_to` zet het
+    antwoordadres, zodat antwoorden bij de opsteller belanden.
+    """
     api_key = env("RESEND_API_KEY")
-    to = env("REPORT_EMAIL_TO")
+    to = to or env("REPORT_EMAIL_TO")
     if not api_key or not to:
         return "e-mail overgeslagen (RESEND_API_KEY/REPORT_EMAIL_TO niet gezet)"
     sender = env("REPORT_EMAIL_FROM") or "concurrentiemonitor <onboarding@resend.dev>"
-    html = ("<pre style=\"font: 13px/1.5 ui-monospace, monospace; white-space: pre-wrap;\">"
-            + markdown_body.replace("&", "&amp;").replace("<", "&lt;") + "</pre>")
-    resp = requests.post(
-        "https://api.resend.com/emails", timeout=60,
-        headers={"Authorization": f"Bearer {api_key}"},
-        json={"from": sender, "to": [t.strip() for t in to.split(",")],
-              "subject": subject, "html": html})
+    if html is None:
+        html = ("<pre style=\"font: 13px/1.5 ui-monospace, monospace; white-space: pre-wrap;\">"
+                + (markdown_body or "").replace("&", "&amp;").replace("<", "&lt;") + "</pre>")
+    payload: dict = {"from": sender, "to": [t.strip() for t in to.split(",") if t.strip()],
+                     "subject": subject, "html": html}
+    if text:
+        payload["text"] = text
+    if reply_to:
+        payload["reply_to"] = reply_to
+    resp = requests.post("https://api.resend.com/emails", timeout=60,
+                         headers={"Authorization": f"Bearer {api_key}"}, json=payload)
     if resp.status_code >= 400:
         return f"e-mail mislukt: {resp.status_code} {resp.text[:200]}"
-    return f"e-mail verstuurd naar {to}"
+    return f"e-mail verstuurd naar {len(payload['to'])} adres(sen)"
 
 
-def write_report(week: date, send: bool = True) -> Path:
+def write_report(week: date, send: bool = False) -> Path:
     body = build(week)
     REPORTS_DIR.mkdir(exist_ok=True)
     iso_year, iso_week, _ = week.isocalendar()

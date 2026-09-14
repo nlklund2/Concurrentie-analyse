@@ -1,0 +1,48 @@
+{
+ "week": "2026-09-14",
+ "onderwerp": "W38 · Instroom kerstpyjama bij 2 bronnen · KiK mediaan meisjes sokken & panty's omhoog · 7/8 bronnen ok",
+ "top3": [
+  {
+   "rid": "kik",
+   "bron": "KiK",
+   "aud": "meisjes",
+   "ptype": "sokken & panty's",
+   "soort": "mediaan",
+   "richting": 1,
+   "van": 1.99,
+   "naar": 2.74,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "KiK: mediaanprijs meisjes / sokken & panty's omhoog van €1,99 naar €2,74 (+38%)",
+   "kop": "KiK mediaan meisjes sokken & panty's omhoog"
+  },
+  {
+   "rid": "hema",
+   "bron": "HEMA",
+   "aud": "dames",
+   "ptype": "ondergoed",
+   "soort": "mediaan",
+   "richting": -1,
+   "van": 12.29,
+   "naar": 8.99,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "HEMA: mediaanprijs dames / ondergoed omlaag van €12,29 naar €8,99 (-27%)",
+   "kop": "HEMA mediaan dames ondergoed omlaag"
+  },
+  {
+   "rid": "terstal",
+   "bron": "terStal familiemode",
+   "aud": "dames",
+   "ptype": "ondergoed",
+   "soort": "instap",
+   "richting": 1,
+   "van": 5.0,
+   "naar": 6.99,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "terStal familiemode: instapniveau dames / ondergoed omhoog van €5,00 naar €6,99 (+40%)",
+   "kop": "terStal familiemode instap dames ondergoed omhoog"
+  }
+ ]
+}

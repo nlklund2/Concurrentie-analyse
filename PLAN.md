@@ -243,7 +243,8 @@ extra opvraging bij een bron.
 | 11.12 | Affiliate-productfeeds als legitieme route | L | nee (eigenaarsactie) | – |
 | 11.13 | Zeeman: flight-payload-route | S | ja | ✅ gebouwd 04-09 |
 | 11.14 | Koppelen aan eigen verkoop- en margedata | L | nee (eigenaarsactie) | – |
-| §11E | Actieteller vastleggen in de repo | S | n.v.t. | – |
+| 11.15 | Weekmail voor de inkoopmanager: maandagsamenvatting van het dashboard, per mail | M | ja | ✅ gebouwd 14-09 (docs/weekmail-voorstel.md) |
+| §11E | Actieteller vastleggen in de repo | S | n.v.t. | ✅ `reports/besluiten.md` (14-09); de weekmail toont de stand |
 
 ### A. Uit data die er al ligt (nul extra scrapes)
 
@@ -359,7 +360,9 @@ database — herzie dan de toegangslijst uit §6.10.
 
 Drie dingen gaan vóór alles hierboven:
 
-- **Actieteller vastleggen.** Er zit nu niets in de repo dat de maandagbesluiten bijhoudt,
+- **Actieteller vastleggen.** ✅ 14-09: `reports/besluiten.md`, gevoed door het antwoord (1/2/3)
+  op de weekmail; de mail toont de stand van de laatste drie weken. Oorspronkelijke
+  overweging: er zat niets in de repo dat de maandagbesluiten bijhield,
   terwijl §6.9 daarop afrekent ("na 8 weken ≥6 acties, waarvan ≥2 met aantoonbaar
   resultaat"). Eén `reports/besluiten.md` of een GitHub-issue per week is genoeg — zonder
   teller is de succesvraag over acht weken niet te beantwoorden.
