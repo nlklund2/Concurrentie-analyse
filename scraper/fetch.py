@@ -220,26 +220,31 @@ class Fetcher:
         if self.credits >= self.cfg.firecrawl_page_cap:
             raise BlockedError(f"Firecrawl-cap van {self.cfg.firecrawl_page_cap} pagina's "
                                "bereikt (firecrawl_page_cap in retailers.yml)", url=url)
-        from .strategies.firecrawl_api import _firecrawl_html
+        from .strategies.firecrawl_api import _firecrawl_fetch
         if self._fc_session is None:
             import requests
             self._fc_session = requests.Session()
             self._fc_session.headers.update({
                 "Authorization": f"Bearer {os.environ['FIRECRAWL_API_KEY']}",
                 "Content-Type": "application/json"})
+        # Eén opvraging = één credit op het basistarief; een residentiële
+        # proxy kan op sommige plannen meer kosten — het Firecrawl-dashboard
+        # is de waarheid, deze teller het signaal in het weekrapport.
         self.credits += 1
         self.res.credits_used = self.credits
         self._wacht(self.cfg.min_delay)
-        html = _firecrawl_html(self._fc_session, url, self.res, raw=True)
+        proxy = self.cfg.firecrawl_proxy
+        html, status = _firecrawl_fetch(self._fc_session, url, self.res, raw=True, proxy=proxy)
+        label = f"firecrawl/{proxy}" if proxy else "firecrawl"
+        if status in (403, 429) or (html is not None and blokkade.is_challenge(html)):
+            sig = blokkade.signatuur(status or 200, {}, html or "")
+            raise BlockedError(f"HTTP {status or 200} op {url} ({label}) — {blokkade.kort(sig)}",
+                               status=status or 200, body=html or "", url=url)
         if html is None:
             if self.res.error:               # 401/402: de dienst zelf zegt nee
                 fout, self.res.error = self.res.error, ""
                 raise BlockedError(fout, url=url)
             return None
-        if blokkade.is_challenge(html):
-            raise BlockedError(f"challenge-pagina via Firecrawl op {url} — "
-                               f"{blokkade.kort(blokkade.signatuur(200, {}, html))}",
-                               status=200, body=html, url=url)
         return html
 
     # -- hulpjes ---------------------------------------------------------
@@ -336,18 +341,21 @@ def toegangsmatrix(url: str) -> list[str]:
       requests ✗, requests+browserheaders ✓  → filter op headers;
       beide ✗, chrome ✓                       → TLS-/HTTP2-fingerprint;
       chrome ✗, browser ✓                     → JavaScript-challenge;
-      alles ✗, firecrawl ✓                    → het datacenter-IP zelf."""
+      alles ✗, firecrawl basic ✓              → het IP van GitHub Actions;
+      ook basic ✗, firecrawl enhanced ✓       → élk datacenter-IP (alleen
+                                                 residentieel komt binnen)."""
     regels: list[str] = []
-    cfg = RetailerCfg(id="diagnose", name="diagnose", base=url, respect_robots=False,
-                      min_delay=0.5)
-    varianten: list[tuple[str, str]] = [
-        ("requests (kaal, zoals de scraper tot 14-09)", "http"),
-        ("requests + volledige Chrome-headerset", "http+headers"),
-        ("curl_cffi chrome-impersonatie (TLS/HTTP2-handschrift)", "chrome"),
-        ("Chromium via Playwright (echte browser)", "browser"),
-        ("Firecrawl rawHtml (residentieel IP, 1 credit)", "firecrawl"),
+    varianten: list[tuple[str, str, str]] = [
+        ("requests (kaal, zoals de scraper tot 14-09)", "http", ""),
+        ("requests + volledige Chrome-headerset", "http+headers", ""),
+        ("curl_cffi chrome-impersonatie (TLS/HTTP2-handschrift)", "chrome", ""),
+        ("Chromium via Playwright (echte browser)", "browser", ""),
+        ("Firecrawl basic (datacenter-proxy, 1 credit)", "firecrawl", "basic"),
+        ("Firecrawl enhanced (residentieel IP)", "firecrawl", "enhanced"),
     ]
-    for label, trede in varianten:
+    for label, trede, proxy in varianten:
+        cfg = RetailerCfg(id="diagnose", name="diagnose", base=url, respect_robots=False,
+                          min_delay=0.5, firecrawl_proxy=proxy)
         res = ScrapeResult(retailer_id="diagnose")
         http = Http(min_delay=0.5, respect_robots=False, browser_headers=(trede == "http+headers"))
         f = Fetcher(cfg, http, res)

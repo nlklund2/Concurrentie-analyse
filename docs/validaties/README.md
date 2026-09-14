@@ -38,3 +38,4 @@ Run-id's hieronder zijn te openen als
 | 18-08-2026 | `2026-08-18-zeeman-eindoordeel.md` | Zeeman rood: uitgeklede serving op elke laag — **herroepen 04-09** |
 | 19-08-2026 | `2026-08-19-zeeman-paginering.md` | `?page=`-route (externe suggestie) gemeten en verworpen — **herroepen 04-09**; de groencriteria blijven gelden |
 | 04-09-2026 | `2026-09-04-zeeman-flight-payload.md` | Zeeman groen: producten zaten al die tijd in de Next.js-flight-payload; de extractie las het formaat niet |
+| 14-09-2026 | `2026-09-14-zeeman-toegangsladder.md` | Zeeman dicht sinds W38 (HTTP 403 op elke request): poortwachter gemeten per client, toegangsladder als structureel antwoord |

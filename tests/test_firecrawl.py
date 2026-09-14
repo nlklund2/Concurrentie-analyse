@@ -468,3 +468,36 @@ def test_wp_store_dichte_api_geeft_schone_fout(monkeypatch):
     res = firecrawl_api.scrape(_cfg(firecrawl_mode="wp_store"), http=None)
     assert res.products == []
     assert "Store-API" in res.error
+
+
+def test_fetch_geeft_status_van_de_bron_en_probeert_proxy_alias(monkeypatch):
+    """Zeeman 14-09: Firecrawl gaf HTTP 200 met de 403-pagina van CloudFront
+    erin; metadata.statusCode is de echte status. En de residentiële proxy
+    heet per API-versie 'enhanced' of 'stealth' — bij een 400 de andere naam."""
+    import scraper.strategies.firecrawl_api as fc_api
+    from scraper.models import ScrapeResult
+    monkeypatch.setattr(fc_api, "PAUZE_TUSSEN_CALLS", 0)
+    gezien = []
+
+    class _R:
+        def __init__(self, status, body=None):
+            self.status_code, self._body = status, body
+        def json(self): return self._body
+
+    class _Session:
+        def post(self, url, json=None, timeout=0):
+            gezien.append(json.get("proxy"))
+            if json.get("proxy") == "enhanced":
+                return _R(400, {"error": "unknown proxy"})
+            return _R(200, {"success": True, "data": {"rawHtml": "<html>403 ERROR</html>",
+                                                       "metadata": {"statusCode": 403}}})
+
+    res = ScrapeResult(retailer_id="x")
+    html, status = fc_api._firecrawl_fetch(_Session(), "https://www.zeeman.com/nl-nl/x", res,
+                                           raw=True, proxy="enhanced")
+    assert (html, status) == ("<html>403 ERROR</html>", 403)
+    assert gezien == ["enhanced", "stealth"]
+    assert any("niet geaccepteerd → stealth" in n for n in res.notes)
+    # de oude wrapper blijft alleen HTML geven
+    assert fc_api._firecrawl_html(_Session(), "https://www.zeeman.com/nl-nl/x", res, raw=True) \
+        == "<html>403 ERROR</html>"

@@ -99,6 +99,7 @@ retailers:
     # meer werkt.
     fetch_ladder: [http, chrome, browser, firecrawl]
     firecrawl_page_cap: 60
+    firecrawl_proxy: enhanced       # 14-09: alleen een residentieel IP komt nog binnen
     notes: >-
       Maatstaf waardetextiel; sterk in basics-ondergoed en sokken. Vaste
       prijspunten (€ 3,99 / 5,99 / 4,99 dragen een derde van het assortiment)

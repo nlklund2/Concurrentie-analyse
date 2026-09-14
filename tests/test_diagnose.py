@@ -87,6 +87,9 @@ def test_diagnose_bij_403_toont_handtekening_en_toegangsmatrix(monkeypatch):
 def test_diagnose_conclusie_per_eerste_werkende_trede():
     ok = "- Chromium via Playwright (echte browser): **HTTP 200**, 700,000 tekens"
     assert "JavaScript-challenge" in dg._blokkade_conclusie(["- x: **geweigerd**", ok])
-    assert "residentieel IP" in dg._blokkade_conclusie(
-        ["- Firecrawl rawHtml (residentieel IP, 1 credit): **HTTP 200**, 1 tekens"])
+    assert "residentieel IP komt binnen" in dg._blokkade_conclusie(
+        ["- Firecrawl basic (datacenter-proxy, 1 credit): **geweigerd** — x",
+         "- Firecrawl enhanced (residentieel IP): **HTTP 200**, 1 tekens"])
+    assert "IP van GitHub Actions" in dg._blokkade_conclusie(
+        ["- Firecrawl basic (datacenter-proxy, 1 credit): **HTTP 200**, 1 tekens"])
     assert "geen enkele trede" in dg._blokkade_conclusie(["- a: **geweigerd** — x"])

@@ -164,16 +164,19 @@ def test_firecrawl_trede_telt_credits_en_stopt_op_de_cap(monkeypatch):
     import scraper.strategies.firecrawl_api as fc_api
     gehaald = []
 
-    def nep(session, url, res, raw=False, **kw):
-        gehaald.append(url)
+    def nep(session, url, res, raw=False, proxy="", **kw):
+        gehaald.append((url, proxy))
         assert raw is True
-        return {ROBOTS: "", BASE: _pagina_1()}.get(url)
-    monkeypatch.setattr(fc_api, "_firecrawl_html", nep)
+        html = {ROBOTS: "", BASE: _pagina_1()}.get(url)
+        return html, (200 if html is not None else 0)
+    monkeypatch.setattr(fc_api, "_firecrawl_fetch", nep)
 
     http = _Http({}, blokkade={BASE: 403})
-    res = lc.scrape(_cfg(fetch_ladder=["http", "firecrawl"], firecrawl_page_cap=5), http)
+    res = lc.scrape(_cfg(fetch_ladder=["http", "firecrawl"], firecrawl_page_cap=5,
+                         firecrawl_proxy="enhanced"), http)
     assert res.strategy == "listing+firecrawl" and len(res.products) == 3
     assert res.credits_used == len(gehaald) == 2      # robots.txt + de pagina
+    assert all(proxy == "enhanced" for _, proxy in gehaald)
 
     res2 = ScrapeResult(retailer_id="zeeman")
     f = fetch.Fetcher(_cfg(fetch_ladder=["firecrawl"], firecrawl_page_cap=1, respect_robots=False),
@@ -199,3 +202,18 @@ def test_strategies_run_bewaart_ladder_notities_bij_volledige_weigering(monkeypa
     assert res.error.startswith("alle treden van de toegangsladder geweigerd")
     assert any(n.startswith("toegang: trede 'http' geweigerd") for n in res.notes)
     assert res.strategy == "listing"
+
+
+def test_firecrawl_trede_ziet_een_403_van_de_bron_als_weigering(monkeypatch):
+    """Zeeman 14-09: CloudFront's 403-pagina kwam via Firecrawl als 'geslaagde'
+    scrape binnen (HTTP 200 van Firecrawl zelf). De status van de bron
+    (metadata.statusCode) beslist, niet die van de dienst."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    import scraper.strategies.firecrawl_api as fc_api
+    monkeypatch.setattr(fc_api, "_firecrawl_fetch", lambda *a, **kw: (
+        "<html><title>ERROR: The request could not be satisfied</title>", 403))
+    res = ScrapeResult(retailer_id="zeeman")
+    f = fetch.Fetcher(_cfg(fetch_ladder=["firecrawl"], respect_robots=False,
+                           firecrawl_proxy="enhanced"), _Http({}), res)
+    with pytest.raises(BlockedError, match=r"HTTP 403 .* \(firecrawl/enhanced\)"):
+        f.html(BASE)

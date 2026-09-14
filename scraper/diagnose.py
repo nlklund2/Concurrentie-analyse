@@ -422,9 +422,13 @@ def _blokkade_conclusie(regels: list[str]) -> str:
     if "Playwright" in eerste:
         return ("er staat een JavaScript-challenge; alleen de echte browser lost hem op. "
                 "Trede 'browser' volstaat (±2 s per pagina).")
+    if "Firecrawl enhanced" in eerste:
+        return ("élk datacenter-IP wordt geweerd (ook Firecrawl's standaardproxy); alleen een "
+                "residentieel IP komt binnen. Route: trede 'firecrawl' met "
+                "`firecrawl_proxy: enhanced` (betaald), of een meting vanaf een thuisaansluiting.")
     if "Firecrawl" in eerste:
-        return ("het datacenter-IP zelf wordt geweerd; alleen een residentieel IP komt binnen. "
-                "Trede 'firecrawl' (betaald, 1 credit per pagina) is de enige route.")
+        return ("het IP van GitHub Actions wordt geweerd; Firecrawl's standaardproxy komt wel "
+                "binnen. Trede 'firecrawl' (betaald, 1 credit per pagina) is de route.")
     return "zie de matrix hierboven." if "geweigerd" in tekst else "zie de matrix hierboven."
 
 

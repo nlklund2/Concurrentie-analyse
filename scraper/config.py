@@ -47,6 +47,11 @@ class RetailerCfg:
     # opvragingen zonder leesbaar artikel stopt de run; levert de kanarie wél
     # iets op, dan loopt hij door tot de gewone cap. 0 = uit (volle run).
     firecrawl_canary: int = 0
+    # Proxyklasse voor Firecrawl: '' (standaard), 'basic', 'enhanced'
+    # (residentieel IP — de enige route langs een WAF die datacenter-IP's
+    # weert, zoals Zeeman's CloudFront sinds 14-09) of 'auto' (basic, en bij
+    # een weigering alsnog enhanced). Let op het tarief van je plan.
+    firecrawl_proxy: str = ""
     focus_categories: str = ""     # regex: beperk de crawl tot deze categorieën
     focus_product_types: list[str] = field(default_factory=list)  # filter na mapping
     # Toegangsladder voor de lijstroute (scraper/fetch.py): treden in volgorde
