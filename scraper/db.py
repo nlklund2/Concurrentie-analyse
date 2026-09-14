@@ -203,3 +203,43 @@ class Db:
                 "select": "product_key,title,url,audience,product_type"})
             out.update({r["product_key"]: r for r in rows})
         return out
+
+    # -- lezen (weekmail: trend over meerdere weken) -------------------
+    def weekly_stats_range(self, start: date) -> list[dict]:
+        """Alle groepsaggregaten vanaf `start` — dezelfde rijen als het dashboard leest."""
+        return self.get_all("weekly_stats", {"week": f"gte.{start.isoformat()}",
+                                             "select": "*", "order": "week.asc"})
+
+    def week_totals_range(self, start: date) -> dict[date, dict[str, dict]]:
+        rows = self.get_all("v_retailer_week_totals",
+                            {"week": f"gte.{start.isoformat()}", "select": "*"})
+        out: dict[date, dict[str, dict]] = {}
+        for r in rows:
+            out.setdefault(date.fromisoformat(r["week"]), {})[r["retailer_id"]] = r
+        return out
+
+    def new_titles(self, week: date) -> list[dict]:
+        """Titels van artikelen die deze week voor het eerst gezien zijn (trendwoorden)."""
+        return self.get_all("products", {"first_seen": f"eq.{week.isoformat()}",
+                                         "select": "retailer_id,title"})
+
+    def count_events(self, week: date, kind: str) -> int:
+        resp = self._req(
+            "GET", "price_events", timeout=60,
+            params={"week": f"eq.{week.isoformat()}", "event": f"eq.{kind}",
+                    "select": "id", "limit": "1"},
+            headers={"Prefer": "count=exact", "Range": "0-0", "Range-Unit": "items"})
+        total = resp.headers.get("Content-Range", "/0").rsplit("/", 1)[-1]
+        return int(total) if total.isdigit() else 0
+
+    # -- weekmail bewaren (dashboardpaneel + terugblik) ------------------
+    def save_weekmail(self, row: dict) -> None:
+        self._req("POST", "weekmails", json=row, timeout=60,
+                  params={"on_conflict": "week"},
+                  headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+
+    def load_weekmail(self, week: date) -> dict | None:
+        rows = self._req("GET", "weekmails", timeout=30,
+                         params={"week": f"eq.{week.isoformat()}",
+                                 "select": "week,subject,top3,status"}).json()
+        return rows[0] if rows else None

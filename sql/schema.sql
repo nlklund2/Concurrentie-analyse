@@ -399,3 +399,24 @@ drop policy if exists lezen_ingelogd on weekly_articles;
 create policy lezen_ingelogd on weekly_articles for select to authenticated using (true);
 drop policy if exists lezen_ingelogd on scrape_runs;
 create policy lezen_ingelogd on scrape_runs  for select to authenticated using (true);
+
+-- ---------- Weekmail ----------
+-- Eén rij per week: de maandagsamenvatting van het dashboard zoals hij is
+-- verstuurd (docs/weekmail-voorstel.md). Het dashboard toont de laatste in het
+-- paneel "Weekmail"; de weekmail van de week erna leest de top-3 terug voor
+-- de terugblik. Bestaande installaties: sql/migratie_weekmail.sql.
+
+create table if not exists weekmails (
+  week       date primary key,
+  subject    text not null,
+  html       text not null,
+  text       text not null,
+  top3       jsonb,
+  sent_to    int  not null default 0,
+  status     text,
+  created_at timestamptz not null default now()
+);
+
+alter table weekmails enable row level security;
+drop policy if exists lezen_ingelogd on weekmails;
+create policy lezen_ingelogd on weekmails for select to authenticated using (true);
