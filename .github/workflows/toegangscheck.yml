@@ -45,13 +45,14 @@ jobs:
           pip install playwright
           playwright install --with-deps chromium
 
-      # Kleine steekproef: 2-3 pagina's per bron via de ladder. Klimt hij naar
-      # Firecrawl, dan kost dat hooguit die paar credits.
+      # Kleine steekproef: één lijstpagina per bron via de ladder (limiet 30 =
+      # één Zeeman-pagina). Klimt hij naar Firecrawl, dan kost dat robots.txt
+      # plus die ene pagina — met de residentiële proxy het tarief van je plan.
       - name: Proefscrape via de toegangsladder
         run: |
           EXTRA=""
           for r in $INPUT_RETAILERS; do EXTRA="$EXTRA --retailer $r"; done
-          python -m scraper probe $EXTRA --limit 60 --out toegangscheck.md
+          python -m scraper probe $EXTRA --limit 30 --out toegangscheck.md
 
       - name: Rapport in job-samenvatting tonen
         if: always()
