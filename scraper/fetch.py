@@ -366,6 +366,12 @@ def toegangsmatrix(url: str) -> list[str]:
             if html is None:
                 regels.append(f"- {label}: geen antwoord (404/netwerk) na {duur:.1f} s")
                 continue
+            if url.lower().endswith((".txt", ".xml")):
+                # robots.txt/sitemap: de inhoud zelf is de meting (welke paden
+                # en parameters zijn toegestaan?), niet een productteller
+                regels.append(f"- {label}: **HTTP 200**, {len(html):,} tekens ({duur:.1f} s): `"
+                              + " | ".join(html[:700].splitlines()) + "`")
+                continue
             stroom = flight_payload(html)
             if stroom:
                 from .jsonscan import flight_meta, products_from_flight
