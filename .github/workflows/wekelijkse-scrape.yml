@@ -1,19 +1,22 @@
-# Wekelijkse concurrentiescrape — maandagochtend vroeg, zodat het rapport er
-# vóór het maandagochtend-overleg (09:00) ligt. Cron loopt in UTC en volgt
-# géén zomertijd: 04:07 UTC = 06:07 NL-zomertijd / 05:07 NL-wintertijd.
-# Wil je 06:07 het hele jaar rond, zet de expressie eind oktober op "7 5 * * 1"
-# en eind maart weer terug.
+# Wekelijkse concurrentiescrape — maandagnacht, zodat de weekmail er ruim
+# vóór 07:00 ligt en het rapport vóór het maandagochtend-overleg (09:00).
+# Cron loopt in UTC en volgt géén zomertijd: 01:07 UTC = 03:07 NL-zomertijd /
+# 02:07 NL-wintertijd. Wil je 03:07 het hele jaar rond, zet de expressie eind
+# oktober op "7 2 * * 1" en eind maart weer terug.
 #
 # Waarom :07 en niet :00 — GitHub voert geplande runs 'best effort' uit en slaat
 # ze bij drukte over zónder melding. Het hele uur is veruit het drukste moment
 # (iedereen zet zijn cron op :00); GitHub raadt daarom zelf aan een paar minuten
 # ernaast te gaan zitten. Op 10-08-2026 werd de run van 04:00 UTC inderdaad
 # helemaal niet gestart en moest hij handmatig worden aangezwengeld.
+#
+# Sinds 14-09-2026 start de run om 03:07 in plaats van 06:07 (besluit eigenaar):
+# de meting duurt tot ruim twee uur, en de weekmail moet om 07:00 binnen zijn.
 name: Wekelijkse scrape
 
 on:
   schedule:
-    - cron: "7 4 * * 1"
+    - cron: "7 1 * * 1"
   workflow_dispatch:
     inputs:
       retailers:
@@ -21,7 +24,16 @@ on:
         required: false
         default: ""
       alleen_rapport:
-        description: "Niets meten, alleen het weekrapport opnieuw uit de database genereren (na een schoning)"
+        description: "Niets meten, alleen weekrapport en weekmail opnieuw uit de database genereren (na een schoning)"
+        type: boolean
+        required: false
+        default: false
+      mail_to:
+        description: "Proefmail: weekmail naar dit adres i.p.v. de vaste ontvangers (leeg = vaste ontvangers)"
+        required: false
+        default: ""
+      geen_mail:
+        description: "Weekmail wel bouwen (reports/ + dashboard), niet versturen"
         type: boolean
         required: false
         default: false
@@ -44,6 +56,8 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
       REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
+      REPORT_EMAIL_REPLY_TO: ${{ secrets.REPORT_EMAIL_REPLY_TO }}
+      DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
       INPUT_RETAILERS: ${{ inputs.retailers }}
     steps:
       - uses: actions/checkout@v4
@@ -57,9 +71,8 @@ jobs:
         run: pip install -r requirements.txt
 
       # alleen_rapport: na een schoning van de database (zie docs/validaties/)
-      # het rapport opnieuw genereren zonder een meting te draaien — een
-      # meting die enkel mislukt (Zeeman) laat de job falen en slaat het
-      # rapport óók over. Bij de cron-run is de invoer leeg en meet hij gewoon.
+      # rapport en weekmail opnieuw genereren zonder een meting te draaien.
+      # Bij de cron-run is de invoer leeg en meet hij gewoon.
       - name: Headless browser voor render-bronnen
         if: ${{ !inputs.alleen_rapport }}
         run: |
@@ -67,19 +80,36 @@ jobs:
           playwright install --with-deps chromium
 
       - name: Scrapen en verwerken
+        id: scrape
         if: ${{ !inputs.alleen_rapport }}
         run: |
           EXTRA=""
           for r in $INPUT_RETAILERS; do EXTRA="$EXTRA --retailer $r"; done
           python -m scraper scrape $EXTRA
 
+      # Rapport en weekmail draaien óók als de meting faalt: stilte op maandag
+      # is het grootste risico (PLAN.md §9). De weekmail meldt de storing dan
+      # in de kop en toont de laatst verwerkte stand per bron.
       - name: Weekrapport genereren
+        if: ${{ !cancelled() }}
         run: python -m scraper report
 
+      - name: Weekmail bouwen en versturen
+        if: ${{ !cancelled() }}
+        env:
+          SCRAPE_OUTCOME: ${{ steps.scrape.outcome }}
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.geen_mail }}" = "true" ]; then EXTRA="--dry-run"; fi
+          if [ -n "${{ inputs.mail_to }}" ]; then EXTRA="$EXTRA --to ${{ inputs.mail_to }}"; fi
+          python -m scraper weekmail $EXTRA
+
       - name: Rapport in job-samenvatting tonen
+        if: ${{ !cancelled() }}
         run: cat reports/latest.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Rapport committen
+      - name: Rapport en weekmail committen
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "concurrentiemonitor[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

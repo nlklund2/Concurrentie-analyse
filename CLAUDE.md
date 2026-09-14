@@ -3,8 +3,9 @@
 - Communiceer in het Nederlands.
 - **Tijden altijd in Nederlandse tijd (CET/CEST) weergeven**, nooit kaal UTC.
   Interne zaken (cron-expressies, GitHub-logs) blijven UTC; reken ze om in
-  elke boodschap aan de gebruiker. De weekcron `7 4 * * 1` = maandag
-  06:07 NL-zomertijd / 05:07 NL-wintertijd (GitHub-cron volgt geen zomertijd).
+  elke boodschap aan de gebruiker. De weekcron `7 1 * * 1` = maandag
+  03:07 NL-zomertijd / 02:07 NL-wintertijd (GitHub-cron volgt geen zomertijd);
+  de weekmail moet om 07:00 binnen zijn (besluit eigenaar 14-09-2026).
 - GitHub voert geplande runs *best effort* uit: bij drukte worden ze vertraagd
   of overgeslagen zónder melding. Zet cron-expressies daarom nooit op het hele
   uur, en beloof een geplande run nooit als zekerheid — controleer achteraf of

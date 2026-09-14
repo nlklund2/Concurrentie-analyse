@@ -196,6 +196,14 @@
   </div>
 </div>
 <main>
+  <div class="card" id="weekmailCard">
+    <h2>Weekmail</h2>
+    <p class="sub">De maandagsamenvatting van dit dashboard, zoals hij per e-mail is verstuurd
+      (docs/weekmail-voorstel.md). Elk blok in de mail linkt terug naar de sectie hier; de mail
+      van een andere week zie je door die week bovenaan te kiezen.</p>
+    <div id="weekmail"></div>
+  </div>
+
   <div class="card">
     <h2>Actueel assortiment</h2>
     <p class="sub" id="tilesSub">Actieve artikelen online in de gekozen week, met verschil t.o.v. de week ervoor en het aandeel afgeprijsd.</p>
@@ -322,7 +330,16 @@ function isoWeekLabel(d) {
 
 let sb = null, charts = {};
 const state = { weeks:[], week:null, range:26, retailers:{}, selected:[],
-                stats:[], totals:[], aud:"", type:"" };
+                stats:[], totals:[], aud:"", type:"", deep:{} };
+/* Deep links uit de weekmail: ?week=JJJJ-MM-DD&sectie=prijsindex&bron=kik&perstuk=1
+   (&aud=…&type=…). De sectie wordt na het laden in beeld gescrold. */
+const SECTIES = { weekmail:"weekmail", signalen:"signalen", prijsindex:"prijsindex",
+                  omvang:"omvangChart", mediaan:"mediaanChart", punten:"puntenChart",
+                  movers:"movers", instroom:"instroom", explorer:"explorer", health:"health" };
+(function leesDeepLink() {
+  const q = new URLSearchParams(location.search);
+  ["week", "sectie", "bron", "perstuk", "aud", "type"].forEach(k => { if (q.get(k)) state.deep[k] = q.get(k); });
+})();
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!window.MONITOR_CONFIG || !window.MONITOR_CONFIG.url) {
@@ -359,7 +376,7 @@ async function login() {
   // dat ook in de code, dan kan het dashboard nooit stilletjes accounts openen
   // als de schakelaar in Supabase ooit weer omgaat.
   const { error } = await sb.auth.signInWithOtp({ email,
-    options: { emailRedirectTo: location.origin + location.pathname,
+    options: { emailRedirectTo: location.origin + location.pathname + location.search,
                shouldCreateUser: false } });
   if (!error) {
     msg.textContent = "Verstuurd — check je inbox (alleen uitgenodigde accounts kunnen inloggen).";
@@ -405,6 +422,11 @@ async function showApp() {
     return;
   }
   buildFilters(); render();
+  const doel = SECTIES[state.deep.sectie];
+  if (doel) {
+    const el = document.getElementById(doel);
+    setTimeout(() => el && (el.closest(".card") || el).scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+  }
 }
 
 async function loadData() {
@@ -425,7 +447,7 @@ async function loadData() {
        “Wekelijkse scrape” op GitHub; kom daarna hier terug.</div></div>`;
     return;
   }
-  state.week = state.weeks[0];
+  state.week = state.weeks.includes(state.deep.week) ? state.deep.week : state.weeks[0];
   const start = state.weeks[Math.min(state.weeks.length, 52) - 1];
   [state.stats, state.totals] = await Promise.all([
     fetchAll(() => sb.from("weekly_stats").select("*").gte("week", start)),
@@ -437,7 +459,12 @@ function buildFilters() {
   const weekSel = document.getElementById("weekSel");
   weekSel.innerHTML = state.weeks.map(w =>
     `<option value="${w}">${isoWeekLabel(w)} · ${w}</option>`).join("");
+  weekSel.value = state.week;
   weekSel.onchange = () => { state.week = weekSel.value; render(); };
+  if (state.deep.perstuk) {
+    document.getElementById("perStuk").checked = true;
+    document.getElementById("idxPerStuk").checked = true;
+  }
   document.getElementById("rangeSel").onchange = e => { state.range = +e.target.value; render(); };
   document.getElementById("perStuk").onchange = render;
   document.getElementById("idxPerStuk").onchange = render;
@@ -447,6 +474,8 @@ function buildFilters() {
   const audSel = document.getElementById("audSel"), typeSel = document.getElementById("typeSel");
   audSel.innerHTML += auds.map(a => `<option>${a}</option>`).join("");
   typeSel.innerHTML += types.map(t => `<option>${t}</option>`).join("");
+  if (auds.includes(state.deep.aud)) { state.aud = state.deep.aud; audSel.value = state.aud; }
+  if (types.includes(state.deep.type)) { state.type = state.deep.type; typeSel.value = state.type; }
   audSel.onchange = () => { state.aud = audSel.value; render(); };
   typeSel.onchange = () => { state.type = typeSel.value; render(); };
 
@@ -454,6 +483,10 @@ function buildFilters() {
   const ids = Object.keys(state.retailers).filter(r => withData.has(r))
     .sort((a, b) => (SLOTS[a] || 99) - (SLOTS[b] || 99));
   state.selected = ids.filter(r => SLOTS[r]).slice(0, 8);
+  // ?bron=kik uit de weekmail: alleen die bron (en terStal als referentie) aan.
+  if (state.deep.bron && ids.includes(state.deep.bron) && SLOTS[state.deep.bron]) {
+    state.selected = [...new Set([state.deep.bron, "terstal"])].filter(r => ids.includes(r));
+  }
   const box = document.getElementById("retailerChips");
   box.innerHTML = ids.map(rid => `
     <span class="chip ${state.selected.includes(rid) ? "on" : ""}" data-rid="${rid}">
@@ -537,6 +570,7 @@ function tableFrom(labels, datasets, fmt) {
 }
 
 function render() {
+  renderWeekmail();
   renderTiles(); renderSignalen(); renderIndex(); renderOmvang(); renderMediaan();
   renderPunten(); renderMovers(); renderInstroom(); renderExplorer(); renderHealth();
 }
@@ -1037,6 +1071,38 @@ async function renderHealth() {
       <td class="num">${r.products_found ?? "–"}</td>
       <td class="status-${r.status}">${r.status}</td>
       <td>${(r.note || "").slice(0, 140)}</td></tr>`).join("") + `</table>`;
+}
+
+// Weekmail van de gekozen week (tabel weekmails, gevuld door de weekrun).
+// De mail wordt in een iframe getoond zodat zijn eigen stijlen het dashboard
+// niet raken; links in de mail openen in een nieuw tabblad.
+async function renderWeekmail() {
+  const box = document.getElementById("weekmail");
+  const { data, error } = await sb.from("weekmails")
+    .select("week,subject,html,sent_to,status,created_at").eq("week", state.week).maybeSingle();
+  if (error) {
+    box.innerHTML = /does not exist|relation|schema cache/i.test(error.message)
+      ? `<div class="hint">Nog geen weekmail: draai eenmalig <code>sql/migratie_weekmail.sql</code> in Supabase.</div>`
+      : `<div class="hint">${esc(error.message)}</div>`;
+    return;
+  }
+  if (!data) { box.innerHTML = `<div class="hint">Geen weekmail voor ${isoWeekLabel(state.week)}.</div>`; return; }
+  const wanneer = new Date(data.created_at).toLocaleString("nl-NL", { timeZone: "Europe/Amsterdam",
+    weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const status = data.sent_to ? `verstuurd naar ${data.sent_to} adres${data.sent_to === 1 ? "" : "sen"}` : "niet verstuurd";
+  const open = state.deep.sectie === "weekmail";
+  box.innerHTML = `
+    <div class="feiten"><b>${esc(data.subject)}</b><span>${wanneer} · ${esc(status)}</span></div>
+    <div class="tools" style="margin:8px 0"><button id="weekmailToggle">${open ? "Verberg mail" : "Toon mail"}</button></div>
+    <iframe id="weekmailFrame" title="Weekmail ${isoWeekLabel(state.week)}" ${open ? "" : "hidden"}
+      style="width:100%;min-height:600px;border:1px solid color-mix(in srgb, var(--surface) 80%, var(--ink) 20%);border-radius:6px;background:#e9ebee"></iframe>`;
+  const frame = document.getElementById("weekmailFrame");
+  frame.srcdoc = data.html.replace("<head>", '<head><base target="_blank">');
+  frame.onload = () => { try { frame.style.height = (frame.contentDocument.body.scrollHeight + 24) + "px"; } catch (_) {} };
+  document.getElementById("weekmailToggle").onclick = () => {
+    frame.hidden = !frame.hidden;
+    document.getElementById("weekmailToggle").textContent = frame.hidden ? "Toon mail" : "Verberg mail";
+  };
 }
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {

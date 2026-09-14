@@ -2,7 +2,8 @@
 
   python -m scraper scrape [--retailer id ...] [--dry-run] [--limit N]
   python -m scraper probe  [--retailer id ...] [--limit N] [--out bestand.md]
-  python -m scraper report [--week JJJJ-MM-DD] [--no-email]
+  python -m scraper report [--week JJJJ-MM-DD] [--email]
+  python -m scraper weekmail [--week JJJJ-MM-DD] [--dry-run] [--to adres]
   python -m scraper diagnose --url <url> [--url <url> ...] [--no-render]
 """
 from __future__ import annotations
@@ -175,7 +176,14 @@ def cmd_diagnose(args) -> int:
 def cmd_report(args) -> int:
     from .report import write_report
     week = date.fromisoformat(args.week) if args.week else week_monday()
-    write_report(week, send=not args.no_email)
+    write_report(week, send=args.email)
+    return 0
+
+
+def cmd_weekmail(args) -> int:
+    from .weekmail import write_weekmail
+    week = date.fromisoformat(args.week) if args.week else week_monday()
+    write_weekmail(week, send=not args.dry_run, to=args.to or None)
     return 0
 
 
@@ -203,8 +211,15 @@ def main() -> int:
 
     r = sub.add_parser("report", help="weekrapport genereren uit de database")
     r.add_argument("--week", help="maandag van de week (JJJJ-MM-DD), standaard deze week")
-    r.add_argument("--no-email", action="store_true")
+    r.add_argument("--email", action="store_true",
+                   help="het volledige rapport óók als platte tekst mailen (normaal doet de weekmail dat)")
     r.set_defaults(fn=cmd_report)
+
+    w = sub.add_parser("weekmail", help="weekmail (maandagsamenvatting van het dashboard) bouwen en versturen")
+    w.add_argument("--week", help="maandag van de week (JJJJ-MM-DD), standaard deze week")
+    w.add_argument("--dry-run", action="store_true", help="alleen schrijven naar reports/, niet versturen")
+    w.add_argument("--to", help="proefmail: naar dit adres i.p.v. REPORT_EMAIL_TO")
+    w.set_defaults(fn=cmd_weekmail)
 
     args = ap.parse_args()
     return args.fn(args)

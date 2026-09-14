@@ -5,8 +5,11 @@ terStal familiemode, met **focus op ondergoedmode** (ondergoed, nachtmode, sokke
 panty's) bij terStal, Wibra, Zeeman, Primark, Action, HEMA en C&A. Elke
 maandagochtend liggen er automatisch klaar:
 
-1. een **weekrapport** (markdown, in [`reports/`](reports/), in de job-samenvatting op
-   GitHub en optioneel per e-mail) met bron-gezondheid, signalen, prijsverlagingen,
+1. een **weekmail** voor de inkoopmanager (de maandagsamenvatting van het dashboard in zes
+   blokken, HTML + platte tekst, via Resend; ontwerp in
+   [`docs/weekmail-voorstel.md`](docs/weekmail-voorstel.md)) en een **weekrapport**
+   (markdown, in [`reports/`](reports/) en in de job-samenvatting op
+   GitHub) met bron-gezondheid, signalen, prijsverlagingen,
    assortimentstabellen, de prijsindex t.o.v. terStal (op artikelprijs én per stuk,
    zodat multipacks eerlijk meetellen) en het vernieuwingstempo per bron;
 2. een bijgewerkt **dashboard** (Netlify) met trends per productgroep.
@@ -26,7 +29,7 @@ GitHub Actions (cron, ma ±06:07 NL)      Supabase (Postgres)
 │ scraper (Python)            │─ REST ──►│ staging → process_staging()  │
 │  Shopify-JSON /             │          │ products, price_events,      │
 │  lijstpagina's / sitemap    │          │ weekly_stats, scrape_runs    │
-│ weekrapport + e-mail        │          └───────────┬──────────────────┘
+│ weekrapport + weekmail      │          └───────────┬──────────────────┘
 └─────────────────────────────┘                      │ RLS: alleen ingelogd lezen
         ruwe dumps → artifact                        ▼
                                          Netlify: dashboard/index.html
@@ -69,8 +72,13 @@ GitHub Actions (cron, ma ±06:07 NL)      Supabase (Postgres)
 1. Zet in de repo **Settings → Secrets and variables → Actions**:
    - `SUPABASE_URL` — de Project URL
    - `SUPABASE_SERVICE_ROLE_KEY` — de service_role key
-   - optioneel voor e-mail: `RESEND_API_KEY`, `REPORT_EMAIL_TO` (kommagescheiden),
-     `REPORT_EMAIL_FROM` (geverifieerd afzenderadres bij [resend.com](https://resend.com))
+   - voor de **weekmail** (docs/weekmail-voorstel.md): `RESEND_API_KEY`, `REPORT_EMAIL_TO`
+     (ontvangers, kommagescheiden — nooit in de repo), `REPORT_EMAIL_FROM` (afzender op een
+     bij [resend.com](https://resend.com) geverifieerd domein, bv. `Concurrentiemonitor terStal
+     <naam@domein.nl>`), optioneel `REPORT_EMAIL_REPLY_TO` (antwoordadres). Zonder deze
+     secrets wordt de weekmail wél gebouwd (reports/ en dashboard), niet verstuurd.
+   - optioneel de repository-variabele `DASHBOARD_URL` als het dashboard niet op
+     `concurrentiemonitor-terstal.netlify.app` staat (de doorkliklinks in de mail).
 2. Draai **Actions → "Validatie bronnen" → Run workflow**. Dit test alle bronnen met een
    proefscrape (±40 artikelen per bron, zonder database) en zet een leesbaar rapport in de
    job-samenvatting: welke strategie werkt, prijsdekking, mappingkwaliteit en een advies
@@ -104,9 +112,17 @@ bij Action). Het bijbehorende maandagrapport staat in
 
 ## Wekelijks gebruik
 
-- **Maandag 09:00**: rapport staat in `reports/` (nieuwste = `reports/latest.md`), in de
-  Actions-samenvatting en eventueel in de mail. Dashboard voor de verdieping.
-- **Maandag 09:15**: 15 minuten overleg, maximaal 3 acties (zie PLAN.md §1).
+- **Maandag ±03:07**: de weekrun start (cron `7 1 * * 1`, UTC; in de winter 02:07).
+- **Maandag vóór 07:00**: de **weekmail** ligt in de mailbox van de inkoopmanager — de
+  maandagsamenvatting van het dashboard in zes blokken, met per blok een doorklik
+  (docs/weekmail-voorstel.md). Dezelfde mail staat in het dashboardpaneel *Weekmail* en in
+  `reports/JJJJ-Www.html`.
+- **Maandag 09:00**: het volledige rapport staat in `reports/` (nieuwste = `reports/latest.md`)
+  en in de Actions-samenvatting. Dashboard voor de verdieping.
+- **Maandag 09:15**: 15 minuten overleg, maximaal 3 acties (zie PLAN.md §1). Antwoord op de
+  weekmail met 1, 2 of 3; het besluit komt in `reports/besluiten.md` (de actieteller).
+- **Proefmail**: workflow "Wekelijkse scrape" → Run workflow met `alleen_rapport` aan en
+  `mail_to` op je eigen adres; met `geen_mail` bouw je de mail zonder te versturen.
 - Bron rood/oranje? Draai "Validatie bronnen" voor die bron en kijk naar het advies.
 
 ## CLI (lokaal of in Actions)
@@ -118,6 +134,8 @@ python -m scraper probe --retailer zeeman --limit 40   # bron valideren, zonder 
 python -m scraper scrape --dry-run --limit 100         # scrapen zonder te schrijven
 python -m scraper scrape                               # volledige weekrun (secrets nodig)
 python -m scraper report                               # weekrapport uit de database
+python -m scraper weekmail --dry-run                   # weekmail bouwen (reports/), niet versturen
+python -m scraper weekmail --to naam@domein.nl         # proefmail naar één adres
 
 python -m folders validate --bron zeeman               # foldermonitor: folderbron valideren (fase 0)
 python -m folders bronnen                              # foldermonitor: bronconfiguratie tonen
@@ -125,7 +143,8 @@ python -m folders mailbox                              # foldermonitor: mailbox 
 ```
 
 Omgevingsvariabelen voor database/rapport: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-optioneel `RESEND_API_KEY`, `REPORT_EMAIL_TO`, `REPORT_EMAIL_FROM`.
+voor de weekmail `RESEND_API_KEY`, `REPORT_EMAIL_TO`, `REPORT_EMAIL_FROM`, optioneel
+`REPORT_EMAIL_REPLY_TO` en `DASHBOARD_URL`.
 
 ## Beheer
 
@@ -152,6 +171,8 @@ scraper/                    Python-pakket (scrapen, normaliseren, rapporteren)
   retailers.yml             bronnen + strategie per bron
   mapping.yml               uniforme taxonomie (regexregels)
   strategies/               shopify / listing_crawl / sitemap_pages (+ autodetectie)
+  signals.py                weekmail: signaalscore, ruisfilter, sjablonen, terugblik (zuiver, getest)
+  weekmail.py               weekmail: model → HTML + platte tekst, versturen, bewaren
 sql/schema.sql              Supabase-schema incl. verwerkingsfunctie en RLS
 dashboard/                  statisch dashboard (Netlify), login via Supabase Auth
 .github/workflows/          wekelijkse scrape · validatie bronnen · CI · validatie folders · foldermonitor (preview)
