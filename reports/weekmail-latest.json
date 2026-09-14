@@ -17,18 +17,18 @@
    "kop": "KiK mediaan meisjes sokken & panty's omhoog"
   },
   {
-   "rid": "kik",
-   "bron": "KiK",
-   "aud": "heren",
-   "ptype": "sokken & panty's",
-   "soort": "instap",
-   "richting": 1,
-   "van": 1.99,
-   "naar": 2.49,
+   "rid": "hema",
+   "bron": "HEMA",
+   "aud": "dames",
+   "ptype": "ondergoed",
+   "soort": "mediaan",
+   "richting": -1,
+   "van": 12.29,
+   "naar": 8.99,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "KiK: instapniveau heren / sokken & panty's omhoog van €1,99 naar €2,49 (+25%)",
-   "kop": "KiK instap heren sokken & panty's omhoog"
+   "tekst": "HEMA: mediaanprijs dames / ondergoed omlaag van €12,29 naar €8,99 (-27%)",
+   "kop": "HEMA mediaan dames ondergoed omlaag"
   },
   {
    "rid": "terstal",
