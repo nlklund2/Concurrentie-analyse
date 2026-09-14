@@ -53,6 +53,8 @@ def test_trend_krijgt_hogere_score_dan_eenmalige_sprong():
     assert hema["weken"] == 1 and hema["tag"] == "nieuw"
     assert kik["score"] > hema["score"]
     assert "mediaanprijs heren / ondergoed omhoog van €4,84 naar €5,32" in kik["tekst"]
+    assert S.korte_reden("HTTP 403 op https://www.zeeman.com/nl-nl/dames (bot-bescherming?)") == "HTTP 403, bot-bescherming"
+    assert S.korte_reden("slechts 11 artikelen (minimum 25); bron gewijzigd?") == "te weinig artikelen"
 
 
 def test_kleine_groep_en_rode_bron_zijn_niet_betrouwbaar():
@@ -108,9 +110,15 @@ def test_trendwoorden_tellen_per_bron_en_slaan_stopwoorden_over():
               ("wibra", "thermoshirt heren zwart"), ("hema", "thermoshirt kids"),
               ("kik", "Dames sokken 5 paar"), ("hema", "dames sokken katoen")]
     woorden = S.trendwoorden(titels)
-    assert woorden[0] == {"woord": "thermoshirt", "bronnen": 3, "n": 3}
-    assert woorden[1] == {"woord": "kerstpyjama", "bronnen": 2, "n": 3}
+    assert woorden[0] == {"woord": "thermoshirt", "bronnen": 3, "n": 3, "nieuw": True}
+    assert woorden[1] == {"woord": "kerstpyjama", "bronnen": 2, "n": 3, "nieuw": True}
     assert all(w["woord"] not in ("dames", "sokken", "heren") for w in woorden)
+    # 'pyjama' stroomt elke week in en is een stopwoord; wat eerder al instroomde is niet nieuw
+    eerder = [("hema", "thermoshirt kids"), ("primark", "thermoshirt dames"), ("kik", "pyjama heren")]
+    woorden2 = S.trendwoorden(titels + [("kik", "Pyjama dames"), ("hema", "pyjama kind")], eerder)
+    assert woorden2[0]["woord"] == "kerstpyjama" and woorden2[0]["nieuw"] is True
+    assert next(w for w in woorden2 if w["woord"] == "thermoshirt")["nieuw"] is False
+    assert all(w["woord"] != "pyjama" for w in woorden2)
 
 
 # --- 4.5 concurrentenkaart ---------------------------------------------------
@@ -131,7 +139,7 @@ def test_kaart_geen_meting_toont_laatste_goede_stand():
     regel = S.kaart_regel("zeeman", W[:3], stats, totals,
                           {"status": "fout", "note": "HTTP 403 op https://www.zeeman.com"},
                           [], {"zeeman": "Zeeman"})
-    assert regel["hoofdlijn"].startswith("Geen meting deze week (HTTP 403)")
+    assert regel["hoofdlijn"].startswith("Geen meting deze week (HTTP 403, bot-bescherming)")
     assert "Laatste beeld W33: 1.042 artikelen" in regel["hoofdlijn"]
     assert regel["gemeten_deze_week"] is False and regel["bijzin"] == ""
 

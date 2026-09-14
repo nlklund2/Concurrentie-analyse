@@ -84,8 +84,11 @@ def build_model(week: date, db) -> dict:
     for s in gekozen:
         s["kop"] = S.kop_uit_signaal(s)
     nieuwe = [(r["retailer_id"], r.get("title") or "") for r in db.new_titles(week)]
-    woorden = S.trendwoorden(nieuwe)
-    seizoen = [w for w in woorden if w["bronnen"] >= 3][:2]
+    eerder = [(r["retailer_id"], r.get("title") or "")
+              for r in db.recent_titles(week - timedelta(weeks=4), week)]
+    woorden = S.trendwoorden(nieuwe, eerder)
+    # Seizoenssignaal: nieuw in de instroom bij ≥ 2 bronnen, of bij ≥ 3 bronnen sowieso.
+    seizoen = [w for w in woorden if (w["nieuw"] and w["bronnen"] >= 2) or w["bronnen"] >= 3][:2]
 
     kaart = []
     volgorde = [r for r in KAART_VOLGORDE if r in bronnen] + \
@@ -146,7 +149,7 @@ def build_model(week: date, db) -> dict:
         else S.onderwerp(week, [], status)
 
     ok = sum(1 for v in status.values() if v == "ok")
-    rood = [(names.get(r, r), laatste_run.get(r, {}).get("note") or status[r])
+    rood = [(names.get(r, r), S.korte_reden(laatste_run.get(r, {}).get("note") or status[r]))
             for r, v in status.items() if v != "ok"]
     nu = datetime.now(_nl_tz())
     return {
@@ -196,11 +199,17 @@ def _spiegel(week, weeks, stats, totals, sigs, db, names) -> dict:
              if d["retailer_id"] == EIGEN and d.get("prev_price") and d.get("price")]
     downs.sort(key=lambda d: (float(d["price"]) - float(d["prev_price"])) / float(d["prev_price"]))
     if downs:
-        titels = db.products_by_keys(EIGEN, [d["product_key"] for d in downs[:3]])
-        delen = []
-        for d in downs[:3]:
+        titels = db.products_by_keys(EIGEN, [d["product_key"] for d in downs[:8]])
+        delen, gezien = [], set()
+        for d in downs[:8]:
             t = titels.get(d["product_key"], {}).get("title", d["product_key"])[:40]
-            delen.append(f"{t} {S.eur(d['prev_price'])} → {S.eur(d['price'])}")
+            regel = f"{t} {S.eur(d['prev_price'])} → {S.eur(d['price'])}"
+            if regel in gezien:            # twee kleuren van hetzelfde artikel
+                continue
+            gezien.add(regel)
+            delen.append(regel)
+            if len(delen) == 3:
+                break
         regels.append(f"Eigen prijsverlagingen ({len(downs)}): " + "; ".join(delen) + ".")
     if not regels:
         regels.append("Geen noemenswaardige verandering in het eigen assortiment.")
@@ -315,7 +324,7 @@ def render_html(m: dict) -> str:
         status_tekst = ("<b>Storing in de weekrun.</b> De meting is niet (volledig) geslaagd; "
                         "deze mail toont de laatst verwerkte stand per bron. Kijk in GitHub Actions.")
     elif m["rood"]:
-        lijst = "; ".join(f"{h(n)} ({h(str(note)[:60])})" for n, note in m["rood"])
+        lijst = "; ".join(f"{h(n)} ({h(str(note))})" for n, note in m["rood"])
         status_tekst = (f"<b>{m['ok']} van {m['totaal']} bronnen ok.</b> Niet gemeten: {lijst}. "
                         "Cijfers van die bron zijn van de laatste goede week en staan zo gemarkeerd.")
     else:
@@ -405,10 +414,11 @@ def render_html(m: dict) -> str:
 
     # trendwoorden
     if m["trendwoorden"]:
-        w = ", ".join(f"{h(x['woord'])} ({x['bronnen']} bronnen, {x['n']})" for x in m["trendwoorden"][:6])
+        w = ", ".join(f"{h(x['woord'])} ({x['bronnen']} bronnen, {x['n']} art.{', nieuw' if x.get('nieuw') else ''})"
+                      for x in m["trendwoorden"][:6])
         delen.append(f"""
 <div style="{P}">{_kop('', 'Trendwoorden in de instroom', dash('instroom', week), 'nieuw deze week in het dashboard')}
-  <p style="font-size:13.5px;margin:0">Woorden die deze week bij twee of meer bronnen in nieuwe artikelen opduiken: {w}.</p>
+  <p style="font-size:13.5px;margin:0">Woorden die deze week bij twee of meer bronnen in nieuwe artikelen opduiken; <i>nieuw</i> = kwam de vier weken ervoor niet in de instroom voor: {w}.</p>
 </div>""")
 
     # spiegel
@@ -488,7 +498,7 @@ def render_text(m: dict) -> str:
         r.append("STORING in de weekrun: laatst verwerkte stand per bron. Kijk in GitHub Actions.")
     elif m["rood"]:
         r.append(f"Bronnen: {m['ok']} van {m['totaal']} ok. Niet gemeten: "
-                 + "; ".join(f"{n} ({str(note)[:50]})" for n, note in m["rood"]) + ".")
+                 + "; ".join(f"{n} ({note})" for n, note in m["rood"]) + ".")
     else:
         r.append(f"Bronnen: {m['ok']} van {m['totaal']} ok.")
     r.append("")
@@ -525,7 +535,7 @@ def render_text(m: dict) -> str:
         r.append(f"{t['label']}: {t['waarde']} ({t['duiding']})")
     if m["trendwoorden"]:
         r.append("Trendwoorden instroom: " + ", ".join(
-            f"{w['woord']} ({w['bronnen']} bronnen)" for w in m["trendwoorden"][:6]))
+            f"{w['woord']} ({w['bronnen']} bronnen{', nieuw' if w.get('nieuw') else ''})" for w in m["trendwoorden"][:6]))
     r.append("")
     if not m["rustig"]:
         r.append(f"5. SPIEGEL {m['names'].get(EIGEN, EIGEN).upper()}")

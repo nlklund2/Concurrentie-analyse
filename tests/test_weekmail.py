@@ -82,6 +82,10 @@ class FakeDb:
                 {"retailer_id": "terstal", "title": "thermoshirt dames"},
                 {"retailer_id": "wibra", "title": "thermoshirt kids"}]
 
+    def recent_titles(self, start, before):
+        return [{"retailer_id": "kik", "title": "Thermoshirt dames"},
+                {"retailer_id": "wibra", "title": "thermoshirt heren"}]   # thermo stroomde al eerder in
+
     def count_events(self, week, kind):
         return {W[0]: 28, W[1]: 7, W[2]: 37}[week]
 
@@ -121,16 +125,19 @@ def test_model_kiest_signalen_en_markeert_rode_bron(model):
     assert not m["rustig"]
     ridden = [s["rid"] for s in m["top3"]]
     assert "kik" in ridden and "terstal" in ridden
-    assert m["onderwerp"].startswith("W38 · Instroom thermoshirt bij 3 bronnen · ")
+    # kerstpyjama is nieuw in de instroom (2 bronnen) en wint van thermoshirt (3 bronnen, al eerder gezien)
+    assert m["onderwerp"].startswith("W38 · Instroom kerstpyjama bij 2 bronnen · ")
+    assert len(m["onderwerp"]) <= 110
     assert m["onderwerp"].endswith("· 3/4 bronnen ok")
     # Zeeman staat in de kaart met zijn laatste goede week
     zeeman = next(k for k in m["kaart"] if k["rid"] == "zeeman")
-    assert zeeman["hoofdlijn"].startswith("Geen meting deze week (HTTP 403)")
+    assert zeeman["hoofdlijn"].startswith("Geen meting deze week (HTTP 403, bot-bescherming)")
     assert "W37" in zeeman["hoofdlijn"]
     # kernconcurrenten eerst, terStal niet in de kaart, uitgeschakelde bron ook niet
     assert [k["rid"] for k in m["kaart"]] == ["zeeman", "wibra", "kik"]
     assert m["terugblik"][0]["uitkomst"] in ("houdt aan", "teruggedraaid")
-    assert m["trendwoorden"][0]["woord"] == "thermoshirt"
+    assert m["trendwoorden"][0]["woord"] == "kerstpyjama" and m["trendwoorden"][0]["nieuw"] is True
+    assert next(w for w in m["trendwoorden"] if w["woord"] == "thermoshirt")["nieuw"] is False
     assert 1 <= len(m["agenda"]) <= 3
 
 

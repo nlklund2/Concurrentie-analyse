@@ -223,6 +223,12 @@ class Db:
         return self.get_all("products", {"first_seen": f"eq.{week.isoformat()}",
                                          "select": "retailer_id,title"})
 
+    def recent_titles(self, start: date, before: date) -> list[dict]:
+        """Instroom van de weken ervoor: wat toen al binnenkwam is geen seizoenssignaal."""
+        return self.get_all("products", {
+            "and": f"(first_seen.gte.{start.isoformat()},first_seen.lt.{before.isoformat()})",
+            "select": "retailer_id,title"})
+
     def count_events(self, week: date, kind: str) -> int:
         resp = self._req(
             "GET", "price_events", timeout=60,

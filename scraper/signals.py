@@ -32,6 +32,7 @@ DRAAIDEUR = 0.40            # in- én uitstroom ≥ 40% van de omvang
 PIJL_PUNTEN = 10            # prijsindex ≥ 10 punten verschoven sinds 4 weken terug
 TREND_MIN_BRONNEN = 2       # een trendwoord telt bij ≥ 2 bronnen
 TREND_MIN_LENGTE = 5
+OMVANG_MIN_ABS = 10         # een omvangsignaal haalt de top-3 pas vanaf 10 artikelen verschil
 
 BLOKJES = "▁▂▃▄▅▆▇█"
 
@@ -41,6 +42,12 @@ STOPWOORDEN = {
     "wit", "blauw", "grijs", "roze", "groen", "rood", "beige", "bruin", "lichtblauw",
     "donkerblauw", "print", "effen", "basic", "basics", "online", "alleen", "nieuw",
     "kleur", "kleuren", "voor", "van", "met", "zonder", "extra", "lang", "kort",
+    "lange", "korte", "katoenen", "delig", "-delig", "stretch",
+    # producttypen die élke week instromen: geen seizoenssignaal
+    "pyjama", "pyjamas", "pyjama's", "pyjamaset", "pyjamabroek", "nachthemd", "slip", "slips",
+    "boxershort", "boxershorts", "boxer", "boxers", "hipster", "hipsters", "string", "strings",
+    "shirt", "shirts", "hemd", "hemden", "panty", "pantys", "panty's", "sokjes", "kousen",
+    "beha", "bh's", "onesie", "shortama", "romper", "rompers",
 }
 
 
@@ -79,6 +86,19 @@ def _f(v) -> float | None:
 
 def groep_naam(aud: str, ptype: str) -> str:
     return f"{aud} / {ptype}"
+
+
+def korte_reden(note) -> str:
+    """De storingsnotitie van een run in een paar woorden, zonder URL."""
+    note = str(note or "")
+    if "403" in note:
+        return "HTTP 403, bot-bescherming"
+    if "teller" in note:
+        return "tellercontrole"
+    if "<50%" in note or "minimum" in note:
+        return "te weinig artikelen"
+    kort = re.sub(r"https?://\S+", "", note).split(";")[0].strip(" (:-")
+    return (kort[:57] + "…") if len(kort) > 60 else (kort or "geen run")
 
 
 def by_key(rows: list[dict]) -> dict[tuple[str, str, str], dict]:
@@ -163,7 +183,8 @@ def signalen(weeks: list[date], stats: dict[date, list[dict]], names: dict[str, 
                 if cu and pu and abs(cu - pu) / pu <= VERPAKKING_UNIT \
                         and cm - pm >= VERPAKKING_MULTIPACK:
                     verpakking = True
-            betrouwbaar = min(n, pn) >= MIN_GROUP_MAIL and status.get(rid, "ok") == "ok"
+            betrouwbaar = min(n, pn) >= MIN_GROUP_MAIL and status.get(rid, "ok") == "ok" \
+                and (soort != "omvang" or abs(n - pn) >= OMVANG_MIN_ABS)
             score = abs(d) * 100 * math.log(n + 1) * PERSISTENTIE[weken]
             if verpakking:
                 score *= 0.3
@@ -184,8 +205,9 @@ def signalen(weeks: list[date], stats: dict[date, list[dict]], names: dict[str, 
 def _signaal_tekst(bron, aud, ptype, soort, r, d, van, naar, verpakking) -> str:
     g = groep_naam(aud, ptype)
     if soort == "omvang":
-        werk = "breidt uit" if r > 0 else "saneert"
-        return f"{bron} {werk} {g} van {van} naar {naar} artikelen ({d:+.0%})"
+        if r > 0:
+            return f"{bron} breidt {g} uit van {van} naar {naar} artikelen ({d:+.0%})"
+        return f"{bron} saneert {g} van {van} naar {naar} artikelen ({d:+.0%})"
     if soort == "sale":
         werk = "stijgt" if r > 0 else "daalt"
         return f"{bron}: sale-druk {g} {werk} van {pct(van)} naar {pct(naar)}"
@@ -229,18 +251,31 @@ def top3(sigs: list[dict], eigen: str = "terstal") -> list[dict]:
 
 
 # --- 4.3 trendwoorden op instroom ----------------------------------------
-def trendwoorden(nieuwe_titels: list[tuple[str, str]], top: int = 8) -> list[dict]:
-    """Woorden die deze week bij ≥ 2 bronnen in nieuwe artikeltitels opduiken."""
+def _woorden(titels: list[tuple[str, str]]) -> dict[str, Counter]:
     per_woord: dict[str, Counter] = defaultdict(Counter)
-    for rid, titel in nieuwe_titels:
+    for rid, titel in titels:
         for w in re.split(r"\s+", (titel or "").lower()):
             w = re.sub(r"[^a-zà-ÿ-]", "", w).strip("-")
             if len(w) < TREND_MIN_LENGTE or w in STOPWOORDEN:
                 continue
             per_woord[w][rid] += 1
-    rows = [{"woord": w, "bronnen": len(c), "n": sum(c.values())}
+    return per_woord
+
+
+def trendwoorden(nieuwe_titels: list[tuple[str, str]], eerdere_titels: list[tuple[str, str]] | None = None,
+                 top: int = 8) -> list[dict]:
+    """Woorden die deze week bij ≥ 2 bronnen in nieuwe artikeltitels opduiken.
+
+    `nieuw` = het woord kwam in de instroom van de weken ervoor bij minder dan
+    twee bronnen voor: dat is het seizoenssignaal (kerstpyjama, thermo), niet
+    het woord dat elke week instroomt.
+    """
+    per_woord = _woorden(nieuwe_titels)
+    eerder = _woorden(eerdere_titels or [])
+    rows = [{"woord": w, "bronnen": len(c), "n": sum(c.values()),
+             "nieuw": len(eerder.get(w, ())) < TREND_MIN_BRONNEN}
             for w, c in per_woord.items() if len(c) >= TREND_MIN_BRONNEN]
-    rows.sort(key=lambda r: (r["bronnen"], r["n"]), reverse=True)
+    rows.sort(key=lambda r: (r["nieuw"], r["bronnen"], r["n"]), reverse=True)
     return rows[:top]
 
 
@@ -267,13 +302,12 @@ def kaart_regel(rid: str, weeks: list[date], stats: dict[date, list[dict]],
     sale = _f(tot.get("sale_share"))
 
     if status != "ok":
-        note = str(run.get("note") or status)
-        kort = "HTTP 403" if "403" in note else ("tellercontrole" if "teller" in note
-                                                 else note.split(";")[0][:60])
+        kort = korte_reden(run.get("note") or status)
         if laatste_w and n:
+            n_txt = f"{int(n):,}".replace(",", ".")
             kandidaten.append((1000.0,
                 f"Geen meting deze week ({kort}). Laatste beeld {week_label(laatste_w)}: "
-                f"{n:,} artikelen, {pct(sale)} sale.".replace(",", "."),
+                f"{n_txt} artikelen, {pct(sale)} sale.",
                 f"bron rood sinds {week_label(weeks[-1])}"))
         else:
             kandidaten.append((1000.0, f"Geen meting ({kort}) en geen eerdere stand.", ""))
@@ -316,7 +350,11 @@ def kaart_regel(rid: str, weeks: list[date], stats: dict[date, list[dict]],
                         f"sinds {week_label(weeks[-3])}"))
         if len(keyed) >= 4:
             p25 = [_f(k.get(key, {}).get("price_p25")) for k in keyed[-4:]]
-            if all(v is not None for v in p25) and p25[0] > 0:
+            # Per stuk moet mee omhoog: anders is het een verpakkingswissel (KiK W36).
+            up25 = [_f(k.get(key, {}).get("unit_price_p25")) for k in keyed[-4:]]
+            per_stuk_mee = (any(v is None for v in up25) or up25[0] == 0
+                            or (up25[-1] - up25[0]) / up25[0] >= STILLE_INFLATIE / 2)
+            if all(v is not None for v in p25) and p25[0] > 0 and per_stuk_mee:
                 stappen = sum(1 for a, b in zip(p25, p25[1:]) if b > a)
                 nooit_omlaag = all(b >= a for a, b in zip(p25, p25[1:]))
                 stijging = (p25[-1] - p25[0]) / p25[0]
@@ -360,7 +398,7 @@ def kaart_regel(rid: str, weeks: list[date], stats: dict[date, list[dict]],
         if springt:
             ns = [int(g["active_count"]) for g in eigen_groepen]
             kandidaten.append((10.0,
-                f"Kleine groepen ({min(ns)}–{max(ns)} artikelen); mediaan "
+                f"Kleine groepen (grootste {max(ns)} artikelen); mediaan "
                 f"{groep_naam(springt[0]['aud'], springt[0]['ptype'])} springt week op week: ruis, geen trend",
                 "geen trend"))
 
@@ -512,8 +550,11 @@ def onderwerp(week: date, gekozen: list[dict], status: dict[str, str],
     if is_rustig(gekozen, status):
         kern = "Rustige week, geen signalen boven de drempel"
     else:
-        kern = " · ".join((kernwoorden or [s["kop"] for s in gekozen if s.get("kop")])[:3])
-        kern = kern or "Signalen van de week"
+        delen = list((kernwoorden or [s["kop"] for s in gekozen if s.get("kop")])[:3])
+        # Mailclients tonen ±70–100 tekens; liever twee koppen leesbaar dan drie afgekapt.
+        while len(delen) > 1 and len(" · ".join(delen)) > 80:
+            delen.pop()
+        kern = " · ".join(delen) or "Signalen van de week"
     return f"{week_label(week)} · {kern} · {ok}/{tot} bronnen ok"
 
 
@@ -521,7 +562,7 @@ def kop_uit_signaal(s: dict) -> str:
     """Korte kop voor de onderwerpregel, uit een signaal."""
     g = f"{s['aud']} {s['ptype']}"
     if s["soort"] == "omvang":
-        return f"{s['bron']} {'breidt uit' if s['richting'] > 0 else 'saneert'} {g}"
+        return f"{s['bron']} breidt {g} uit" if s["richting"] > 0 else f"{s['bron']} saneert {g}"
     if s["soort"] == "sale":
         return f"{s['bron']} sale-druk {g} {'omhoog' if s['richting'] > 0 else 'omlaag'}"
     naam = "mediaan" if s["soort"] == "mediaan" else "instap"
