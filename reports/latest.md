@@ -8,13 +8,13 @@
 
 | Bron | Strategie | Deze run | In database | t.o.v. vorige week | Status |
 |---|---|---:|---:|---:|---|
-| Action | render | 211 | 211 | +1% | 🟢 ok — {"new": 93, "back": 0, "gone": 90, "price_up": 1, "products": 211, "promo_end": 0, "price_down": 13, "promo_start": 0} |
-| C&A | render | 742 | 742 | +4% | 🟢 ok — {"new": 59, "back": 13, "gone": 41, "price_up": 0, "products": 742, "promo_end": 0, "price_down": 10, "promo_start": 10} |
-| HEMA | firecrawl | 144 | 144 | +4% | 🟢 ok — {"new": 10, "back": 6, "gone": 11, "price_up": 2, "products": 144, "promo_end": 0, "price_down": 4, "promo_start": 0} · 24 Firecrawl-credits |
-| KiK | render | 521 | 521 | -16% | 🟢 ok — {"new": 21, "back": 5, "gone": 128, "price_up": 0, "products": 521, "promo_end": 0, "price_down": 0, "promo_start": 0} |
-| Primark | listing | 1070 | 1070 | -1% | 🟢 ok — {"new": 141, "back": 38, "gone": 191, "price_up": 0, "products": 1070, "promo_end": 0, "price_down": 0, "promo_start": 0} |
-| terStal familiemode | sitemap_pages | 386 | 386 | -15% | 🟢 ok — {"new": 0, "back": 3, "gone": 70, "price_up": 1, "products": 386, "promo_end": 0, "price_down": 10, "promo_start": 0} |
-| Wibra | firecrawl | 110 | 110 | -2% | 🟢 ok — {"new": 6, "back": 1, "gone": 9, "price_up": 0, "products": 110, "promo_end": 0, "price_down": 0, "promo_start": 0} · 12 Firecrawl-credits |
+| Action | render | 211 | 211 | +1% | 🟢 ok — {"new": 57, "back": 0, "gone": 57, "price_up": 0, "products": 211, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| C&A | render | 742 | 742 | +4% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 742, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| HEMA | firecrawl | 143 | 143 | +3% | 🟢 ok — {"new": 0, "back": 0, "gone": 1, "price_up": 0, "products": 143, "promo_end": 0, "price_down": 0, "promo_start": 0} · 24 Firecrawl-credits |
+| KiK | render | 601 | 601 | -4% | 🟢 ok — {"new": 0, "back": 86, "gone": 6, "price_up": 0, "products": 601, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| Primark | listing | 1070 | 1070 | -1% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 1070, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| terStal familiemode | sitemap_pages | 386 | 386 | -15% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 386, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| Wibra | firecrawl | 110 | 110 | -2% | 🟢 ok — {"new": 0, "back": 0, "gone": 0, "price_up": 0, "products": 110, "promo_end": 0, "price_down": 0, "promo_start": 0} · 12 Firecrawl-credits |
 | Zeeman | listing | 0 | – | – | 🔴 fout — HTTP 403 op https://www.zeeman.com/nl-nl/dames/ondergoed (bot-bescherming?) |
 
 > 🟠/🔴: cijfers van die bron deze week niet gebruiken voor besluiten.
@@ -22,7 +22,6 @@
 
 ## 2. Signalen van de week
 
-- **KiK** · onbekend / ondergoed: saneert van 88 naar 0 artikelen (-100%)
 - **terStal familiemode** · dames / ondergoed: instapniveau omhoog van €5,00 naar €6,99 (+40%)
 - **KiK** · meisjes / sokken & panty's: mediaanprijs omhoog van €1,99 naar €2,74 (+38%)
 - **terStal familiemode** · heren / sokken & panty's: saneert van 31 naar 18 artikelen (-42%)
@@ -37,6 +36,7 @@
 - **terStal familiemode** · dames / sokken & panty's: mediaanprijs omlaag van €5,99 naar €4,99 (-17%)
 - **HEMA** · dames / ondergoed: breidt uit van 23 naar 29 artikelen (+26%)
 - **KiK** · dames / ondergoed: mediaanprijs omhoog van €3,99 naar €4,59 (+15%)
+- **Action** · onbekend / nachtmode: instapniveau omhoog van €6,95 naar €7,95 (+14%)
 
 ## 3. Grootste prijsverlagingen deze week
 
@@ -64,17 +64,17 @@
 |---|---|---|---|---|---|---|---|
 | dames / ondergoed | 120 (-19) | 3 | 255 (+4) | 29 (+6) | 237 (-8) | 533 (-3) | 35 (-4) |
 | dames / nachtmode | 27 (-5) | – | – | – | 15 (-1) | 248 (-16) | 2 |
+| onbekend / ondergoed | 1 (-1) | 98 | 51 (+8) | – | 82 (-6) | – | – |
 | heren / ondergoed | 40 (-3) | 2 | 12 | 1 | 57 | 53 (-3) | 7 |
 | dames / sokken & panty's | 27 (-3) | 1 | – | 6 | 1 | 116 (-1) | 7 |
 | heren / nachtmode | 14 | 1 (+1) | 37 (+1) | 14 | 6 (+2) | 82 (+10) | – |
-| onbekend / ondergoed | 1 (-1) | 98 | 51 (+8) | – | 0 (-88) | – | – |
 | heren / sokken & panty's | 18 (-13) | 1 (-1) | 31 (+1) | – | 45 | 38 (+1) | – |
-| meisjes / ondergoed | 29 (-3) | – | 11 (-1) | 11 | 69 (-4) | – | 9 (+1) |
+| meisjes / ondergoed | 29 (-3) | – | 11 (-1) | 11 | 70 (-3) | – | 9 (+1) |
 | baby / nachtmode | – | – | 102 | 11 (-1) | 11 (+1) | – | 2 (-1) |
-| onbekend / sokken & panty's | 12 (-2) | 68 (+1) | 35 (+1) | – | 0 (-1) | – | – |
+| onbekend / sokken & panty's | 12 (-2) | 68 (+1) | 35 (+1) | – | 1 | – | – |
 | jongens / ondergoed | 35 (-5) | – | – | 16 (-1) | 27 (-1) | – | 12 |
-| baby / sokken & panty's | 10 (-2) | – | 30 (+5) | 15 (+1) | 7 (+4) | – | 25 (-1) |
 | kinderen / nachtmode | – | 2 | 85 (+10) | – | – | – | – |
+| baby / sokken & panty's | 10 (-2) | – | 30 (+5) | 15 (+1) | 2 (-1) | – | 25 (-1) |
 | jongens / nachtmode | – | – | 52 (+1) | 13 | 14 (-1) | – | – |
 
 ## 5. Prijsindex t.o.v. terStal (mediaan; terStal = 100)
@@ -119,7 +119,7 @@
 | Action | 0% | +0 pt |
 | C&A | 16% | +0 pt |
 | HEMA | 0% | +0 pt |
-| KiK | 45% | -3 pt |
+| KiK | 46% | -3 pt |
 | Primark | 0% | +0 pt |
 | Wibra | 5% | +0 pt |
 
@@ -128,10 +128,10 @@
 | Bron | Omvang | Instroom deze week | Uitstroom deze week |
 |---|---:|---:|---:|
 | terStal familiemode | 386 | 0 (0%) | 70 (18%) |
-| Action | 211 | 93 (44%) | 90 (43%) |
+| Action | 211 | 93 (44%) | 147 (70%) |
 | C&A | 742 | 59 (8%) | 41 (6%) |
-| HEMA | 144 | 10 (7%) | 11 (8%) |
-| KiK | 521 | 21 (4%) | 128 (25%) |
+| HEMA | 143 | 9 (6%) | 12 (8%) |
+| KiK | 601 | 16 (3%) | 134 (22%) |
 | Primark | 1070 | 141 (13%) | 191 (18%) |
 | Wibra | 110 | 6 (5%) | 9 (8%) |
 
