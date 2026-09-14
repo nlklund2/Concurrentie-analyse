@@ -1,21 +1,7 @@
 {
  "week": "2026-09-14",
- "onderwerp": "W38 · Instroom pyjama bij 5 bronnen · HEMA breidt uit dames ondergoed · KiK mediaan meisjes sokken & panty's omhoog · 7/8 bronnen ok",
+ "onderwerp": "W38 · Instroom kerstpyjama bij 2 bronnen · KiK mediaan meisjes sokken & panty's omhoog · 7/8 bronnen ok",
  "top3": [
-  {
-   "rid": "hema",
-   "bron": "HEMA",
-   "aud": "dames",
-   "ptype": "ondergoed",
-   "soort": "omvang",
-   "richting": 1,
-   "van": 23,
-   "naar": 29,
-   "weken": 3,
-   "tag": "trend",
-   "tekst": "HEMA breidt uit dames / ondergoed van 23 naar 29 artikelen (+26%)",
-   "kop": "HEMA breidt uit dames ondergoed"
-  },
   {
    "rid": "kik",
    "bron": "KiK",
@@ -29,6 +15,20 @@
    "tag": "nieuw",
    "tekst": "KiK: mediaanprijs meisjes / sokken & panty's omhoog van €1,99 naar €2,74 (+38%)",
    "kop": "KiK mediaan meisjes sokken & panty's omhoog"
+  },
+  {
+   "rid": "kik",
+   "bron": "KiK",
+   "aud": "heren",
+   "ptype": "sokken & panty's",
+   "soort": "instap",
+   "richting": 1,
+   "van": 1.99,
+   "naar": 2.49,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "KiK: instapniveau heren / sokken & panty's omhoog van €1,99 naar €2,49 (+25%)",
+   "kop": "KiK instap heren sokken & panty's omhoog"
   },
   {
    "rid": "terstal",
