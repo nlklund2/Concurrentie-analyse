@@ -49,6 +49,12 @@ class RetailerCfg:
     firecrawl_canary: int = 0
     focus_categories: str = ""     # regex: beperk de crawl tot deze categorieën
     focus_product_types: list[str] = field(default_factory=list)  # filter na mapping
+    # Toegangsladder voor de lijstroute (scraper/fetch.py): treden in volgorde
+    # van goedkoop naar zwaar — http, chrome (curl_cffi-impersonatie), browser
+    # (Playwright), firecrawl (betaald, gecapt door firecrawl_page_cap). Leeg =
+    # alleen http. De crawl klimt pas bij een aantoonbare weigering (403/429
+    # of challenge-pagina) en meldt de gebruikte trede in het weekrapport.
+    fetch_ladder: list[str] = field(default_factory=list)
     notes: str = ""
 
 

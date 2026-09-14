@@ -56,3 +56,37 @@ def test_rapport_overleeft_een_kapotte_url(monkeypatch):
     monkeypatch.setattr(dg, "diagnose", knal)
     md = dg.diagnose_rapport(["https://voorbeeld.nl/a", "https://voorbeeld.nl/b"])
     assert md.count("diagnosefout") == 2
+
+
+def test_diagnose_bij_403_toont_handtekening_en_toegangsmatrix(monkeypatch):
+    """Zeeman 14-09: een kale 403 crashte de diagnose (BlockedError ongevangen).
+    Nu: handtekening van de poortwachter + per trede van de ladder het antwoord."""
+    from scraper.http import BlockedError
+
+    class _Http:
+        def __init__(self, **kw): ...
+        def get(self, url):
+            raise BlockedError(f"HTTP 403 op {url}", status=403, url=url,
+                               headers={"Server": "cloudflare", "CF-RAY": "8f1-AMS",
+                                        "cf-mitigated": "challenge", "Set-Cookie": "__cf_bm=abc; Path=/"},
+                               body="<html><title>Just a moment...</title><body>Checking</body></html>")
+
+    monkeypatch.setattr(dg, "Http", _Http)
+    monkeypatch.setattr(dg, "toegangsmatrix", lambda url: [
+        "- requests (kaal, zoals de scraper tot 14-09): **geweigerd** — HTTP 403",
+        "- curl_cffi chrome-impersonatie (TLS/HTTP2-handschrift): **HTTP 200**, 710,037 tekens, "
+        "flight-payload met 30 producten"])
+    md = dg.diagnose("https://www.zeeman.com/nl-nl/dames/ondergoed", render=False)
+    assert "**HTTP 403: geweigerd** — Cloudflare-challenge" in md
+    assert "titel 'Just a moment...'" in md
+    assert "cf-mitigated=challenge" in md and "set-cookie=__cf_bm" in md and "abc" not in md
+    assert "### Toegangsmatrix" in md and "chrome-impersonatie" in md
+    assert "Conclusie:** de poortwachter filtert op het TLS-/HTTP2-handschrift" in md
+
+
+def test_diagnose_conclusie_per_eerste_werkende_trede():
+    ok = "- Chromium via Playwright (echte browser): **HTTP 200**, 700,000 tekens"
+    assert "JavaScript-challenge" in dg._blokkade_conclusie(["- x: **geweigerd**", ok])
+    assert "residentieel IP" in dg._blokkade_conclusie(
+        ["- Firecrawl rawHtml (residentieel IP, 1 credit): **HTTP 200**, 1 tekens"])
+    assert "geen enkele trede" in dg._blokkade_conclusie(["- a: **geweigerd** — x"])

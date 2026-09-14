@@ -44,8 +44,10 @@ def probe_one(cfg: RetailerCfg, limit: int = 40) -> dict:
 def advies(p: dict) -> str:
     res, cfg = p["result"], p["cfg"]
     if res.error:
-        if "blokkeert" in res.error.lower() or "403" in res.error or "429" in res.error:
-            return "geblokkeerd — kandidaat voor fase-2 (headless browser) of accepteer uitval"
+        if "blokkeert" in res.error.lower() or "403" in res.error or "429" in res.error \
+                or "toegangsladder" in res.error:
+            return ("geblokkeerd — draai de diagnose op een categoriepagina voor de "
+                    "toegangsmatrix (welke trede komt nog binnen?) of accepteer uitval")
         return "configuratie nalopen (base-URL, url_filter, evt. seeds toevoegen)"
     if p["all_rows"] and not p["rows"]:
         return ("artikelen gevonden maar geen enkele binnen de focus — mappingregels "
