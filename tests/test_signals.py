@@ -89,6 +89,17 @@ def test_verpakkingswissel_wordt_herkend_en_niet_als_prijsverhoging_verkocht():
     assert S.top3(sigs2)
 
 
+def test_top3_kiest_liever_twee_concurrenten_dan_twee_keer_dezelfde():
+    stats = _weken([
+        [_stat("kik", "dames", "ondergoed", med=3.0), _stat("kik", "heren", "ondergoed", med=3.0),
+         _stat("wibra", "dames", "ondergoed", med=3.49)],
+        [_stat("kik", "dames", "ondergoed", med=4.5), _stat("kik", "heren", "ondergoed", med=4.2),
+         _stat("wibra", "dames", "ondergoed", med=3.2)],
+    ])
+    top = S.top3(S.signalen(W[:2], stats, NAMEN, OK))
+    assert [s["rid"] for s in top] == ["kik", "wibra", "kik"]   # KiK sterkste, dan Wibra, dan pas KiK nog eens
+
+
 def test_top3_is_twee_concurrenten_plus_eigen_huis():
     stats = _weken([
         [_stat("kik", "dames", "ondergoed", med=3.0), _stat("wibra", "dames", "ondergoed", med=3.49),

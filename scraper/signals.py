@@ -230,13 +230,19 @@ def top3(sigs: list[dict], eigen: str = "terstal") -> list[dict]:
     own = [s for s in goed if s["rid"] == eigen]
     gekozen: list[dict] = []
     gezien: set[tuple] = set()
-    for s in conc:
-        k = (s["rid"], s["aud"], s["ptype"])
-        if k in gezien:
-            continue
-        gezien.add(k)
-        gekozen.append(s)
-        if len(gekozen) == (2 if own else 3):
+    plekken = 2 if own else 3
+    # Eerst per concurrent het sterkste signaal (twee KiK-zinnen zeggen minder
+    # dan één KiK- en één C&A-zin), daarna aanvullen op score.
+    for ronde in ("per_bron", "op_score"):
+        for s in conc:
+            k = (s["rid"], s["aud"], s["ptype"])
+            if k in gezien or (ronde == "per_bron" and any(g["rid"] == s["rid"] for g in gekozen)):
+                continue
+            gezien.add(k)
+            gekozen.append(s)
+            if len(gekozen) == plekken:
+                break
+        if len(gekozen) == plekken:
             break
     if own:
         gekozen.append(own[0])
@@ -359,8 +365,11 @@ def kaart_regel(rid: str, weeks: list[date], stats: dict[date, list[dict]],
                 nooit_omlaag = all(b >= a for a, b in zip(p25, p25[1:]))
                 stijging = (p25[-1] - p25[0]) / p25[0]
                 if stappen >= 2 and nooit_omlaag and stijging >= STILLE_INFLATIE:
+                    per_stuk = ""
+                    if all(v is not None for v in up25) and up25[0]:
+                        per_stuk = f" (per stuk {(up25[-1] - up25[0]) / up25[0]:+.0%})"
                     kandidaten.append((stijging * 100,
-                        f"Instap {g} in vier weken van {eur(p25[0])} naar {eur(p25[-1])}: stille inflatie",
+                        f"Instap {g} in vier weken van {eur(p25[0])} naar {eur(p25[-1])}{per_stuk}: stille inflatie",
                         f"sinds {week_label(weeks[-4])}"))
 
     # krimp over ≥ 4 weken: de omvang komt nooit boven de startstand, eindigt op
