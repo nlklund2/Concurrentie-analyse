@@ -1,7 +1,21 @@
 {
  "week": "2026-09-14",
- "onderwerp": "W38 · Instroom kerstpyjama bij 2 bronnen · KiK mediaan meisjes sokken & panty's omhoog · 7/8 bronnen ok",
+ "onderwerp": "W38 · Instroom kerstpyjama bij 2 bronnen · Zeeman breidt meisjes ondergoed uit · 8/8 bronnen ok",
  "top3": [
+  {
+   "rid": "zeeman",
+   "bron": "Zeeman",
+   "aud": "meisjes",
+   "ptype": "ondergoed",
+   "soort": "omvang",
+   "richting": 1,
+   "van": 52,
+   "naar": 142,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "Zeeman breidt meisjes / ondergoed uit van 52 naar 142 artikelen (+173%)",
+   "kop": "Zeeman breidt meisjes ondergoed uit"
+  },
   {
    "rid": "kik",
    "bron": "KiK",
@@ -15,20 +29,6 @@
    "tag": "nieuw",
    "tekst": "KiK: mediaanprijs meisjes / sokken & panty's omhoog van €1,99 naar €2,74 (+38%)",
    "kop": "KiK mediaan meisjes sokken & panty's omhoog"
-  },
-  {
-   "rid": "hema",
-   "bron": "HEMA",
-   "aud": "dames",
-   "ptype": "ondergoed",
-   "soort": "mediaan",
-   "richting": -1,
-   "van": 12.29,
-   "naar": 8.99,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "HEMA: mediaanprijs dames / ondergoed omlaag van €12,29 naar €8,99 (-27%)",
-   "kop": "HEMA mediaan dames ondergoed omlaag"
   },
   {
    "rid": "terstal",
