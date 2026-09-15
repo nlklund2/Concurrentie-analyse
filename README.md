@@ -156,6 +156,7 @@ voor de weekmail `RESEND_API_KEY`, `REPORT_EMAIL_TO`, `REPORT_EMAIL_FROM`, optio
 | Artikellijst exporteren (artnr t/m URL) | Supabase → Table Editor of SQL-editor → view `v_artikelen_week` → Export CSV |
 | Verrijking kleur/maten afstellen | `enrich` / `enrich_limit` in `retailers.yml` (per bron of in de defaults) |
 | Geblokkeerde/client-side bron | `strategy: render` in `retailers.yml` — headless browser (Playwright) met cookiemuur-acceptatie en API-interceptie; zwaarder, dus eigen krappere caps per bron |
+| Lijstbron die ineens 403 geeft (Zeeman 14-09) | `fetch_ladder: [http, chrome, browser, firecrawl]` in `retailers.yml` — de toegangsladder (`scraper/fetch.py`) klimt zelf naar een zwaardere client; de trede die werkte staat in het weekrapport (`listing+chrome`). Welke poortwachter het is: "Validatie bronnen" met een categoriepagina in `diagnose_urls` → toegangsmatrix |
 | Bron die het datacenter-IP weert (Wibra, HEMA) | `strategy: firecrawl` + secret `FIRECRAWL_API_KEY` — externe scrape-dienst met residentiële proxies (**betaald**, zie PLAN.md §8); zonder sleutel blijft de bron rood |
 | Mapping verbeteren | Regels in `scraper/mapping.yml` (volgorde telt); test in `tests/` |
 | Multipack-herkenning bijstellen | `pack_size()` in `scraper/normalize.py` (regexes + `PACK_MAX`); test in `tests/test_pack_size.py` |
@@ -171,11 +172,12 @@ scraper/                    Python-pakket (scrapen, normaliseren, rapporteren)
   retailers.yml             bronnen + strategie per bron
   mapping.yml               uniforme taxonomie (regexregels)
   strategies/               shopify / listing_crawl / sitemap_pages (+ autodetectie)
+  fetch.py, blokkade.py     toegangsladder (http → chrome → browser → firecrawl) + handtekening van de poortwachter
   signals.py                weekmail: signaalscore, ruisfilter, sjablonen, terugblik (zuiver, getest)
   weekmail.py               weekmail: model → HTML + platte tekst, versturen, bewaren
 sql/schema.sql              Supabase-schema incl. verwerkingsfunctie en RLS
 dashboard/                  statisch dashboard (Netlify), login via Supabase Auth
-.github/workflows/          wekelijkse scrape · validatie bronnen · CI · validatie folders · foldermonitor (preview)
+.github/workflows/          wekelijkse scrape · validatie bronnen · toegangscheck (donderdag-kanarie) · CI · validatie folders · foldermonitor (preview)
 reports/                    gegenereerde weekrapporten (gecommit door de bot)
 folders/                    foldermonitor (add-on, in preview): bronnen.yml, viewerdetectie, validatie, mailboxcontrole
 docs/foldermonitor-plan.md  plan voor de folder-add-on: archief + retailkalender (goedgekeurd 05-09)

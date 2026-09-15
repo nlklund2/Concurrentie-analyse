@@ -11,7 +11,8 @@ from urllib.parse import urlsplit
 
 from .. import discover
 from ..config import RetailerCfg
-from ..http import Http
+from ..fetch import Fetcher
+from ..http import BlockedError, Http
 from ..jsonscan import flight_meta, products_from_html
 from ..models import Product, ScrapeResult
 
@@ -52,6 +53,27 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     if not cats:
         res.error = "geen categorie-URLs gevonden (sitemap noch navigatie)"
         return res
+    # Pagina's komen via de toegangsladder (scraper/fetch.py): bij een
+    # weigering klimt de crawl zelf naar een zwaardere client. Zeeman 14-09:
+    # HTTP 403 op de eerste seed betekende tot dan een week zonder cijfers.
+    fetch = Fetcher(cfg, http, res)
+    try:
+        _crawl(cfg, fetch, res, cats, limit)
+    except BlockedError as e:
+        res.error = str(e)
+        res.notes.append("Bron blokkeert geautomatiseerde toegang op elke trede van de "
+                         "ladder; zie de toegangsmatrix van de diagnose (PLAN.md §8).")
+    finally:
+        fetch.close()
+    if fetch.geklommen and not res.error:
+        # Zichtbaar in het weekrapport: welke trede het werk deed. Verschuift
+        # dat, dan is de bron aan het bewegen — nog vóór hij rood wordt.
+        res.strategy = f"listing+{fetch.trede}"
+    return res
+
+
+def _crawl(cfg: RetailerCfg, fetch: Fetcher, res: ScrapeResult, cats: list[str],
+           limit: int | None) -> None:
     # Welke categorieën gecrawld worden bepaalt of de doelgroep herkenbaar is;
     # zichtbaar maken scheelt gokwerk bij het instellen van `seeds`.
     res.notes.append("gecrawlde categorieën: " + ", ".join(
@@ -60,10 +82,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     seen: dict[str, Product] = {}
     for cat_url in cats:
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
-        first = http.get(cat_url)
+        first = fetch.html(cat_url)
         if first is None:
             continue
-        page_products = products_from_html(first.text, cat_url)
+        page_products = products_from_html(first, cat_url)
         _absorb(seen, page_products, cat_path)
         if not page_products:
             continue
@@ -71,7 +93,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         # Daarmee weten we vooraf hoeveel pagina's er zijn én achteraf of de
         # oogst compleet was — zonder die teller is 'geen nieuwe sleutels
         # meer' het enige stopsignaal.
-        teller = flight_meta(first.text)
+        teller = flight_meta(first)
         bekend_pages = teller.get("totalPages") or 0
         cat_keys = {p.key for p in page_products}
 
@@ -85,10 +107,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
         if bekend_pages != 1:
             for pat in PAGINATION_PATTERNS:
                 candidate = cat_url + pat.format(n=2)
-                resp = http.get(candidate)
+                resp = fetch.html(candidate)
                 if resp is None:
                     continue
-                prods2 = products_from_html(resp.text, candidate)
+                prods2 = products_from_html(resp, candidate)
                 nieuw = {p.key for p in prods2} - (cat_keys if bekend_pages else set(seen))
                 if prods2 and nieuw:
                     pattern = pat
@@ -99,10 +121,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             for n in range(3, cfg.max_pages_per_category + 1):
                 if bekend_pages and n > bekend_pages:
                     break
-                resp = http.get(cat_url + pattern.format(n=n))
+                resp = fetch.html(cat_url + pattern.format(n=n))
                 if resp is None:
                     break
-                prods_n = products_from_html(resp.text, cat_url)
+                prods_n = products_from_html(resp, cat_url)
                 new_keys = {p.key for p in prods_n} - (cat_keys if bekend_pages else set(seen))
                 _absorb(seen, prods_n, cat_path)
                 cat_keys.update(p.key for p in prods_n)
@@ -123,7 +145,6 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             f"telt over {len(res.coverage)} categorieën "
             f"({geoogst / verwacht:.0%})" if verwacht else "tellercontrole: bron telt 0")
     res.products = list(seen.values())[: limit or cfg.max_products]
-    return res
 
 
 def _absorb(seen: dict[str, Product], products: list[Product], cat_path: str) -> None:

@@ -1,0 +1,70 @@
+# Toegangscheck — donderdagse kanarie voor de bronnen die weleens dichtgaan.
+#
+# Zeeman ging tussen maandag 07-09 en maandag 14-09-2026 dicht (HTTP 403 op
+# elke request); dat bleek pas tijdens de weekrun, met een week zonder cijfers
+# als gevolg. Deze check draait midweek een kleine proefscrape via de
+# toegangsladder (scraper/fetch.py) en faalt hard zodra een bron rood is —
+# GitHub mailt dan de eigenaar, en er zijn nog vier dagen om de ladder of de
+# bron bij te stellen vóór de maandagrun. Geen database, geen weekcijfers.
+#
+# Cron in UTC en niet op het hele uur (zie wekelijkse-scrape.yml): 05:23 UTC
+# = donderdag 07:23 NL-zomertijd / 06:23 NL-wintertijd. GitHub voert geplande
+# runs best effort uit; een gemiste check is geen alarm, een rode wél.
+name: Toegangscheck bronnen
+
+on:
+  schedule:
+    - cron: "23 5 * * 4"
+  workflow_dispatch:
+    inputs:
+      retailers:
+        description: "Te controleren bronnen (spaties ertussen)"
+        required: false
+        default: "zeeman"
+
+jobs:
+  toegang:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      INPUT_RETAILERS: ${{ inputs.retailers || 'zeeman' }}
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Afhankelijkheden installeren
+        run: pip install -r requirements.txt
+
+      - name: Headless browser (trede 'browser' van de ladder)
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      # Kleine steekproef: één lijstpagina per bron via de ladder (limiet 30 =
+      # één Zeeman-pagina). Klimt hij naar Firecrawl, dan kost dat robots.txt
+      # plus die ene pagina — met de residentiële proxy het tarief van je plan.
+      - name: Proefscrape via de toegangsladder
+        run: |
+          EXTRA=""
+          for r in $INPUT_RETAILERS; do EXTRA="$EXTRA --retailer $r"; done
+          python -m scraper probe $EXTRA --limit 30 --out toegangscheck.md
+
+      - name: Rapport in job-samenvatting tonen
+        if: always()
+        run: |
+          [ -f toegangscheck.md ] && cat toegangscheck.md >> "$GITHUB_STEP_SUMMARY"
+          true
+
+      - name: Rood = alarm
+        run: |
+          if grep -q "🔴" toegangscheck.md; then
+            echo "::error::Minstens één bron is geblokkeerd — zie de job-samenvatting (toegangsladder uitgeput?)"
+            exit 1
+          fi
+          echo "Alle gecontroleerde bronnen bereikbaar:"
+          grep -E "^\| " toegangscheck.md | grep -v "^| Bron\|^|---" || true

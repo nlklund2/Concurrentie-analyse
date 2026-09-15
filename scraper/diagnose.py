@@ -22,7 +22,9 @@ from collections import Counter
 import re
 from urllib.parse import urlsplit
 
-from .http import Http
+from . import blokkade
+from .fetch import toegangsmatrix
+from .http import BlockedError, Http
 from .jsonscan import (deep_find_products, flight_meta, flight_payload,
                        products_from_flight, products_from_html)
 from .promo import promo_fragmenten
@@ -297,7 +299,27 @@ def diagnose(url: str, render: bool = True) -> str:
         return _firecrawl_diagnose(url[3:])
     regels: list[str] = [f"## {url}", ""]
     http = Http(min_delay=0.5, respect_robots=True)
-    resp = http.get(url)
+    try:
+        resp = http.get(url)
+    except BlockedError as e:
+        # Zeeman 14-09: een kale 403 crashte de diagnose en zei niets over
+        # wíe er nee zegt. Nu: handtekening van de poortwachter plus dezelfde
+        # pagina via elke trede van de toegangsladder — de combinatie wijst
+        # de route aan (headers, TLS-handschrift, JS-challenge of het IP).
+        matrix = toegangsmatrix(url)
+        regels += [
+            f"- **HTTP {e.status}: geweigerd** — {e.signatuur}",
+            f"- weigerpagina: {len(e.body):,} tekens, titel {blokkade.titel(e.body)!r}",
+            "- kop van de weigerpagina: `" + " ".join(e.body[:400].split()) + "`",
+            "- relevante antwoordheaders: " + _blokkade_headers(e.headers),
+            "",
+            "### Toegangsmatrix — dezelfde pagina via elke trede van de ladder",
+            "",
+            *matrix,
+            "",
+            "**Conclusie:** " + _blokkade_conclusie(matrix),
+        ]
+        return "\n".join(regels)
     if resp is None:
         regels.append("- **HTTP: geen antwoord** — geblokkeerd, robots.txt of netwerkfout.")
     elif url.lower().endswith(".xml"):
@@ -362,6 +384,52 @@ def diagnose(url: str, render: bool = True) -> str:
     regels.append("")
     regels += _render_diagnose(url)
     return "\n".join(regels)
+
+
+_HEADER_HINTS = ("server", "cf-ray", "cf-mitigated", "cf-cache-status", "x-vercel-id",
+                 "x-vercel-mitigated", "x-amzn-waf-action", "x-iinfo", "x-cdn", "x-datadome",
+                 "x-akamai-transformed", "akamai-grn", "x-reference-error", "via",
+                 "content-type", "set-cookie", "retry-after", "x-robots-tag")
+
+
+def _blokkade_headers(headers) -> str:
+    uit = []
+    for k, v in (headers or {}).items():
+        kl = str(k).lower()
+        if kl in _HEADER_HINTS or kl.startswith(("cf-", "x-vercel", "x-px", "x-datadome", "akamai")):
+            waarde = str(v)
+            if kl == "set-cookie":       # alleen de cookienamen; waarden zijn ruis
+                waarde = ", ".join(c.split("=")[0].strip() for c in waarde.split(","))
+            uit.append(f"{kl}={waarde[:80]}")
+    return ", ".join(uit) if uit else "geen herkenbare"
+
+
+def _blokkade_conclusie(regels: list[str]) -> str:
+    tekst = "\n".join(regels)
+    ok = [r for r in regels if r.startswith("- ") and "**HTTP 200**" in r]
+    if not ok:
+        return ("geen enkele trede komt binnen — ook niet via een residentieel IP. "
+                "Dan blijft de bron rood tot de serving verandert; folder en winkel "
+                "zijn het kanaal (PLAN.md §8).")
+    eerste = ok[0]
+    if "requests (kaal" in eerste:
+        return "de kale client komt (weer) binnen; de weigering was tijdelijk of geldt niet voor deze URL."
+    if "headerset" in eerste:
+        return "de poortwachter filtert op headers; de volledige Chrome-headerset volstaat (trede 'http' met browserheaders)."
+    if "impersonatie" in eerste:
+        return ("de poortwachter filtert op het TLS-/HTTP2-handschrift van de client; "
+                "trede 'chrome' (curl_cffi) volstaat — gratis en even snel als requests.")
+    if "Playwright" in eerste:
+        return ("er staat een JavaScript-challenge; alleen de echte browser lost hem op. "
+                "Trede 'browser' volstaat (±2 s per pagina).")
+    if "Firecrawl enhanced" in eerste:
+        return ("élk datacenter-IP wordt geweerd (ook Firecrawl's standaardproxy); alleen een "
+                "residentieel IP komt binnen. Route: trede 'firecrawl' met "
+                "`firecrawl_proxy: enhanced` (betaald), of een meting vanaf een thuisaansluiting.")
+    if "Firecrawl" in eerste:
+        return ("het IP van GitHub Actions wordt geweerd; Firecrawl's standaardproxy komt wel "
+                "binnen. Trede 'firecrawl' (betaald, 1 credit per pagina) is de route.")
+    return "zie de matrix hierboven." if "geweigerd" in tekst else "zie de matrix hierboven."
 
 
 def _render_diagnose(url: str) -> list[str]:

@@ -90,6 +90,16 @@ retailers:
     max_pages_per_category: 12      # grootste categorie telt 10 pagina's van 30
     min_products_expected: 600      # 04-09: 1.202; daaronder is de bron gewijzigd
     enrich: false                   # kleur zit in de naam, maten in de payload
+    # Toegangsladder (scraper/fetch.py) sinds 14-09: W38 begon met HTTP 403 op
+    # de eerste seed, terwijl W37 (07-09) nog gewoon binnenkwam. De crawl
+    # start op de goedkoopste trede en klimt pas bij een weigering; de trede
+    # die het werk deed staat in het weekrapport ('listing+chrome' e.d.).
+    # Firecrawl is de laatste trede en betaald: cap op 60 pagina's (±49 nodig
+    # voor 14 seeds), dus hooguit ±60 credits in een week waarin niets anders
+    # meer werkt.
+    fetch_ladder: [http, chrome, browser, firecrawl]
+    firecrawl_page_cap: 60
+    firecrawl_proxy: enhanced       # 14-09: alleen een residentieel IP komt nog binnen
     notes: >-
       Maatstaf waardetextiel; sterk in basics-ondergoed en sokken. Vaste
       prijspunten (€ 3,99 / 5,99 / 4,99 dragen een derde van het assortiment)
@@ -100,6 +110,11 @@ retailers:
       dezelfde pagina als een gewone browser, de scraper las alleen het
       flight-formaat niet en telde eurotekens die Zeeman nooit rendert.
       Dossier: docs/validaties/2026-09-04-zeeman-flight-payload.md.
+      BLOKKADE 14-09 (W38): HTTP 403 op élke request vanaf GitHub Actions,
+      in beide runs (11:34 en 12:47 NL), vanaf de allereerste seed; W37 op
+      07-09 was nog groen met 1.058 artikelen. Antwoord: de toegangsladder
+      hierboven plus de blokkade-matrix in de diagnose. Dossier:
+      docs/validaties/2026-09-14-zeeman-toegangsladder.md.
   wibra:
     name: Wibra
     base: https://www.wibra.nl

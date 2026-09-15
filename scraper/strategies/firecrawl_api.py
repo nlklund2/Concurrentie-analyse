@@ -460,6 +460,26 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
     """raw=True haalt de onbewerkte bron op (sitemap-XML) zonder rendering;
     actions (scrollen/wachten) laten lui ladende rasters eerst renderen;
     wait_ms > 0 vervangt de standaard-rendertijd van 5000 ms."""
+    html, _ = _firecrawl_fetch(session, url, res, raw=raw, actions=actions, wait_ms=wait_ms)
+    return html
+
+
+# Oudere API-versies kennen de residentiële proxy als 'stealth'; de huidige
+# als 'enhanced'. Bij een 400 op de ene naam proberen we de andere.
+_PROXY_ALIAS = {"enhanced": "stealth", "stealth": "enhanced"}
+
+
+def _firecrawl_fetch(session: requests.Session, url: str, res: ScrapeResult,
+                     raw: bool = False, actions: list | None = None,
+                     wait_ms: int = 0, proxy: str = "",
+                     _alias_geprobeerd: bool = False) -> tuple[str | None, int]:
+    """Als _firecrawl_html, maar geeft ook de HTTP-status terug die de bron
+    zélf aan Firecrawl gaf (data.metadata.statusCode). Zeeman 14-09: een
+    403-pagina kwam als 'geslaagde' scrape binnen en las als challenge.
+
+    proxy: '' (standaard), 'basic', 'enhanced' (residentieel IP — voor
+    bronnen die datacenter-IP's weren, zoals Zeeman's WAF sinds 14-09) of
+    'auto' (basic, en bij een weigering alsnog enhanced)."""
     payload = {
         "url": url,
         "formats": ["rawHtml"] if raw else ["html"],
@@ -469,6 +489,8 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
         "timeout": 30000 if not actions else 45000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
     }
+    if proxy:
+        payload["proxy"] = proxy
     if actions:
         payload["actions"] = actions
     for poging in range(len(WACHT_BIJ_429) + 1):
@@ -476,11 +498,11 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
         if wacht > 0:
             time.sleep(wacht)
         try:
-            r = session.post(FIRECRAWL_ENDPOINT, json=payload, timeout=60)
+            r = session.post(FIRECRAWL_ENDPOINT, json=payload, timeout=90)
         except requests.RequestException as e:
             _laatste_call[0] = time.monotonic()
             res.notes.append(f"Firecrawl-netwerkfout: {str(e)[:120]}")
-            return None
+            return None, 0
         _laatste_call[0] = time.monotonic()
         if r.status_code != 429:
             break
@@ -488,26 +510,40 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
             time.sleep(WACHT_BIJ_429[poging])
     if r.status_code == 429:
         res.notes.append(f"Firecrawl-limiet (HTTP 429) hield aan op {url[:60]}")
-        return None
+        return None, 0
+    if r.status_code == 400 and proxy and not _alias_geprobeerd:
+        # de proxy-naam wordt op dit plan/deze API-versie niet geaccepteerd:
+        # de andere naam proberen, daarna zonder keuze (standaardproxy)
+        volgende = _PROXY_ALIAS.get(proxy, "")
+        melding = f"Firecrawl-proxy '{proxy}' niet geaccepteerd → {volgende or 'standaard'}"
+        if melding not in res.notes:
+            res.notes.append(melding)
+        return _firecrawl_fetch(session, url, res, raw=raw, actions=actions, wait_ms=wait_ms,
+                                proxy=volgende, _alias_geprobeerd=not volgende or True)
     if r.status_code == 400 and actions:
         # acties niet beschikbaar op dit plan of afgekeurd: zonder proberen,
         # dan komt er in elk geval een snapshot (zonder scroll) terug
         if "acties niet geaccepteerd — zonder acties verder" not in res.notes:
             res.notes.append("acties niet geaccepteerd — zonder acties verder")
-        return _firecrawl_html(session, url, res, raw=raw, actions=None,
-                               wait_ms=wait_ms)
+        return _firecrawl_fetch(session, url, res, raw=raw, actions=None,
+                                wait_ms=wait_ms, proxy=proxy, _alias_geprobeerd=True)
     if r.status_code == 402:
         res.error = "Firecrawl-credits op (HTTP 402) — tegoed bijvullen of tier verhogen"
-        return None
+        return None, 0
     if r.status_code == 401:
         res.error = "Firecrawl-sleutel ongeldig (HTTP 401)"
-        return None
+        return None, 0
     if r.status_code >= 400:
         res.notes.append(f"Firecrawl HTTP {r.status_code} op {url[:60]}")
-        return None
+        return None, 0
     try:
         data = r.json()
     except ValueError:
-        return None
+        return None, 0
     d = data.get("data") or {}
-    return d.get("rawHtml") or d.get("html")
+    meta = d.get("metadata") if isinstance(d.get("metadata"), dict) else {}
+    try:
+        status = int(meta.get("statusCode") or 0)
+    except (TypeError, ValueError):
+        status = 0
+    return d.get("rawHtml") or d.get("html"), status
