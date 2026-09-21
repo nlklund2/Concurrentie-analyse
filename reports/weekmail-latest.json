@@ -1,48 +1,48 @@
 {
- "week": "2026-09-14",
- "onderwerp": "W38 · Instroom kerstpyjama bij 2 bronnen · Zeeman breidt meisjes ondergoed uit · 8/8 bronnen ok",
+ "week": "2026-09-21",
+ "onderwerp": "W39 · Instroom satijnen bij 2 bronnen · KiK mediaan dames nachtmode omhoog · 8/8 bronnen ok",
  "top3": [
-  {
-   "rid": "zeeman",
-   "bron": "Zeeman",
-   "aud": "meisjes",
-   "ptype": "ondergoed",
-   "soort": "omvang",
-   "richting": 1,
-   "van": 52,
-   "naar": 142,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "Zeeman breidt meisjes / ondergoed uit van 52 naar 142 artikelen (+173%)",
-   "kop": "Zeeman breidt meisjes ondergoed uit"
-  },
   {
    "rid": "kik",
    "bron": "KiK",
-   "aud": "meisjes",
-   "ptype": "sokken & panty's",
+   "aud": "dames",
+   "ptype": "nachtmode",
    "soort": "mediaan",
    "richting": 1,
-   "van": 1.99,
-   "naar": 2.74,
+   "van": 4.99,
+   "naar": 9.99,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "KiK: mediaanprijs meisjes / sokken & panty's omhoog van €1,99 naar €2,74 (+38%)",
-   "kop": "KiK mediaan meisjes sokken & panty's omhoog"
+   "tekst": "KiK: mediaanprijs dames / nachtmode omhoog van €4,99 naar €9,99 (+100%)",
+   "kop": "KiK mediaan dames nachtmode omhoog"
+  },
+  {
+   "rid": "wibra",
+   "bron": "Wibra",
+   "aud": "dames",
+   "ptype": "ondergoed",
+   "soort": "mediaan",
+   "richting": 1,
+   "van": 3.49,
+   "naar": 5.99,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "Wibra: mediaanprijs dames / ondergoed omhoog van €3,49 naar €5,99 (+72%)",
+   "kop": "Wibra mediaan dames ondergoed omhoog"
   },
   {
    "rid": "terstal",
    "bron": "terStal familiemode",
-   "aud": "dames",
+   "aud": "meisjes",
    "ptype": "ondergoed",
-   "soort": "instap",
+   "soort": "mediaan",
    "richting": 1,
-   "van": 5.0,
-   "naar": 6.99,
+   "van": 3.99,
+   "naar": 4.49,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "terStal familiemode: instapniveau dames / ondergoed omhoog van €5,00 naar €6,99 (+40%)",
-   "kop": "terStal familiemode instap dames ondergoed omhoog"
+   "tekst": "terStal familiemode: mediaanprijs meisjes / ondergoed omhoog van €3,99 naar €4,49 (+13%)",
+   "kop": "terStal familiemode mediaan meisjes ondergoed omhoog"
   }
  ]
 }
