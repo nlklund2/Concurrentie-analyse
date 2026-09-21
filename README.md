@@ -24,7 +24,7 @@ Kosten: **€0/maand** (GitHub Actions + Supabase free tier + Netlify free tier)
 ## Hoe het werkt
 
 ```
-GitHub Actions (cron, ma ±06:07 NL)      Supabase (Postgres)
+GitHub Actions (cron, ma-nacht NL)       Supabase (Postgres)
 ┌─────────────────────────────┐          ┌──────────────────────────────┐
 │ scraper (Python)            │─ REST ──►│ staging → process_staging()  │
 │  Shopify-JSON /             │          │ products, price_events,      │
@@ -112,7 +112,16 @@ bij Action). Het bijbehorende maandagrapport staat in
 
 ## Wekelijks gebruik
 
-- **Maandag ±03:07**: de weekrun start (cron `7 1 * * 1`, UTC; in de winter 02:07).
+- **Maandagnacht vanaf ±01:07**: de weekrun start (in de winter 00:07). GitHub start
+  geplande runs soms uren te laat of helemaal niet (14-09 en 21-09-2026: ruim vijf uur),
+  daarom staan er vijf cron-slots in `wekelijkse-scrape.yml` — zo 23:07, ma 00:37, 02:07,
+  03:37 en 05:17 UTC = ma 01:07, 02:37, 04:07, 05:37 en 07:17 NL-zomertijd (winter: een
+  uur vroeger). Het eerste slot dat echt start meet; de **planningspoort**
+  (`scraper/planning.py`) laat latere slots zichzelf overslaan zodra er een run loopt of
+  de week al gemeten is. Handmatig starten meet altijd. De week loopt van maandag 00:00
+  **Nederlandse tijd** (`week_monday()`), niet UTC.
+- **Geen mail om 07:00?** Kijk bij Actions of er een run loopt; zo niet, start
+  "Wekelijkse scrape" handmatig. Ook vijf slots zijn *best effort*, geen garantie.
 - **Maandag vóór 07:00**: de **weekmail** ligt in de mailbox van de inkoopmanager — de
   maandagsamenvatting van het dashboard in zes blokken, met per blok een doorklik
   (docs/weekmail-voorstel.md). Dezelfde mail staat in het dashboardpaneel *Weekmail* en in

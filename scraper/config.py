@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 
 import yaml
@@ -63,9 +63,33 @@ class RetailerCfg:
     notes: str = ""
 
 
+def nl_tz(nu: datetime | None = None) -> tzinfo:
+    """Nederlandse tijd zonder externe afhankelijkheid (zoneinfo kan op een
+    kale runner ontbreken): CEST van de laatste zondag van maart t/m de
+    laatste zondag van oktober, anders CET."""
+    nu = nu or datetime.now(timezone.utc)
+    jaar = nu.year
+
+    def laatste_zondag(maand: int) -> datetime:
+        d = datetime(jaar, maand + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+
+    zomer = laatste_zondag(3) <= nu < laatste_zondag(10)
+    return timezone(timedelta(hours=2 if zomer else 1))
+
+
+def vandaag_nl(nu: datetime | None = None) -> date:
+    """De kalenderdag in Nederland. De runner loopt in UTC: zondag 23:07 UTC
+    is in Nederland al maandag, en hoort dus bij de nieuwe week."""
+    nu = nu or datetime.now(timezone.utc)
+    return nu.astimezone(nl_tz(nu)).date()
+
+
 def week_monday(d: date | None = None) -> date:
-    """De maandag van de ISO-week — onze waarnemingsdatum."""
-    d = d or date.today()
+    """De maandag van de ISO-week — onze waarnemingsdatum. Zonder argument:
+    de week van vandaag in Nederlandse tijd (niet UTC), zodat een run vlak na
+    maandag 00:00 NL niet nog bij de vorige week wordt geboekt."""
+    d = d or vandaag_nl()
     return d - timedelta(days=d.weekday())
 
 

@@ -13,11 +13,11 @@ from __future__ import annotations
 import html as _html
 import json
 import re
-from datetime import date, datetime, timedelta, timezone, tzinfo
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import signals as S
-from .config import env, focus_product_types
+from .config import env, focus_product_types, nl_tz
 from .db import Db, DbError
 from .report import REPORTS_DIR, send_email
 
@@ -31,21 +31,6 @@ BESLUITEN = REPORTS_DIR / "besluiten.md"
 LAATSTE_JSON = REPORTS_DIR / "weekmail-latest.json"
 
 h = _html.escape
-
-
-def _nl_tz() -> tzinfo:
-    """Nederlandse tijd zonder externe afhankelijkheid (zoneinfo kan op een
-    kale runner ontbreken): CEST van de laatste zondag van maart t/m de
-    laatste zondag van oktober, anders CET."""
-    nu = datetime.now(timezone.utc)
-    jaar = nu.year
-
-    def laatste_zondag(maand: int) -> datetime:
-        d = datetime(jaar, maand + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
-        return d - timedelta(days=(d.weekday() + 1) % 7)
-
-    zomer = laatste_zondag(3) <= nu < laatste_zondag(10)
-    return timezone(timedelta(hours=2 if zomer else 1))
 
 
 def dash(sectie: str, week: date, **extra) -> str:
@@ -151,7 +136,7 @@ def build_model(week: date, db) -> dict:
     ok = sum(1 for v in status.values() if v == "ok")
     rood = [(names.get(r, r), S.korte_reden(laatste_run.get(r, {}).get("note") or status[r]))
             for r, v in status.items() if v != "ok"]
-    nu = datetime.now(_nl_tz())
+    nu = datetime.now(nl_tz())
     return {
         "week": week, "label": S.week_label(week), "weeks": weeks, "names": names,
         "status": status, "ok": ok, "totaal": len(status), "rood": rood, "storing": storing,
