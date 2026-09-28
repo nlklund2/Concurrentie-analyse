@@ -1,6 +1,6 @@
 {
- "week": "2026-09-21",
- "onderwerp": "W39 · Instroom satijnen bij 2 bronnen · KiK mediaan dames nachtmode omhoog · 8/8 bronnen ok",
+ "week": "2026-09-28",
+ "onderwerp": "W40 · Instroom paars bij 2 bronnen · KiK mediaan dames nachtmode omhoog · 7/8 bronnen ok",
  "top3": [
   {
    "rid": "kik",
@@ -9,40 +9,40 @@
    "ptype": "nachtmode",
    "soort": "mediaan",
    "richting": 1,
-   "van": 4.99,
-   "naar": 9.99,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "KiK: mediaanprijs dames / nachtmode omhoog van €4,99 naar €9,99 (+100%)",
+   "van": 9.99,
+   "naar": 12.99,
+   "weken": 2,
+   "tag": "houdt aan",
+   "tekst": "KiK: mediaanprijs dames / nachtmode omhoog van €9,99 naar €12,99 (+30%)",
    "kop": "KiK mediaan dames nachtmode omhoog"
   },
   {
    "rid": "wibra",
    "bron": "Wibra",
-   "aud": "dames",
-   "ptype": "ondergoed",
-   "soort": "mediaan",
+   "aud": "baby",
+   "ptype": "sokken & panty's",
+   "soort": "omvang",
    "richting": 1,
-   "van": 3.49,
-   "naar": 5.99,
+   "van": 25,
+   "naar": 35,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "Wibra: mediaanprijs dames / ondergoed omhoog van €3,49 naar €5,99 (+72%)",
-   "kop": "Wibra mediaan dames ondergoed omhoog"
+   "tekst": "Wibra breidt baby / sokken & panty's uit van 25 naar 35 artikelen (+40%)",
+   "kop": "Wibra breidt baby sokken & panty's uit"
   },
   {
-   "rid": "terstal",
-   "bron": "terStal familiemode",
-   "aud": "meisjes",
+   "rid": "c-and-a",
+   "bron": "C&A",
+   "aud": "onbekend",
    "ptype": "ondergoed",
    "soort": "mediaan",
    "richting": 1,
-   "van": 3.99,
-   "naar": 4.49,
+   "van": 9.99,
+   "naar": 12.99,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "terStal familiemode: mediaanprijs meisjes / ondergoed omhoog van €3,99 naar €4,49 (+13%)",
-   "kop": "terStal familiemode mediaan meisjes ondergoed omhoog"
+   "tekst": "C&A: mediaanprijs onbekend / ondergoed omhoog van €9,99 naar €12,99 (+30%)",
+   "kop": "C&A mediaan onbekend ondergoed omhoog"
   }
  ]
 }
