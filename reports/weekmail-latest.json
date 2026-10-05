@@ -1,20 +1,34 @@
 {
- "week": "2026-09-28",
- "onderwerp": "W40 · Instroom paars bij 2 bronnen · KiK mediaan dames nachtmode omhoog · 7/8 bronnen ok",
+ "week": "2026-10-05",
+ "onderwerp": "W41 · Instroom strikje bij 2 bronnen · C&A instap heren nachtmode omhoog · 7/8 bronnen ok",
  "top3": [
   {
-   "rid": "kik",
-   "bron": "KiK",
-   "aud": "dames",
+   "rid": "c-and-a",
+   "bron": "C&A",
+   "aud": "heren",
    "ptype": "nachtmode",
-   "soort": "mediaan",
+   "soort": "instap",
    "richting": 1,
-   "van": 9.99,
+   "van": 8.99,
    "naar": 12.99,
    "weken": 2,
    "tag": "houdt aan",
-   "tekst": "KiK: mediaanprijs dames / nachtmode omhoog van €9,99 naar €12,99 (+30%)",
-   "kop": "KiK mediaan dames nachtmode omhoog"
+   "tekst": "C&A: instapniveau heren / nachtmode omhoog van €8,99 naar €12,99 (+44%)",
+   "kop": "C&A instap heren nachtmode omhoog"
+  },
+  {
+   "rid": "zeeman",
+   "bron": "Zeeman",
+   "aud": "dames",
+   "ptype": "sokken & panty's",
+   "soort": "omvang",
+   "richting": -1,
+   "van": 111,
+   "naar": 93,
+   "weken": 2,
+   "tag": "houdt aan",
+   "tekst": "Zeeman saneert dames / sokken & panty's van 111 naar 93 artikelen (-16%)",
+   "kop": "Zeeman saneert dames sokken & panty's"
   },
   {
    "rid": "wibra",
@@ -22,27 +36,13 @@
    "aud": "baby",
    "ptype": "sokken & panty's",
    "soort": "omvang",
-   "richting": 1,
-   "van": 25,
-   "naar": 35,
+   "richting": -1,
+   "van": 35,
+   "naar": 25,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "Wibra breidt baby / sokken & panty's uit van 25 naar 35 artikelen (+40%)",
-   "kop": "Wibra breidt baby sokken & panty's uit"
-  },
-  {
-   "rid": "c-and-a",
-   "bron": "C&A",
-   "aud": "onbekend",
-   "ptype": "ondergoed",
-   "soort": "mediaan",
-   "richting": 1,
-   "van": 9.99,
-   "naar": 12.99,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "C&A: mediaanprijs onbekend / ondergoed omhoog van €9,99 naar €12,99 (+30%)",
-   "kop": "C&A mediaan onbekend ondergoed omhoog"
+   "tekst": "Wibra saneert baby / sokken & panty's van 35 naar 25 artikelen (-29%)",
+   "kop": "Wibra saneert baby sokken & panty's"
   }
  ]
 }
