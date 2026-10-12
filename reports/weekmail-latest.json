@@ -1,48 +1,48 @@
 {
- "week": "2026-10-05",
- "onderwerp": "W41 · Instroom strikje bij 2 bronnen · C&A instap heren nachtmode omhoog · 7/8 bronnen ok",
+ "week": "2026-10-12",
+ "onderwerp": "W42 · Instroom jacquard bij 2 bronnen · C&A breidt onbekend nachtmode uit · 7/8 bronnen ok",
  "top3": [
   {
    "rid": "c-and-a",
    "bron": "C&A",
-   "aud": "heren",
+   "aud": "onbekend",
    "ptype": "nachtmode",
-   "soort": "instap",
+   "soort": "omvang",
    "richting": 1,
-   "van": 8.99,
-   "naar": 12.99,
-   "weken": 2,
-   "tag": "houdt aan",
-   "tekst": "C&A: instapniveau heren / nachtmode omhoog van €8,99 naar €12,99 (+44%)",
-   "kop": "C&A instap heren nachtmode omhoog"
+   "van": 18,
+   "naar": 34,
+   "weken": 3,
+   "tag": "trend",
+   "tekst": "C&A breidt onbekend / nachtmode uit van 18 naar 34 artikelen (+89%)",
+   "kop": "C&A breidt onbekend nachtmode uit"
+  },
+  {
+   "rid": "action",
+   "bron": "Action",
+   "aud": "onbekend",
+   "ptype": "sokken & panty's",
+   "soort": "instap",
+   "richting": -1,
+   "van": 2.29,
+   "naar": 1.89,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "Action: instapniveau onbekend / sokken & panty's omlaag van €2,29 naar €1,89 (-17%)",
+   "kop": "Action instap onbekend sokken & panty's omlaag"
   },
   {
    "rid": "zeeman",
    "bron": "Zeeman",
    "aud": "dames",
    "ptype": "sokken & panty's",
-   "soort": "omvang",
-   "richting": -1,
-   "van": 111,
-   "naar": 93,
-   "weken": 2,
-   "tag": "houdt aan",
-   "tekst": "Zeeman saneert dames / sokken & panty's van 111 naar 93 artikelen (-16%)",
-   "kop": "Zeeman saneert dames sokken & panty's"
-  },
-  {
-   "rid": "wibra",
-   "bron": "Wibra",
-   "aud": "baby",
-   "ptype": "sokken & panty's",
-   "soort": "omvang",
-   "richting": -1,
-   "van": 35,
-   "naar": 25,
+   "soort": "mediaan",
+   "richting": 1,
+   "van": 3.49,
+   "naar": 3.99,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "Wibra saneert baby / sokken & panty's van 35 naar 25 artikelen (-29%)",
-   "kop": "Wibra saneert baby sokken & panty's"
+   "tekst": "Zeeman: mediaanprijs dames / sokken & panty's omhoog van €3,49 naar €3,99 (+14%)",
+   "kop": "Zeeman mediaan dames sokken & panty's omhoog"
   }
  ]
 }
