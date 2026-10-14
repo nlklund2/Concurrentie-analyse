@@ -1,22 +1,40 @@
 # Wekelijkse concurrentiescrape — maandagnacht, zodat de weekmail er ruim
 # vóór 07:00 ligt en het rapport vóór het maandagochtend-overleg (09:00).
-# Cron loopt in UTC en volgt géén zomertijd: 01:07 UTC = 03:07 NL-zomertijd /
-# 02:07 NL-wintertijd. Wil je 03:07 het hele jaar rond, zet de expressie eind
-# oktober op "7 2 * * 1" en eind maart weer terug.
 #
-# Waarom :07 en niet :00 — GitHub voert geplande runs 'best effort' uit en slaat
-# ze bij drukte over zónder melding. Het hele uur is veruit het drukste moment
-# (iedereen zet zijn cron op :00); GitHub raadt daarom zelf aan een paar minuten
-# ernaast te gaan zitten. Op 10-08-2026 werd de run van 04:00 UTC inderdaad
-# helemaal niet gestart en moest hij handmatig worden aangezwengeld.
+# Meerdere cron-slots, één meting. GitHub voert geplande runs 'best effort' uit:
+# bij drukte start een run uren te laat of helemaal niet, zónder melding. Met
+# één slot (01:07 UTC) startte de run op 14-09-2026 en 21-09-2026 ruim vijf uur
+# te laat (21-09: 08:13 NL) en kwam de weekmail dus na 07:00. Daarom staan er
+# nu vijf slots; het eerste dat écht start doet de meting, en de job 'poort'
+# (scraper/planning.py) laat elk later slot zichzelf overslaan zodra er een run
+# loopt of de week al gemeten is (scrape_runs in Supabase). Een overgeslagen
+# slot kost ±1 minuut. Handmatig starten (workflow_dispatch) meet altijd.
 #
-# Sinds 14-09-2026 start de run om 03:07 in plaats van 06:07 (besluit eigenaar):
-# de meting duurt tot ruim twee uur, en de weekmail moet om 07:00 binnen zijn.
+# Cron loopt in UTC en volgt géén zomertijd (NL-zomertijd / NL-wintertijd):
+#   "7 23 * * 0"  zo 23:07 UTC = ma 01:07 / 00:07   ← normale start
+#   "37 0 * * 1"  ma 00:37 UTC = ma 02:37 / 01:37
+#   "7 2 * * 1"   ma 02:07 UTC = ma 04:07 / 03:07
+#   "37 3 * * 1"  ma 03:37 UTC = ma 05:37 / 04:37   ← laatste dat 07:00 haalt (meting ±70 min)
+#   "17 5 * * 1"  ma 05:17 UTC = ma 07:17 / 06:17   ← vangnet: mail te laat, wel vóór het overleg
+# Geen slot vóór zo 23:00 UTC: in de winter is dat in Nederland nog zondag en
+# zou de meting in de vorige week boeken (week_monday() in scraper/config.py
+# rekent in NL-tijd; tests/test_planning.py bewaakt dit voor elk slot).
+#
+# Waarom nooit :00 of :30 — het hele en halve uur zijn de drukste momenten
+# (iedereen zet zijn cron daar); GitHub raadt zelf aan ernaast te gaan zitten.
+# Op 10-08-2026 werd de run van 04:00 UTC helemaal niet gestart.
+#
+# Ook vijf slots zijn geen garantie: controleer maandagochtend of de mail er
+# is, en start anders handmatig (Actions → Wekelijkse scrape → Run workflow).
 name: Wekelijkse scrape
 
 on:
   schedule:
-    - cron: "7 1 * * 1"
+    - cron: "7 23 * * 0"
+    - cron: "37 0 * * 1"
+    - cron: "7 2 * * 1"
+    - cron: "37 3 * * 1"
+    - cron: "17 5 * * 1"
   workflow_dispatch:
     inputs:
       retailers:
@@ -38,17 +56,57 @@ on:
         required: false
         default: false
 
-concurrency:
-  group: wekelijkse-scrape
-  cancel-in-progress: false
-
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # Planningspoort: alleen bij een geplande run. Geeft 'meten=false' als een
+  # eerder slot al loopt of de week al gemeten is. Faalt de poort zelf, dan
+  # blijft de uitvoer leeg en wordt er gewoon gemeten (stilte is het risico).
+  poort:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      meten: ${{ steps.poort.outputs.meten || 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name == 'schedule' }}
+        continue-on-error: true
+
+      - uses: actions/setup-python@v5
+        if: ${{ github.event_name == 'schedule' }}
+        continue-on-error: true
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Is deze week al gemeten of loopt er al een run?
+        id: poort
+        if: ${{ github.event_name == 'schedule' }}
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          pip install -r requirements.txt
+          python -m scraper.planning
+
   scrape:
+    needs: poort
+    if: ${{ !cancelled() && needs.poort.outputs.meten != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    # Op de job, niet op de workflow: een overgeslagen slot hoeft dan niet in
+    # de rij en verdringt geen wachtende run.
+    concurrency:
+      group: wekelijkse-scrape
+      cancel-in-progress: false
+    permissions:
+      contents: write
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -115,7 +173,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add reports/
           if ! git diff --cached --quiet; then
-            git commit -m "Weekrapport $(date -u +%G-W%V)"
+            git commit -m "Weekrapport $(TZ=Europe/Amsterdam date +%G-W%V)"
             git pull --rebase origin "$GITHUB_REF_NAME"
             git push origin "HEAD:$GITHUB_REF_NAME"
           fi
