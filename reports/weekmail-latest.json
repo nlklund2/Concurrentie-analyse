@@ -1,6 +1,6 @@
 {
- "week": "2026-10-12",
- "onderwerp": "W42 · Instroom jacquard bij 2 bronnen · C&A breidt onbekend nachtmode uit · 7/8 bronnen ok",
+ "week": "2026-10-19",
+ "onderwerp": "W43 · Instroom kerst bij 3 bronnen · C&A breidt onbekend nachtmode uit · 8/8 bronnen ok",
  "top3": [
   {
    "rid": "c-and-a",
@@ -9,40 +9,40 @@
    "ptype": "nachtmode",
    "soort": "omvang",
    "richting": 1,
-   "van": 18,
-   "naar": 34,
+   "van": 34,
+   "naar": 44,
    "weken": 3,
    "tag": "trend",
-   "tekst": "C&A breidt onbekend / nachtmode uit van 18 naar 34 artikelen (+89%)",
+   "tekst": "C&A breidt onbekend / nachtmode uit van 34 naar 44 artikelen (+29%)",
    "kop": "C&A breidt onbekend nachtmode uit"
   },
   {
-   "rid": "action",
-   "bron": "Action",
-   "aud": "onbekend",
-   "ptype": "sokken & panty's",
-   "soort": "instap",
-   "richting": -1,
-   "van": 2.29,
-   "naar": 1.89,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "Action: instapniveau onbekend / sokken & panty's omlaag van €2,29 naar €1,89 (-17%)",
-   "kop": "Action instap onbekend sokken & panty's omlaag"
-  },
-  {
-   "rid": "zeeman",
-   "bron": "Zeeman",
-   "aud": "dames",
-   "ptype": "sokken & panty's",
+   "rid": "kik",
+   "bron": "KiK",
+   "aud": "jongens",
+   "ptype": "ondergoed",
    "soort": "mediaan",
    "richting": 1,
-   "van": 3.49,
+   "van": 2.99,
    "naar": 3.99,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "Zeeman: mediaanprijs dames / sokken & panty's omhoog van €3,49 naar €3,99 (+14%)",
-   "kop": "Zeeman mediaan dames sokken & panty's omhoog"
+   "tekst": "KiK: mediaanprijs jongens / ondergoed omhoog van €2,99 naar €3,99 (+33%)",
+   "kop": "KiK mediaan jongens ondergoed omhoog"
+  },
+  {
+   "rid": "wibra",
+   "bron": "Wibra",
+   "aud": "baby",
+   "ptype": "sokken & panty's",
+   "soort": "mediaan",
+   "richting": 1,
+   "van": 3.99,
+   "naar": 4.99,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "Wibra: mediaanprijs baby / sokken & panty's omhoog van €3,99 naar €4,99 (+25%)",
+   "kop": "Wibra mediaan baby sokken & panty's omhoog"
   }
  ]
 }
