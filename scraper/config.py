@@ -60,6 +60,10 @@ class RetailerCfg:
     # alleen http. De crawl klimt pas bij een aantoonbare weigering (403/429
     # of challenge-pagina) en meldt de gebruikte trede in het weekrapport.
     fetch_ladder: list[str] = field(default_factory=list)
+    # Artikelsleutel uit de URL: regex met één groep, bv. "/p/(\\d+)/" (Action).
+    # Voor bronnen waarvan de ingebedde id per week wisselt; de URL blijft
+    # wél staan. Leeg = de sleutel die de strategie vindt.
+    key_from_url: str = ""
     notes: str = ""
 
 
