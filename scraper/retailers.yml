@@ -172,6 +172,10 @@ retailers:
     # na de eerste categorie, vijf weken lang. Drempel op ±45% van de bewezen
     # baseline; de <50%-van-vorige-week-regel blijft de fijne breukdetectie.
     min_products_expected: 100
+    # Sleutel = productnummer uit de URL (/nl-nl/p/<nr>/). De id in Action's
+    # ingebedde JSON wisselde t/m W40 elke week; historie hersteld met
+    # sql/herstel_action_sleutel_2026-10.sql.
+    key_from_url: "/p/(\\d+)/"
     notes: >-
       Prijszetter in sokken/boxers-multipacks.
       GEVALIDEERD 07-08: WERKT via de render-strategie nadat de cookiemuur wordt

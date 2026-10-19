@@ -12,6 +12,11 @@
 #
 # Sinds 14-09-2026 start de run om 03:07 in plaats van 06:07 (besluit eigenaar):
 # de meting duurt tot ruim twee uur, en de weekmail moet om 07:00 binnen zijn.
+#
+# Sinds 19-10-2026: GitHub start deze cron in deze repo structureel 5–6 uur te
+# laat (08:00–09:20 NL). Een externe trigger start de run daarom maandag om
+# 03:07 NL via workflow_dispatch; deze cron blijft staan als vangnet. De job
+# 'bewaking' zorgt dat het vangnet een al gemeten week niet opnieuw scrapet.
 name: Wekelijkse scrape
 
 on:
@@ -37,6 +42,11 @@ on:
         type: boolean
         required: false
         default: false
+      forceer:
+        description: "Ook meten als het weekrapport van deze week al op main staat (overschrijft de weekcijfers)"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: wekelijkse-scrape
@@ -46,7 +56,42 @@ permissions:
   contents: write
 
 jobs:
+  # Weekbewaking: één volledige meting per ISO-week. De cron komt in deze repo
+  # structureel 5–6 uur te laat; ging er al een (handmatige of externe) run
+  # voor, dan scrapete de late cron de week opnieuw en overschreef hij de
+  # cijfers (14-09). Staat reports/<week>.md al op main, dan slaat een volledige
+  # run over. Deelruns (retailers), alleen_rapport en forceer gaan altijd door.
+  bewaking:
+    runs-on: ubuntu-latest
+    outputs:
+      doorgaan: ${{ steps.check.outputs.doorgaan }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Weekrapport al aanwezig?
+        id: check
+        env:
+          RETAILERS: ${{ inputs.retailers }}
+          ALLEEN_RAPPORT: ${{ inputs.alleen_rapport }}
+          FORCEER: ${{ inputs.forceer }}
+        run: |
+          WEEK=$(date -u +%G-W%V)
+          git fetch --depth=1 origin "$GITHUB_REF_NAME"
+          if [ -n "$RETAILERS" ] || [ "$ALLEEN_RAPPORT" = "true" ] || [ "$FORCEER" = "true" ]; then
+            echo "Deelrun, alleen rapport of geforceerd: doorgaan."
+            echo "doorgaan=true" >> "$GITHUB_OUTPUT"
+          elif git cat-file -e "FETCH_HEAD:reports/$WEEK.md" 2>/dev/null; then
+            echo "::notice::reports/$WEEK.md staat al op main: deze week is gemeten. Run overgeslagen (gebruik forceer om toch te meten)."
+            echo "Weekrapport $WEEK bestaat al; run overgeslagen." >> "$GITHUB_STEP_SUMMARY"
+            echo "doorgaan=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "doorgaan=true" >> "$GITHUB_OUTPUT"
+          fi
+
   scrape:
+    needs: bewaking
+    if: needs.bewaking.outputs.doorgaan == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:

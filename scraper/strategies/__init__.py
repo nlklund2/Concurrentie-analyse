@@ -1,10 +1,33 @@
 """Strategieregister + automatische keuze (waterval van goedkoop naar duur)."""
 from __future__ import annotations
 
+import re
+
 from ..config import RetailerCfg
 from ..http import BlockedError, Http
 from ..models import ScrapeResult
 from . import firecrawl_api, listing_crawl, render_listing, shopify, sitemap_pages
+
+def sleutel_uit_url(result: ScrapeResult, patroon: str) -> None:
+    """Artikelsleutel uit de URL halen (cfg.key_from_url).
+
+    Action wisselde t/m W40 elke week de id in zijn ingebedde JSON: 716
+    sleutels voor ±220 artikelen, dus elke week ±40% schijn-instroom en
+    -uitstroom. Het productnummer in de URL bleef gelijk. Artikelen zonder
+    match houden hun sleutel; dubbele sleutels worden samengevoegd (eerste wint).
+    """
+    rx = re.compile(patroon)
+    gezien: dict[str, object] = {}
+    for p in result.products:
+        m = rx.search(p.url or "")
+        if m and m.group(1):
+            p.key = m.group(1)
+        gezien.setdefault(p.key, p)
+    if len(gezien) < len(result.products):
+        result.notes.append(f"sleutel uit URL: {len(result.products) - len(gezien)} "
+                            "dubbele artikelen samengevoegd")
+    result.products = list(gezien.values())
+
 
 FIXED = {
     "shopify": shopify.scrape,
@@ -30,6 +53,8 @@ def run(cfg: RetailerCfg, limit: int | None = None) -> ScrapeResult:
     except Exception as e:  # één bron mag nooit de hele weekrun breken
         result.error = f"{type(e).__name__}: {e}"
     result.retailer_id = cfg.id
+    if cfg.key_from_url:
+        sleutel_uit_url(result, cfg.key_from_url)
     if result.strategy == "firecrawl":
         # requests_done telt hierboven de Firecrawl-aanroepen; bewaar die als
         # creditverbruik vóór de teller hieronder de gewone-HTTP-stand krijgt.
