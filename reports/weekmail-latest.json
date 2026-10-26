@@ -1,48 +1,48 @@
 {
- "week": "2026-10-19",
- "onderwerp": "W43 · Instroom kerst bij 3 bronnen · C&A breidt onbekend nachtmode uit · 8/8 bronnen ok",
+ "week": "2026-10-26",
+ "onderwerp": "W44 · Instroom geruite bij 2 bronnen · C&A mediaan onbekend sokken & panty's omhoog · 8/8 bronnen ok",
  "top3": [
   {
    "rid": "c-and-a",
    "bron": "C&A",
    "aud": "onbekend",
-   "ptype": "nachtmode",
-   "soort": "omvang",
+   "ptype": "sokken & panty's",
+   "soort": "mediaan",
    "richting": 1,
-   "van": 34,
-   "naar": 44,
-   "weken": 3,
-   "tag": "trend",
-   "tekst": "C&A breidt onbekend / nachtmode uit van 34 naar 44 artikelen (+29%)",
-   "kop": "C&A breidt onbekend nachtmode uit"
+   "van": 4.49,
+   "naar": 7.99,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "C&A: mediaanprijs onbekend / sokken & panty's omhoog van €4,49 naar €7,99 (+78%)",
+   "kop": "C&A mediaan onbekend sokken & panty's omhoog"
   },
   {
    "rid": "kik",
    "bron": "KiK",
-   "aud": "jongens",
+   "aud": "heren",
    "ptype": "ondergoed",
-   "soort": "mediaan",
-   "richting": 1,
-   "van": 2.99,
-   "naar": 3.99,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "KiK: mediaanprijs jongens / ondergoed omhoog van €2,99 naar €3,99 (+33%)",
-   "kop": "KiK mediaan jongens ondergoed omhoog"
-  },
-  {
-   "rid": "wibra",
-   "bron": "Wibra",
-   "aud": "baby",
-   "ptype": "sokken & panty's",
-   "soort": "mediaan",
+   "soort": "instap",
    "richting": 1,
    "van": 3.99,
-   "naar": 4.99,
+   "naar": 5.49,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "Wibra: mediaanprijs baby / sokken & panty's omhoog van €3,99 naar €4,99 (+25%)",
-   "kop": "Wibra mediaan baby sokken & panty's omhoog"
+   "tekst": "KiK: instapniveau heren / ondergoed omhoog van €3,99 naar €5,49 (+38%)",
+   "kop": "KiK instap heren ondergoed omhoog"
+  },
+  {
+   "rid": "terstal",
+   "bron": "terStal familiemode",
+   "aud": "dames",
+   "ptype": "nachtmode",
+   "soort": "mediaan",
+   "richting": 1,
+   "van": 14.99,
+   "naar": 19.99,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "terStal familiemode: mediaanprijs dames / nachtmode omhoog van €14,99 naar €19,99 (+33%)",
+   "kop": "terStal familiemode mediaan dames nachtmode omhoog"
   }
  ]
 }
