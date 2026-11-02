@@ -1,6 +1,6 @@
-# Weekrapport concurrentiemonitor — week 44, 2026
+# Weekrapport concurrentiemonitor — week 45, 2026
 
-*Peildatum: maandag 26-10-2026. Cijfers betreffen het online assortiment (trend-indicatie, geen winkeltelling).*
+*Peildatum: maandag 02-11-2026. Cijfers betreffen het online assortiment (trend-indicatie, geen winkeltelling).*
 
 *Scope: ondergoedmode — ondergoed, nachtmode, sokken & panty's.*
 
@@ -8,87 +8,88 @@
 
 | Bron | Strategie | Deze run | In database | t.o.v. vorige week | Status |
 |---|---|---:|---:|---:|---|
-| Action | render | 212 | 212 | +0% | 🟢 ok — {"new": 1, "back": 6, "gone": 7, "price_up": 12, "products": 212, "promo_end": 0, "price_down": 5, "promo_start": 0} |
-| C&A | render | 881 | 881 | +4% | 🟢 ok — {"new": 59, "back": 23, "gone": 45, "price_up": 0, "products": 881, "promo_end": 0, "price_down": 25, "promo_start": 24} |
-| HEMA | firecrawl | 115 | 115 | -1% | 🟢 ok — {"new": 2, "back": 0, "gone": 3, "price_up": 3, "products": 115, "promo_end": 0, "price_down": 3, "promo_start": 0} · 24 Firecrawl-credits |
-| KiK | render | 619 | 619 | -1% | 🟢 ok — {"new": 36, "back": 6, "gone": 49, "price_up": 0, "products": 619, "promo_end": 0, "price_down": 0, "promo_start": 0} |
-| Primark | listing | 1102 | 1102 | +2% | 🟢 ok — {"new": 183, "back": 57, "gone": 215, "price_up": 0, "products": 1102, "promo_end": 0, "price_down": 0, "promo_start": 0} |
-| terStal familiemode | sitemap_pages | 410 | 410 | -2% | 🟢 ok — {"new": 11, "back": 1, "gone": 20, "price_up": 11, "products": 410, "promo_end": 0, "price_down": 0, "promo_start": 0} |
-| Wibra | firecrawl | 116 | 116 | +15% | 🟢 ok — {"new": 18, "back": 2, "gone": 5, "price_up": 0, "products": 116, "promo_end": 0, "price_down": 0, "promo_start": 0} · 12 Firecrawl-credits |
-| Zeeman | listing+firecrawl | 935 | 935 | +1% | 🟢 ok — {"new": 51, "back": 9, "gone": 54, "price_up": 1, "products": 935, "promo_end": 0, "price_down": 1, "promo_start": 0} · 45 Firecrawl-credits |
+| Action | render | 214 | 214 | +1% | 🟢 ok — {"new": 0, "back": 10, "gone": 8, "price_up": 3, "products": 214, "promo_end": 0, "price_down": 19, "promo_start": 0} |
+| C&A | render | 902 | 902 | +2% | 🟢 ok — {"new": 54, "back": 27, "gone": 60, "price_up": 2, "products": 902, "promo_end": 2, "price_down": 6, "promo_start": 6} |
+| HEMA | firecrawl | 132 | 132 | +15% | 🟢 ok — {"new": 23, "back": 3, "gone": 9, "price_up": 2, "products": 132, "promo_end": 0, "price_down": 4, "promo_start": 0} · 24 Firecrawl-credits |
+| KiK | render | 661 | 661 | +7% | 🟢 ok — {"new": 75, "back": 15, "gone": 48, "price_up": 0, "products": 661, "promo_end": 0, "price_down": 24, "promo_start": 1} |
+| Primark | listing | 1106 | 1106 | +0% | 🟢 ok — {"new": 172, "back": 62, "gone": 230, "price_up": 0, "products": 1106, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| terStal familiemode | sitemap_pages | 408 | 408 | -0% | 🟢 ok — {"new": 3, "back": 1, "gone": 6, "price_up": 0, "products": 408, "promo_end": 0, "price_down": 0, "promo_start": 0} |
+| Wibra | firecrawl | 113 | 113 | -3% | 🟢 ok — {"new": 10, "back": 1, "gone": 14, "price_up": 0, "products": 113, "promo_end": 0, "price_down": 2, "promo_start": 2} · 12 Firecrawl-credits |
+| Zeeman | listing+firecrawl | 920 | 920 | -2% | 🟢 ok — {"new": 61, "back": 9, "gone": 85, "price_up": 0, "products": 920, "promo_end": 0, "price_down": 4, "promo_start": 0} · 47 Firecrawl-credits |
 
 > 🟠/🔴: cijfers van die bron deze week niet gebruiken voor besluiten.
 > *Deze run* is wat de scraper deze week ophaalde, *in database* de laatst verwerkte stand. Lopen die uiteen, dan heeft de kwaliteitspoort deze week tegengehouden en staat er nog oudere data.
 
 ## 2. Signalen van de week
 
-- **C&A** · onbekend / sokken & panty's: mediaanprijs omhoog van €4,49 naar €7,99 (+78%)
-- **terStal familiemode** · meisjes / nachtmode: mediaanprijs omhoog van €12,99 naar €19,99 (+54%)
-- **KiK** · heren / ondergoed: instapniveau omhoog van €3,99 naar €5,49 (+38%)
-- **C&A** · onbekend / sokken & panty's: instapniveau omhoog van €2,99 naar €3,99 (+33%)
-- **terStal familiemode** · dames / nachtmode: mediaanprijs omhoog van €14,99 naar €19,99 (+33%)
-- **terStal familiemode** · meisjes / nachtmode: instapniveau omhoog van €10,00 naar €12,99 (+30%)
-- **KiK** · heren / nachtmode: instapniveau omhoog van €7,99 naar €9,99 (+25%)
-- **Zeeman** · baby / nachtmode: mediaanprijs omhoog van €4,99 naar €5,99 (+20%)
-- **C&A** · jongens / sokken & panty's: mediaanprijs omlaag van €9,99 naar €7,99 (-20%)
-- **Wibra** · dames / ondergoed: breidt uit van 39 naar 50 artikelen (+28%)
-- **Zeeman** · kinderen / nachtmode: mediaanprijs omhoog van €8,49 naar €9,99 (+18%)
-- **Action** · onbekend / sokken & panty's: mediaanprijs omhoog van €2,38 naar €2,79 (+17%)
-- **Zeeman** · baby / sokken & panty's: instapniveau omhoog van €2,84 naar €3,29 (+16%)
-- **KiK** · heren / nachtmode: mediaanprijs omhoog van €9,99 naar €11,49 (+15%)
-- **Zeeman** · kinderen / sokken & panty's: instapniveau omlaag van €3,49 naar €2,99 (-14%)
+- **HEMA** · dames / sokken & panty's: breidt uit van 9 naar 19 artikelen (+111%)
+- **KiK** · meisjes / sokken & panty's: breidt uit van 20 naar 33 artikelen (+65%)
+- **KiK** · heren / nachtmode: breidt uit van 10 naar 17 artikelen (+70%)
+- **Wibra** · dames / sokken & panty's: instapniveau omlaag van €3,12 naar €1,99 (-36%)
+- **KiK** · baby / sokken & panty's: breidt uit van 14 naar 22 artikelen (+57%)
+- **C&A** · onbekend / ondergoed: mediaanprijs omhoog van €9,99 naar €12,99 (+30%)
+- **C&A** · onbekend / sokken & panty's: mediaanprijs omlaag van €7,99 naar €5,99 (-25%)
+- **C&A** · jongens / sokken & panty's: mediaanprijs omhoog van €7,99 naar €9,99 (+25%)
+- **KiK** · meisjes / sokken & panty's: mediaanprijs omhoog van €3,24 naar €3,99 (+23%)
+- **KiK** · jongens / ondergoed: instapniveau omhoog van €2,49 naar €2,99 (+20%)
+- **C&A** · dames / ondergoed: mediaanprijs omlaag van €15,99 naar €12,99 (-19%)
+- **Zeeman** · baby / nachtmode: mediaanprijs omhoog van €5,99 naar €6,99 (+17%)
+- **C&A** · baby / sokken & panty's: mediaanprijs omhoog van €5,99 naar €6,99 (+17%)
+- **C&A** · onbekend / ondergoed: breidt uit van 72 naar 85 artikelen (+18%)
+- **terStal familiemode** · heren / nachtmode: instapniveau omhoog van €15,74 naar €18,12 (+15%)
 
 ## 3. Grootste prijsverlagingen deze week
 
 | Bron | Artikel | Van | Naar | Verschil |
 |---|---|---:|---:|---:|
-| HEMA | kindersokken rib - 5 paar multicolor | €8,69 | €4,00 | -54% |
-| HEMA | babypyjama honden naturel | €11,19 | €9,99 | -11% |
-| HEMA | baby meegroeipyjama rib ganzen creme | €16,49 | €14,99 | -9% |
-| C&A | Set 2 - PAW Patrol - Chase, Rubble, Rex - hemdje | €7,99 | €3,99 | -50% |
-| C&A | Set 5 paar - Halloween - vleermuis, spin - sokken | €7,99 | €3,99 | -50% |
-| C&A | Set 3 - PAW Patrol - Chase, Marshall - boxershort | €9,99 | €4,99 | -50% |
-| C&A | Pyjama - 2-delig - ribstof | €14,99 | €9,99 | -33% |
-| C&A | NYC - pyjama met strass-steentjes - 2-delig | €19,99 | €14,99 | -25% |
-| Zeeman | Boxer - Roze | €5,49 | €3,69 | -33% |
-| Action | Fleecepanty | €5,95 | €4,49 | -25% |
-| Action | Huispak | €12,95 | €9,95 | -23% |
-| Action | Pyjama | €7,95 | €6,95 | -13% |
-| Action | Velours jongenspyjama | €7,95 | €6,95 | -13% |
-| Action | Kinderonesie | €9,95 | €8,95 | -10% |
+| Wibra | Hipster invisible kant maat S – XL | €3,49 | €1,75 | -50% |
+| Wibra | Heren boxer maat M – XXL | €3,49 | €1,75 | -50% |
+| KiK | Slips | €1,99 | €1,00 | -50% |
+| KiK | Spider-Man retro boxershort | €2,99 | €1,99 | -33% |
+| KiK | Spider-Man retro boxershort | €2,99 | €1,99 | -33% |
+| KiK | Gabby's Dollhouse onderboekjes | €2,99 | €1,99 | -33% |
+| KiK | Gestreepte retro boxershorts | €2,99 | €1,99 | -33% |
+| HEMA | corrigerende panty ultimate control 20 denier glans zwart | €9,49 | €5,69 | -40% |
+| HEMA | corrigerende panty ultimate control 40 denier glans zwart | €9,99 | €5,99 | -40% |
+| HEMA | kinderboxers uni - 3 stuks blauw | €12,99 | €8,00 | -38% |
+| HEMA | kinderonderbroek eenhoorn - 3 stuks geel | €11,19 | €9,99 | -11% |
+| C&A | Set 5 - rompertje | €15,99 | €10,99 | -31% |
+| C&A | Set 5 - rompertje | €15,99 | €10,99 | -31% |
+| C&A | Spider-Man - badjas met capuchon | €22,99 | €15,99 | -30% |
+| C&A | Set 10 paar - sneakersokken | €9,99 | €6,99 | -30% |
 
 ## 4. Assortimentsomvang per groep (verschil t.o.v. vorige week)
 
 | Groep | terStal familiemode | Action | C&A | HEMA | KiK | Primark | Wibra | Zeeman |
 |---|---|---|---|---|---|---|---|---|
-| dames / ondergoed | 115 (-2) | 2 | 252 (-2) | 1 | 210 (-6) | 549 (+7) | 50 (+11) | 266 (-3) |
-| dames / nachtmode | 38 (+3) | 1 (-1) | 8 (+4) | – | 28 (+2) | 257 (+5) | 2 | 32 (+5) |
-| dames / sokken & panty's | 33 | 2 | – | 9 (+1) | 1 | 125 (+8) | 8 (+4) | 104 (+1) |
-| heren / ondergoed | 41 (-4) | 2 | 14 | – | 64 (+4) | 54 (+1) | 8 (+1) | 71 (-2) |
-| onbekend / ondergoed | – | 100 | 72 (+9) | – | 75 (+3) | – | – | – |
-| kinderen / ondergoed | – | 1 | – | – | – | – | – | 232 (-1) |
-| heren / sokken & panty's | 22 (-1) | 2 (-1) | 34 (+3) | 5 (-1) | 50 (+1) | 33 (+2) | – | 34 (+3) |
-| kinderen / nachtmode | – | 2 | 100 (+2) | – | – | – | – | 77 (+3) |
-| baby / nachtmode | – | – | 120 (+12) | 6 | 16 | – | 2 (-1) | 21 (-4) |
-| heren / nachtmode | 11 (-3) | 4 (+1) | 24 (-1) | 9 | 10 (-1) | 84 (+2) | – | 11 (+1) |
-| baby / sokken & panty's | 10 | – | 52 (+3) | 14 | 14 (-3) | – | 27 | 20 (-2) |
-| meisjes / ondergoed | 17 (-2) | – | 10 (-1) | 18 | 76 (-1) | – | 7 (+1) | – |
-| onbekend / sokken & panty's | 17 | 64 (+1) | 25 (-5) | – | 1 | – | – | – |
-| jongens / nachtmode | 3 | 2 | 65 (+2) | 13 | 14 | – | – | – |
+| dames / ondergoed | 118 (+3) | 3 (+1) | 247 (-5) | 1 | 213 (+3) | 551 (+2) | 47 (-3) | 292 (+26) |
+| dames / nachtmode | 38 | 2 (+1) | 10 (+2) | – | 31 (+3) | 251 (-6) | 1 (-1) | 32 |
+| dames / sokken & panty's | 33 | 2 | – | 19 (+10) | 1 | 131 (+6) | 8 | 100 (-4) |
+| onbekend / ondergoed | – | 99 (-1) | 85 (+13) | – | 75 | – | – | – |
+| heren / ondergoed | 40 (-1) | 2 | 13 (-1) | – | 65 (+1) | 53 (-1) | 8 | 66 (-5) |
+| kinderen / ondergoed | – | 1 | – | – | – | – | – | 208 (-24) |
+| kinderen / nachtmode | – | 2 | 108 (+8) | – | – | – | – | 78 (+1) |
+| heren / sokken & panty's | 20 (-2) | 2 | 35 (+1) | 4 (-1) | 54 (+4) | 33 | – | 31 (-3) |
+| baby / nachtmode | – | – | 123 (+3) | 8 (+2) | 18 (+2) | – | 2 | 20 (-1) |
+| heren / nachtmode | 10 (-1) | 4 | 22 (-2) | 9 | 17 (+7) | 87 (+3) | – | 10 (-1) |
+| baby / sokken & panty's | 10 | – | 51 (-1) | 15 (+1) | 22 (+8) | – | 29 (+2) | 18 (-2) |
+| meisjes / ondergoed | 17 | 1 | 11 (+1) | 16 (-2) | 76 | – | 6 (-1) | – |
+| onbekend / sokken & panty's | 17 | 65 (+1) | 29 (+4) | – | 1 | – | – | – |
+| jongens / nachtmode | 3 | 2 | 65 | 17 (+4) | 16 (+2) | – | 2 | – |
 
 ## 5. Prijsindex t.o.v. terStal (mediaan; terStal = 100)
 
 | Groep | Action | C&A | HEMA | KiK | Primark | Wibra | Zeeman |
 |---|---|---|---|---|---|---|---|
-| dames / ondergoed | – | 200 | – | 62 | 100 | 75 | 62 |
+| dames / ondergoed | – | 163 | – | 62 | 100 | 75 | 62 |
 | dames / nachtmode | – | 150 | – | 65 | 80 | – | 42 |
-| dames / sokken & panty's | – | – | 112 | – | 90 | 70 | 75 |
+| dames / sokken & panty's | – | – | 120 | – | 90 | 70 | 70 |
 | heren / ondergoed | – | 130 | – | 60 | 180 | 70 | 60 |
-| heren / sokken & panty's | – | 237 | – | 73 | 109 | – | 73 |
-| heren / nachtmode | – | 65 | 185 | 57 | 85 | – | 50 |
-| baby / sokken & panty's | – | 150 | 175 | 75 | – | 125 | 87 |
-| meisjes / ondergoed | – | 351 | 280 | 125 | – | – | – |
-| onbekend / sokken & panty's | 56 | 160 | – | – | – | – | – |
+| heren / sokken & panty's | – | 260 | – | 80 | 120 | – | 80 |
+| heren / nachtmode | – | 65 | 185 | 50 | 85 | – | 50 |
+| baby / sokken & panty's | – | 175 | 175 | 75 | – | 125 | 87 |
+| meisjes / ondergoed | – | 326 | 265 | 125 | – | – | – |
+| onbekend / sokken & panty's | 56 | 120 | – | – | – | – | – |
 
 > Index < 100: concurrent is goedkoper dan terStal. Kompas, geen rechter — kwaliteitsverschil is online onzichtbaar (PLAN.md §6.5).
 
@@ -96,16 +97,16 @@
 
 | Groep | Action | C&A | HEMA | KiK | Primark | Wibra | Zeeman |
 |---|---|---|---|---|---|---|---|
-| dames / ondergoed | – | 163 | – | 44 | 67 | 62 | 34 |
-| dames / sokken & panty's | – | – | 373 | – | 133 | 233 | 117 |
+| dames / ondergoed | – | 163 | – | 44 | 67 | 75 | 38 |
+| dames / sokken & panty's | – | – | 379 | – | 133 | 233 | 118 |
 | heren / ondergoed | – | 162 | – | 75 | 90 | 150 | 75 |
-| heren / sokken & panty's | – | 278 | – | 83 | 100 | – | 92 |
-| heren / nachtmode | – | 13 | 185 | 57 | 85 | – | 50 |
-| baby / sokken & panty's | – | 83 | 132 | 88 | – | 250 | 35 |
-| meisjes / ondergoed | – | 125 | 107 | 50 | – | – | – |
-| onbekend / sokken & panty's | 223 | 114 | – | – | – | – | – |
+| heren / sokken & panty's | – | 278 | – | 83 | 100 | – | 83 |
+| heren / nachtmode | – | 17 | 185 | 50 | 85 | – | 50 |
+| baby / sokken & panty's | – | 83 | 140 | 75 | – | 250 | 35 |
+| meisjes / ondergoed | – | 125 | 100 | 50 | – | – | – |
+| onbekend / sokken & panty's | 223 | 149 | – | – | – | – | – |
 
-> Prijs per stuk = prijs ÷ aantal in de verpakking, afgeleid uit de artikelnaam (3-pack, 5 paar) of uit de stukprijs op de kaart (KiK '0,66 € / Stuk', Action '€ 2,48/st'). Alleen groepen waarin minstens één bron ≥10% multipacks voert. Aandeel multipacks in die groepen: terStal familiemode 54%, Action 0%, C&A 60%, HEMA 23%, KiK 60%, Primark 66%, Wibra 23%, Zeeman 50%.
+> Prijs per stuk = prijs ÷ aantal in de verpakking, afgeleid uit de artikelnaam (3-pack, 5 paar) of uit de stukprijs op de kaart (KiK '0,66 € / Stuk', Action '€ 2,48/st'). Alleen groepen waarin minstens één bron ≥10% multipacks voert. Aandeel multipacks in die groepen: terStal familiemode 55%, Action 0%, C&A 59%, HEMA 24%, KiK 59%, Primark 66%, Wibra 20%, Zeeman 49%.
 > Wijkt deze index sterk af van §5, dan zit het prijsverschil in de verpakkingsgrootte en niet in de prijs per stuk.
 
 ## 6. Sale-druk per bron
@@ -114,25 +115,25 @@
 |---|---:|---:|
 | terStal familiemode | 0% | +0 pt |
 | Action | 0% | +0 pt |
-| C&A | 10% | +1 pt |
+| C&A | 10% | -0 pt |
 | HEMA | 0% | +0 pt |
-| KiK | 27% | -2 pt |
+| KiK | 25% | -3 pt |
 | Primark | 0% | +0 pt |
-| Wibra | 3% | -0 pt |
+| Wibra | 4% | +2 pt |
 | Zeeman | 0% | +0 pt |
 
 ## 7. Vernieuwingstempo per bron
 
 | Bron | Omvang | Instroom deze week | Uitstroom deze week |
 |---|---:|---:|---:|
-| terStal familiemode | 410 | 11 (3%) | 20 (5%) |
-| Action | 212 | 1 (0%) | 7 (3%) |
-| C&A | 881 | 59 (7%) | 45 (5%) |
-| HEMA | 115 | 2 (2%) | 3 (3%) |
-| KiK | 619 | 36 (6%) | 49 (8%) |
-| Primark | 1102 | 183 (17%) | 215 (20%) |
-| Wibra | 116 | 18 (16%) | 5 (4%) |
-| Zeeman | 935 | 51 (5%) | 54 (6%) |
+| terStal familiemode | 408 | 3 (1%) | 6 (1%) |
+| Action | 214 | 0 (0%) | 8 (4%) |
+| C&A | 902 | 54 (6%) | 60 (7%) |
+| HEMA | 132 | 23 (17%) | 9 (7%) |
+| KiK | 661 | 75 (11%) | 48 (7%) |
+| Primark | 1106 | 172 (16%) | 230 (21%) |
+| Wibra | 113 | 10 (9%) | 14 (12%) |
+| Zeeman | 920 | 61 (7%) | 85 (9%) |
 
 > Instroom en uitstroom als aandeel van het eigen assortiment: wie hoog zit speelt op snelheid en nieuwheid, wie laag zit zit op voorraad. Ontbreekt de vorige week (eerste meting of tegengehouden door de kwaliteitspoort), dan zegt het percentage niets en blijft het leeg.
 
