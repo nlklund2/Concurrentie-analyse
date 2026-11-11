@@ -67,7 +67,10 @@ jobs:
       - name: Headless browser voor render-capture
         run: |
           pip install playwright
-          playwright install --with-deps chromium
+          # --with-deps haalt extra fonts via apt; de runner-image (ubuntu-26.04)
+          # heeft alle browserlibs al, maar de apt-spiegels zijn soms onbereikbaar
+          # (11-11: DNS-fout, hele run rood). Dan zonder apt verder.
+          playwright install --with-deps chromium || playwright install chromium
 
       - name: Sweep, capture en verwerking
         run: |
