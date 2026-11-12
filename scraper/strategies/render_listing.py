@@ -640,9 +640,17 @@ class _KaartLezer(HTMLParser):
         stukje = re.sub(r"\s+", " ", data).strip()
         if not stukje:
             return
+        # KiK (Firecrawl, 12-11): '€<span>5</span><sup>99</sup>'. Met spaties
+        # ertussen werd dat '€ 5 99' en las de scraper €5,00. Plak daarom aan
+        # zoals innerText doet: direct achter een €-teken, en centen in
+        # superscript direct achter een cijfer — dan pakt CENTEN_AANEEN_RE het.
+        centen = (self._stack[-1]["tag"] == "sup" and stukje.isdigit()
+                  and len(stukje) == 2)
         for node in self._stack:
             if len(node["tekst"]) < self._TEKST_CAP:
-                node["tekst"] = (node["tekst"] + " " + stukje).strip()
+                vorige = node["tekst"]
+                plak = vorige.endswith("€") or (centen and vorige[-1:].isdigit())
+                node["tekst"] = (vorige + ("" if plak else " ") + stukje).strip()
 
 
 def lees_ankers(html: str, heeft_euro: bool = True,
