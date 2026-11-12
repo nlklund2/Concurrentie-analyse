@@ -501,3 +501,63 @@ def test_fetch_geeft_status_van_de_bron_en_probeert_proxy_alias(monkeypatch):
     # de oude wrapper blijft alleen HTML geven
     assert fc_api._firecrawl_html(_Session(), "https://www.zeeman.com/nl-nl/x", res, raw=True) \
         == "<html>403 ERROR</html>"
+
+
+def _kik_pagina(start, aantal):
+    tegels = "".join(
+        f'<div><a href="https://www.kik.nl/p/slip-{i}/{1000 + i}" aria-label="Slip {i}">Slip {i}</a>'
+        f'<p>€<span>2</span><sup>99</sup></p></div>' for i in range(start, start + aantal))
+    return f"<html><body>{tegels}</body></html>"
+
+
+def test_doorbladeren_tot_onvolle_pagina(monkeypatch):
+    """KiK: pagina 1 en 2 vol, pagina 3 half → stop zonder pagina 4 te vragen."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=_kik_pagina(0, 24)),
+                                  _Resp(html=_kik_pagina(24, 24)),
+                                  _Resp(html=_kik_pagina(48, 7))])
+    cfg = _cfg(id="kik", base="https://www.kik.nl", firecrawl_pages=10,
+               seeds=["https://www.kik.nl/c/dames/dameskleding-ondergoed"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(res.products) == 55
+    assert {p.price for p in res.products} == {2.99}
+    assert calls[1:] == ["https://www.kik.nl/c/dames/dameskleding-ondergoed?page=2",
+                         "https://www.kik.nl/c/dames/dameskleding-ondergoed?page=3"]
+    assert res.requests_done == 3
+
+
+def test_doorbladeren_stopt_als_bron_page_negeert(monkeypatch):
+    """Geeft ?page=2 dezelfde artikelen, dan stoppen (1 credit verloren, niet 9)."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=_kik_pagina(0, 24))])
+    cfg = _cfg(id="kik", base="https://www.kik.nl", firecrawl_pages=10,
+               seeds=["https://www.kik.nl/c/heren/sokken"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(res.products) == 24 and len(calls) == 2
+
+
+def test_zonder_firecrawl_pages_geen_vervolgpagina(monkeypatch):
+    """HEMA (standaard firecrawl_pages=1): gedrag ongewijzigd, 1 credit per categorie."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=_kik_pagina(0, 24))])
+    cfg = _cfg(seeds=["https://www.wibra.nl/a", "https://www.wibra.nl/b"])
+    firecrawl_api.scrape(cfg, http=None)
+    assert calls == ["https://www.wibra.nl/a", "https://www.wibra.nl/b"]
+
+
+def test_cap_begrenst_doorbladeren(monkeypatch):
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    pagina = iter(range(0, 10_000, 24))
+    calls = []
+
+    def post(self, url, json=None, timeout=None):
+        calls.append(json["url"])
+        return _Resp(html=_kik_pagina(next(pagina), 24))
+
+    monkeypatch.setattr("requests.Session.post", post)
+    cfg = _cfg(id="kik", base="https://www.kik.nl", firecrawl_pages=10,
+               firecrawl_page_cap=5,
+               seeds=["https://www.kik.nl/c/a", "https://www.kik.nl/c/b"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert len(calls) == 5 and res.requests_done == 5
+    assert any("cap van 5" in n for n in res.notes)

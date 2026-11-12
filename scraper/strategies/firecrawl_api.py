@@ -52,6 +52,10 @@ ACTIES_SCROLL = [
     {"type": "wait", "milliseconds": 1200},
 ]
 
+# Minder tegels dan dit op een lijstpagina = laatste pagina (KiK toont er 24+
+# per volle pagina; een categorie met 11 artikelen past op één pagina).
+VOLLE_PAGINA = 16
+
 _PRIJS_LOS_RE = re.compile(r"(?<![\d.,])\d{1,4}[.,]\d{2}(?![.,]?\d)")
 _API_HINT_RE = re.compile(
     r"https?://[^\s\"'<>\\]{6,140}(?:api|graphql|search|catalog)[^\s\"'<>\\]{0,80}",
@@ -124,6 +128,7 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
     uit_kaarten = 0
     uit_json = 0
     missers = 0
+    extra_paginas = 0
     for n, cat_url in enumerate(cats, start=1):
         cat_path = urlsplit(cat_url).path.strip("/").replace("/", " > ")
         html = _firecrawl_html(session, cat_url, res, actions=ACTIES_SCROLL,
@@ -149,7 +154,36 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
             # crawlpad (doelgroep) én bron-categorie (producttype) allebei bewaren
             p.category_raw = _voeg_samen(cat_path, p.category_raw)
             seen.setdefault(p.key, p)
+        # Doorbladeren (opt-in, firecrawl_pages > 1). KiK via de browser haalde
+        # tot W45 214 artikelen uit dameskleding-ondergoed over meerdere
+        # pagina's; alleen pagina 1 gaf 462 i.p.v. 661 (validatie 12-11).
+        # Een pagina met minder dan VOLLE_PAGINA tegels is de laatste, dus
+        # kleine categorieën kosten geen extra credit.
+        cat_keys = {p.key for p in found}
+        vorige = found
+        for pagina in range(2, cfg.firecrawl_pages + 1):
+            if len(vorige) < VOLLE_PAGINA or credits >= cfg.firecrawl_page_cap:
+                break
+            url = f"{cat_url}{'&' if '?' in cat_url else '?'}page={pagina}"
+            html = _firecrawl_html(session, url, res, actions=ACTIES_SCROLL,
+                                   wait_ms=cfg.firecrawl_wait_ms)
+            credits += 1
+            if html is None:
+                break
+            vorige = products_from_html(html, url) or cards_from_html(html, url)
+            nieuw = [p for p in vorige if p.key not in cat_keys]
+            if not nieuw:     # de bron negeert ?page= of de lijst is op
+                break
+            extra_paginas += 1
+            for p in nieuw:
+                cat_keys.add(p.key)
+                p.category_raw = _voeg_samen(cat_path, p.category_raw)
+                seen.setdefault(p.key, p)
         if (limit and len(seen) >= limit) or len(seen) >= cfg.max_products:
+            break
+        if credits >= cfg.firecrawl_page_cap:
+            res.notes.append(f"Firecrawl-cap van {cfg.firecrawl_page_cap} pagina's bereikt "
+                             f"na {n} van {len(cats)} categorieën")
             break
         # Kanarie: bij HEMA rendert het productraster niet altijd, en dan leest
         # het kaart-vangnet alleen de promoblokken eromheen (koffie, koekjes) —
@@ -163,6 +197,8 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 "levert de kanarie wél data, dan loopt de run door)")
             break
     res.requests_done = credits
+    if extra_paginas:
+        res.notes.append(f"doorgebladerd: {extra_paginas} vervolgpagina('s) met nieuwe artikelen")
     if uit_kaarten:
         res.notes.append(f"kaart-vangnet: {uit_kaarten} artikelen uit de "
                          "gerenderde HTML (geen ingebedde JSON)")

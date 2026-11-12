@@ -285,6 +285,11 @@ retailers:
     # Kosten: ±1 credit per categorie per week. Terug naar 'render' zodra
     # de controle verdwijnt (toegangscheck/validatie laat dat zien).
     strategy: firecrawl
+    # Doorbladeren (?page=n) zoals de browser deed: alleen pagina 1 gaf 462
+    # artikelen i.p.v. 661 (W45). Alleen volle pagina's krijgen een vervolg;
+    # de cap houdt het totaal op ±1,5–2× het aantal categorieën.
+    firecrawl_pages: 10
+    firecrawl_page_cap: 90
     enrich: false
     max_categories: 45
     max_pages_per_category: 15
