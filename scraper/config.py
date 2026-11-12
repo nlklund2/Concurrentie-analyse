@@ -39,6 +39,10 @@ class RetailerCfg:
     # kost 1 credit per artikel per week (cap hieronder).
     firecrawl_mode: str = "listing"
     firecrawl_page_cap: int = 120
+    # Lijstpagina's per categorie in de Firecrawl-lijstroute (?page=n). 1 = alleen
+    # de eerste pagina (HEMA). Elke vervolgpagina kost 1 credit; firecrawl_page_cap
+    # begrenst het totaal.
+    firecrawl_pages: int = 1
     # Extra rendertijd per Firecrawl-fetch in ms; 0 = de standaard (5000).
     # Voor rasters die ook na scrollen traag hydrateren (HEMA-hypothese).
     firecrawl_wait_ms: int = 0
