@@ -278,7 +278,13 @@ retailers:
     segment: breed
     enabled: true
     color_slot: 8
-    strategy: render
+    # Sinds W46 (09-11) toont KiK het datacenter-IP van GitHub Actions een
+    # 'Security Check' (HTTP 503) — ook in de browser. Via Firecrawl laadt de
+    # pagina wél (diagnose 11-11: 118k tekens, 96 prijzen); de kaartlezer
+    # (cards_from_html) kent het '€8<sup>99</sup>'-patroon hieronder.
+    # Kosten: ±1 credit per categorie per week. Terug naar 'render' zodra
+    # de controle verdwijnt (toegangscheck/validatie laat dat zien).
+    strategy: firecrawl
     enrich: false
     max_categories: 45
     max_pages_per_category: 15
