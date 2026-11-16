@@ -1,48 +1,48 @@
 {
- "week": "2026-11-09",
- "onderwerp": "W46 · Instroom disney bij 2 bronnen · HEMA mediaan meisjes sokken & panty's omlaag · 7/8 bronnen ok",
+ "week": "2026-11-16",
+ "onderwerp": "W47 · Instroom naadloze bij 3 bronnen · C&A instap onbekend ondergoed omlaag · 8/8 bronnen ok",
  "top3": [
-  {
-   "rid": "hema",
-   "bron": "HEMA",
-   "aud": "meisjes",
-   "ptype": "sokken & panty's",
-   "soort": "mediaan",
-   "richting": -1,
-   "van": 8.69,
-   "naar": 4.99,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "HEMA: mediaanprijs meisjes / sokken & panty's omlaag van €8,69 naar €4,99 (-43%)",
-   "kop": "HEMA mediaan meisjes sokken & panty's omlaag"
-  },
   {
    "rid": "c-and-a",
    "bron": "C&A",
    "aud": "onbekend",
    "ptype": "ondergoed",
-   "soort": "mediaan",
+   "soort": "instap",
    "richting": -1,
-   "van": 12.99,
-   "naar": 9.99,
+   "van": 7.99,
+   "naar": 5.99,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "C&A: mediaanprijs onbekend / ondergoed omlaag van €12,99 naar €9,99 (-23%)",
-   "kop": "C&A mediaan onbekend ondergoed omlaag"
+   "tekst": "C&A: instapniveau onbekend / ondergoed omlaag van €7,99 naar €5,99 (-25%)",
+   "kop": "C&A instap onbekend ondergoed omlaag"
+  },
+  {
+   "rid": "zeeman",
+   "bron": "Zeeman",
+   "aud": "heren",
+   "ptype": "ondergoed",
+   "soort": "instap",
+   "richting": 1,
+   "van": 4.69,
+   "naar": 5.74,
+   "weken": 1,
+   "tag": "nieuw",
+   "tekst": "Zeeman: instapniveau heren / ondergoed omhoog van €4,69 naar €5,74 (+22%)",
+   "kop": "Zeeman instap heren ondergoed omhoog"
   },
   {
    "rid": "terstal",
    "bron": "terStal familiemode",
-   "aud": "meisjes",
+   "aud": "heren",
    "ptype": "sokken & panty's",
-   "soort": "omvang",
-   "richting": 1,
-   "van": 36,
-   "naar": 47,
+   "soort": "mediaan",
+   "richting": -1,
+   "van": 5.99,
+   "naar": 5.49,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "terStal familiemode breidt meisjes / sokken & panty's uit van 36 naar 47 artikelen (+31%)",
-   "kop": "terStal familiemode breidt meisjes sokken & panty's uit"
+   "tekst": "terStal familiemode: mediaanprijs heren / sokken & panty's omlaag van €5,99 naar €5,49 (-8%)",
+   "kop": "terStal familiemode mediaan heren sokken & panty's omlaag"
   }
  ]
 }
