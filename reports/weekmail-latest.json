@@ -1,48 +1,48 @@
 {
- "week": "2026-11-16",
- "onderwerp": "W47 · Instroom naadloze bij 3 bronnen · C&A instap onbekend ondergoed omlaag · 8/8 bronnen ok",
+ "week": "2026-11-23",
+ "onderwerp": "W48 · Instroom bambi bij 2 bronnen · KiK breidt heren sokken & panty's uit · 8/8 bronnen ok",
  "top3": [
   {
-   "rid": "c-and-a",
-   "bron": "C&A",
-   "aud": "onbekend",
-   "ptype": "ondergoed",
-   "soort": "instap",
-   "richting": -1,
-   "van": 7.99,
-   "naar": 5.99,
+   "rid": "kik",
+   "bron": "KiK",
+   "aud": "heren",
+   "ptype": "sokken & panty's",
+   "soort": "omvang",
+   "richting": 1,
+   "van": 36,
+   "naar": 66,
    "weken": 1,
    "tag": "nieuw",
-   "tekst": "C&A: instapniveau onbekend / ondergoed omlaag van €7,99 naar €5,99 (-25%)",
-   "kop": "C&A instap onbekend ondergoed omlaag"
+   "tekst": "KiK breidt heren / sokken & panty's uit van 36 naar 66 artikelen (+83%)",
+   "kop": "KiK breidt heren sokken & panty's uit"
   },
   {
    "rid": "zeeman",
    "bron": "Zeeman",
-   "aud": "heren",
-   "ptype": "ondergoed",
-   "soort": "instap",
+   "aud": "baby",
+   "ptype": "nachtmode",
+   "soort": "omvang",
    "richting": 1,
-   "van": 4.69,
-   "naar": 5.74,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "Zeeman: instapniveau heren / ondergoed omhoog van €4,69 naar €5,74 (+22%)",
-   "kop": "Zeeman instap heren ondergoed omhoog"
+   "van": 23,
+   "naar": 37,
+   "weken": 2,
+   "tag": "houdt aan",
+   "tekst": "Zeeman breidt baby / nachtmode uit van 23 naar 37 artikelen (+61%)",
+   "kop": "Zeeman breidt baby nachtmode uit"
   },
   {
    "rid": "terstal",
    "bron": "terStal familiemode",
-   "aud": "heren",
+   "aud": "meisjes",
    "ptype": "sokken & panty's",
-   "soort": "mediaan",
+   "soort": "instap",
    "richting": -1,
-   "van": 5.99,
-   "naar": 5.49,
-   "weken": 1,
-   "tag": "nieuw",
-   "tekst": "terStal familiemode: mediaanprijs heren / sokken & panty's omlaag van €5,99 naar €5,49 (-8%)",
-   "kop": "terStal familiemode mediaan heren sokken & panty's omlaag"
+   "van": 5.24,
+   "naar": 3.49,
+   "weken": 2,
+   "tag": "houdt aan",
+   "tekst": "terStal familiemode: instapniveau meisjes / sokken & panty's omlaag van €5,24 naar €3,49 (-33%)",
+   "kop": "terStal familiemode instap meisjes sokken & panty's omlaag"
   }
  ]
 }
