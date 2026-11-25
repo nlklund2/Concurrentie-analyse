@@ -290,6 +290,31 @@ retailers:
     # de cap houdt het totaal op ±1,5–2× het aantal categorieën.
     firecrawl_pages: 10
     firecrawl_page_cap: 90
+    # Vaste categorieën (25-11): uit de sitemap koos de crawl elke week een
+    # andere greep, waardoor 'magazijn/lingerie' (84 artikelen) in W48 wegviel
+    # en als sanering in de signalen stond. Deze lijst is de unie van W45–W48
+    # binnen de focus; zonder overhemden ('hemd' in de focusregex).
+    seeds:
+      - https://www.kik.nl/c/dames/dameskleding-ondergoed
+      - https://www.kik.nl/c/dames/damesbehas-bustiers
+      - https://www.kik.nl/c/dames/dames-slipje
+      - https://www.kik.nl/magazijn/lingerie
+      - https://www.kik.nl/c/dames/dameskleding-nachtkleding
+      - https://www.kik.nl/c/heren/herenkleding-ondergoed
+      - https://www.kik.nl/c/heren/herenkleding-nachtkleding
+      - https://www.kik.nl/c/heren/sokken-sportschoenen
+      - https://www.kik.nl/c/meisjes/meisjes-kinderondergoed
+      - https://www.kik.nl/c/meisjes/peuterondergoed-voor-meisjes
+      - https://www.kik.nl/c/meisjes/meisjes-peuters-nachtkleding
+      - https://www.kik.nl/c/meisjes/meisjes-babys-nachtkleding
+      - https://www.kik.nl/c/meisjes/meisjes-peuters-sokken-pantys
+      - https://www.kik.nl/c/meisjes/meisjes-babys-sokken-pantys
+      - https://www.kik.nl/c/jongens/jongens-peuters-ondergoed
+      - https://www.kik.nl/c/jongens/jongens-peuters-nachtkleding
+      - https://www.kik.nl/c/jongens/jongens-peuter-pyjama
+      - https://www.kik.nl/c/jongens/jongens-babys-nachtkleding
+      - https://www.kik.nl/c/jongens/jongens-babys-sokken-pantys
+      - https://www.kik.nl/magazijn/baby-sokjes
     enrich: false
     max_categories: 45
     max_pages_per_category: 15

@@ -13,7 +13,7 @@ from .. import discover
 from ..config import RetailerCfg
 from ..http import Http
 from ..jsonscan import (extract_jsonld, price_from_microdata, products_from_html,
-                        products_from_jsonld, url_key)
+                        products_from_jsonld, regular_price_hyva, url_key)
 from ..models import Product, ScrapeResult
 
 
@@ -77,6 +77,10 @@ def scrape(cfg: RetailerCfg, http: Http, limit: int | None = None) -> ScrapeResu
                 p.price = micro
                 if p.was_price is None:
                     p.was_price = micro_was
+        if p.price is not None and p.was_price is None:
+            regulier = regular_price_hyva(resp.text)
+            if regulier and regulier > p.price:
+                p.was_price = regulier
         if p.in_stock is False and p.price is None:
             # De pagina bestaat nog, maar het artikel is niet meer te koop:
             # terStal (Magento) houdt verlopen artikelen in de sitemap met

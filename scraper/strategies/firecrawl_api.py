@@ -540,7 +540,10 @@ def _firecrawl_fetch(session: requests.Session, url: str, res: ScrapeResult,
             res.notes.append(f"Firecrawl-netwerkfout: {str(e)[:120]}")
             return None, 0
         _laatste_call[0] = time.monotonic()
-        if r.status_code != 429:
+        # 5xx is bij Firecrawl doorgaans tijdelijk: KiK-validatie 25-11 verloor
+        # zo 7 pagina's (o.a. heren-ondergoed, 65 artikelen) die bij een
+        # volgende poging gewoon laden. Zelfde backoff als bij 429.
+        if r.status_code != 429 and r.status_code < 500:
             break
         if poging < len(WACHT_BIJ_429):
             time.sleep(WACHT_BIJ_429[poging])

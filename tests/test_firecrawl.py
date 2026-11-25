@@ -561,3 +561,14 @@ def test_cap_begrenst_doorbladeren(monkeypatch):
     res = firecrawl_api.scrape(cfg, http=None)
     assert len(calls) == 5 and res.requests_done == 5
     assert any("cap van 5" in n for n in res.notes)
+
+
+def test_500_wordt_herkanst(monkeypatch):
+    """KiK 25-11: losse HTTP 500's van Firecrawl kostten hele categorieën."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(500), _Resp(html=LISTING_HTML)])
+    cfg = _cfg(seeds=["https://www.wibra.nl/dames/ondergoed"])
+    res = firecrawl_api.scrape(cfg, http=None)
+    assert calls[0] == calls[1] and len(calls) == 2
+    assert len(res.products) == 2
+    assert res.requests_done == 1   # één pagina = één credit, ook na herkansing
