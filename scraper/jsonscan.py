@@ -332,6 +332,24 @@ def price_from_microdata(html: str) -> tuple[float | None, float | None]:
     return prijs, (was if (was and prijs and was > prijs) else None)
 
 
+# Hyvä-thema (Magento, terStal): het prijsblok van het artikel zelf zet de
+# normale prijs als Alpine-sjabloon '((7.99 + getCustomOptionPrice())).toFixed(2)'
+# naast de actieprijs in de Offer-microdata. JSON-LD kent alleen de actieprijs,
+# dus zonder dit las de scraper de −30%-actie van W48 als 361 prijsverlagingen.
+_HYVA_PRIJSBLOK_RE = re.compile(r'x-data\s*=\s*["\']initPrice\d+\(\)["\']')
+_HYVA_REGULIER_RE = re.compile(
+    r'\(\(\s*(\d+(?:\.\d+)?)\s*\+\s*getCustomOptionPrice\(\)\s*\)\)\.toFixed\(2\)')
+
+
+def regular_price_hyva(html: str) -> float | None:
+    """De normale prijs uit het eerste Hyvä-prijsblok, of None."""
+    blok = _HYVA_PRIJSBLOK_RE.search(html)
+    if blok is None:
+        return None
+    m = _HYVA_REGULIER_RE.search(html, blok.end(), blok.end() + 3000)
+    return parse_price(m.group(1)) if m else None
+
+
 _OG_TITLE_RE = re.compile(
     r'<meta[^>]+(?:property|name)\s*=\s*["\']og:title["\'][^>]+content\s*=\s*["\']([^"\']+)["\']'
     r'|<meta[^>]+content\s*=\s*["\']([^"\']+)["\'][^>]+(?:property|name)\s*=\s*["\']og:title["\']',
