@@ -33,7 +33,8 @@ from .listing_crawl import _voeg_samen
 from .render_listing import cards_from_html, lees_ankers
 from .sitemap_pages import _eigen_product
 
-FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape"
+# v2 sinds 25-11-2026: v1 geeft vanaf 10-12-2026 16:00 NL alleen nog HTTP 410.
+FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape"
 
 # Het gratis tier staat ±10 scrapes per minuut toe. Zonder tempo eronder
 # kaatste elke categoriefetch op HTTP 429 (validatierun 18: 19 van de 20).
@@ -500,9 +501,10 @@ def _firecrawl_html(session: requests.Session, url: str, res: ScrapeResult,
     return html
 
 
-# Oudere API-versies kennen de residentiële proxy als 'stealth'; de huidige
-# als 'enhanced'. Bij een 400 op de ene naam proberen we de andere.
-_PROXY_ALIAS = {"enhanced": "stealth", "stealth": "enhanced"}
+# v2 kent alleen basic/enhanced/auto; 'stealth' was de v1-naam voor enhanced.
+# Een oude config met 'stealth' wordt bij een 400 alsnog 'enhanced'; wordt
+# ook dat geweigerd, dan zonder keuze (v2-standaard bij een NL-locatie: auto).
+_PROXY_ALIAS = {"stealth": "enhanced"}
 
 
 def _firecrawl_fetch(session: requests.Session, url: str, res: ScrapeResult,
@@ -524,6 +526,9 @@ def _firecrawl_fetch(session: requests.Session, url: str, res: ScrapeResult,
         "waitFor": 0 if raw else (wait_ms or 5000),
         "timeout": 30000 if not actions else 45000,
         "location": {"country": "NL", "languages": ["nl-NL"]},
+        # v2 levert standaard een kopie uit de cache tot 2 dagen oud; een
+        # weekmeting moet de pagina van vandaag zijn.
+        "maxAge": 0,
     }
     if proxy:
         payload["proxy"] = proxy
@@ -581,6 +586,8 @@ def _firecrawl_fetch(session: requests.Session, url: str, res: ScrapeResult,
         return None, 0
     d = data.get("data") or {}
     meta = d.get("metadata") if isinstance(d.get("metadata"), dict) else {}
+    if meta.get("cacheState") == "hit" and "Firecrawl leverde een cachekopie" not in res.notes:
+        res.notes.append("Firecrawl leverde een cachekopie")
     try:
         status = int(meta.get("statusCode") or 0)
     except (TypeError, ValueError):

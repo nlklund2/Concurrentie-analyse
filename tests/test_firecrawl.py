@@ -472,8 +472,8 @@ def test_wp_store_dichte_api_geeft_schone_fout(monkeypatch):
 
 def test_fetch_geeft_status_van_de_bron_en_probeert_proxy_alias(monkeypatch):
     """Zeeman 14-09: Firecrawl gaf HTTP 200 met de 403-pagina van CloudFront
-    erin; metadata.statusCode is de echte status. En de residentiële proxy
-    heet per API-versie 'enhanced' of 'stealth' — bij een 400 de andere naam."""
+    erin; metadata.statusCode is de echte status. En een oude config met
+    'stealth' (v1-naam) wordt in v2 bij een 400 alsnog 'enhanced'."""
     import scraper.strategies.firecrawl_api as fc_api
     from scraper.models import ScrapeResult
     monkeypatch.setattr(fc_api, "PAUZE_TUSSEN_CALLS", 0)
@@ -487,17 +487,17 @@ def test_fetch_geeft_status_van_de_bron_en_probeert_proxy_alias(monkeypatch):
     class _Session:
         def post(self, url, json=None, timeout=0):
             gezien.append(json.get("proxy"))
-            if json.get("proxy") == "enhanced":
+            if json.get("proxy") == "stealth":
                 return _R(400, {"error": "unknown proxy"})
             return _R(200, {"success": True, "data": {"rawHtml": "<html>403 ERROR</html>",
                                                        "metadata": {"statusCode": 403}}})
 
     res = ScrapeResult(retailer_id="x")
     html, status = fc_api._firecrawl_fetch(_Session(), "https://www.zeeman.com/nl-nl/x", res,
-                                           raw=True, proxy="enhanced")
+                                           raw=True, proxy="stealth")
     assert (html, status) == ("<html>403 ERROR</html>", 403)
-    assert gezien == ["enhanced", "stealth"]
-    assert any("niet geaccepteerd → stealth" in n for n in res.notes)
+    assert gezien == ["stealth", "enhanced"]
+    assert any("niet geaccepteerd → enhanced" in n for n in res.notes)
     # de oude wrapper blijft alleen HTML geven
     assert fc_api._firecrawl_html(_Session(), "https://www.zeeman.com/nl-nl/x", res, raw=True) \
         == "<html>403 ERROR</html>"
@@ -572,3 +572,12 @@ def test_500_wordt_herkanst(monkeypatch):
     assert calls[0] == calls[1] and len(calls) == 2
     assert len(res.products) == 2
     assert res.requests_done == 1   # één pagina = één credit, ook na herkansing
+
+
+def test_v2_endpoint_en_verse_meting(monkeypatch):
+    """v1 stopt 10-12-2026. v2 levert standaard tot 2 dagen oude cache: maxAge 0."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(html=LISTING_HTML)])
+    firecrawl_api.scrape(_cfg(seeds=["https://www.wibra.nl/dames/ondergoed"]), http=None)
+    assert firecrawl_api.FIRECRAWL_ENDPOINT == "https://api.firecrawl.dev/v2/scrape"
+    assert firecrawl_api._test_payloads[0]["maxAge"] == 0
