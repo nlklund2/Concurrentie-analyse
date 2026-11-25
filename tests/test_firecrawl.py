@@ -581,3 +581,11 @@ def test_v2_endpoint_en_verse_meting(monkeypatch):
     firecrawl_api.scrape(_cfg(seeds=["https://www.wibra.nl/dames/ondergoed"]), http=None)
     assert firecrawl_api.FIRECRAWL_ENDPOINT == "https://api.firecrawl.dev/v2/scrape"
     assert firecrawl_api._test_payloads[0]["maxAge"] == 0
+
+
+def test_408_wordt_herkanst(monkeypatch):
+    """v2 meldt Firecrawls eigen time-out als HTTP 408 (validatie 25-11, KiK)."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+    calls = _sessie(monkeypatch, [_Resp(408), _Resp(html=LISTING_HTML)])
+    res = firecrawl_api.scrape(_cfg(seeds=["https://www.wibra.nl/dames/ondergoed"]), http=None)
+    assert len(calls) == 2 and len(res.products) == 2

@@ -547,8 +547,9 @@ def _firecrawl_fetch(session: requests.Session, url: str, res: ScrapeResult,
         _laatste_call[0] = time.monotonic()
         # 5xx is bij Firecrawl doorgaans tijdelijk: KiK-validatie 25-11 verloor
         # zo 7 pagina's (o.a. heren-ondergoed, 65 artikelen) die bij een
-        # volgende poging gewoon laden. Zelfde backoff als bij 429.
-        if r.status_code != 429 and r.status_code < 500:
+        # volgende poging gewoon laden. Zelfde backoff als bij 429. 408 is in
+        # v2 Firecrawls eigen time-out (SCRAPE_TIMEOUT): ook tijdelijk.
+        if r.status_code not in (408, 429) and r.status_code < 500:
             break
         if poging < len(WACHT_BIJ_429):
             time.sleep(WACHT_BIJ_429[poging])
